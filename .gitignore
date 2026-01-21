@@ -1,0 +1,117 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Node modules
+node_modules/
+.npm
+.yarn/
+
+# Build files
+dist/
+build/
+*.min.js
+*.min.css
+
+# Frontend
+frontend/dist/
+frontend/node_modules/
+frontend/.nuxt/
+frontend/.output/
+frontend/.cache/
+
+# Backend
+backend/.venv/
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/logs/
+backend/uploads/
+backend/browser_drivers/
+backend/.aerich/
+
+# Database migrations (可选，根据需要决定是否上传)
+# backend/migrations/
+
+# Docker
+*.log
+docker-compose.override.yml
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# MCP
+MCP/.env
+MCP/logs/
+
+# Uploads
+uploads/
+*.upload
+
+# Sensitive data
+*.pem
+*.key
+*.cert
+secrets/
