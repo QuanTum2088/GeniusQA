@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚀 GeniusQA 测试平台
+# 🚀 GeniusQA
 
 <p align="center">
   <strong>AI驱动一体化测试管理平台</strong>
