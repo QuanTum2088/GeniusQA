@@ -4,7 +4,7 @@
 
 ![GeniusQA Logo](backend/img/favicon.ico)
 
-**基于AI驱动智能体测试管理平台**
+**基于AI驱动智能体测试平台**
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
@@ -18,7 +18,7 @@
 
 ## 📖 项目介绍
 
-GeniusQA 是一款**AI驱动的智能化测试管理平台**，采用前后端分离架构，融合 Python FastAPI 后端框架和 Vue3 前端框架，提供一站式开箱即用的测试解决方案。
+GeniusQA 是一款**AI驱动的智能化测试平台**，采用前后端分离架构，融合 Python FastAPI 后端框架和 Vue3 前端框架，提供一站式开箱即用的测试解决方案。
 
 ### 🎯 核心特性
 
