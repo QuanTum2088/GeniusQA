@@ -127,6 +127,10 @@ const toggleDark = (e: MouseEvent) => {
 };
 
 onMounted(() => {
+  // 确保默认/缓存的 primary 写入 CSS 变量（避免色点已选中但按钮仍是 Element 默认蓝）
+  if (getThemeConfig.value.primary) {
+    onColorPickerChange(getThemeConfig.value.primary);
+  }
   NextLoading.done();
 });
 </script>

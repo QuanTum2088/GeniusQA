@@ -10,12 +10,23 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
-from appium import webdriver
-from appium.options.android import UiAutomator2Options
-from appium.webdriver.common.appiumby import AppiumBy
 from app.db.sqlalchemy import async_session
 from .model import AppResultModel, AppResultListModel
 from sqlalchemy import select, update
+
+
+def _require_appium():
+    """Lazy import: portable Nuitka builds exclude appium; must not import at module load."""
+    try:
+        from appium import webdriver
+        from appium.options.android import UiAutomator2Options
+        from appium.webdriver.common.appiumby import AppiumBy
+    except ImportError as e:
+        raise ImportError(
+            "Appium Python Client 未打包或未安装（portable 构建默认排除）。"
+            "需要 Appium 执行能力时请安装 Appium-Python-Client，或调整 pack.manifest.yaml excludes。"
+        ) from e
+    return webdriver, UiAutomator2Options, AppiumBy
 
 
 def _adb(deviceid: str, *args: str, timeout: int = 60) -> subprocess.CompletedProcess:
@@ -170,6 +181,7 @@ def _create_appium_driver(remote_url: str, caps: Dict[str, Any]):
     """
     按 ntest get_appium_config 产物创建 Session：Android UIAutomator2 / iOS XCUITest。
     """
+    webdriver, UiAutomator2Options, _AppiumBy = _require_appium()
     platform = str(caps.get("platformName") or "").strip().lower()
     if platform == "android":
         opts = UiAutomator2Options()
@@ -238,6 +250,7 @@ def _keyevent(deviceid: str, driver, use_adb: bool, keycode: int) -> None:
 
 
 def _by_from_locate_type(locate_type: str):
+    _webdriver, _UiAutomator2Options, AppiumBy = _require_appium()
     t = (locate_type or "id").strip().lower().replace(" ", "_").replace("-", "_")
     if t == "id":
         return AppiumBy.ID
@@ -328,6 +341,7 @@ def run_appium_process(
             if use_ntest:
                 driver = _create_appium_driver(remote, caps or {})
             else:
+                webdriver, UiAutomator2Options, _AppiumBy = _require_appium()
                 options = UiAutomator2Options()
                 options.platform_name = "Android"
                 options.device_name = deviceid

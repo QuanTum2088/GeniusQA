@@ -35,7 +35,13 @@ if __name__ == "__main__":
 
         uvicorn.run(app, host=host, port=port, reload=False)
     except Exception:
-        with open(startup_log, "a", encoding="utf-8") as f:
-            f.write(traceback.format_exc())
-            f.write("\n")
+        # start-backend.bat already redirects stdout/stderr to startup.log; opening the
+        # same file again can raise PermissionError on Windows — never mask the real error.
+        try:
+            with open(startup_log, "a", encoding="utf-8") as f:
+                f.write(traceback.format_exc())
+                f.write("\n")
+        except OSError:
+            sys.stderr.write(traceback.format_exc())
+            sys.stderr.write("\n")
         raise
