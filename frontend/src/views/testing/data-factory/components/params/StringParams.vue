@@ -108,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, watch, defineProps, defineEmits } from 'vue';
+import { computed, reactive, ref, watch, defineProps, defineEmits } from 'vue';
 import type { Tool } from '/@/api/v1/testing/dataFactory';
 
 // Props
@@ -138,8 +138,8 @@ const localData = reactive<Record<string, any>>({
 	format_type: 'trim',
 });
 
-// 正则标志数组
-const flagsArray = reactive<string[]>([]);
+// 正则标志数组（需用 ref：v-model 会整体赋值，Rolldown 不允许对 const reactive 再赋值）
+const flagsArray = ref<string[]>([]);
 
 // 计算属性 - 根据工具类型显示不同参数
 const needsTextInput = computed(() => {
@@ -235,7 +235,7 @@ watch(
 		Object.assign(localData, newValue);
 		// 更新标志数组
 		if (newValue.flags) {
-			flagsArray.splice(0, flagsArray.length, ...newValue.flags.split(''));
+			flagsArray.value = newValue.flags.split('');
 		}
 	},
 	{ deep: true }

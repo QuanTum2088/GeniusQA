@@ -1,41 +1,31 @@
 import vue from '@vitejs/plugin-vue';
-import {resolve} from 'path';
-import {defineConfig, loadEnv, ConfigEnv} from 'vite';
+import { resolve } from 'path';
+import { defineConfig, loadEnv, ConfigEnv } from 'vite';
 import vueSetupExtend from 'vite-plugin-vue-setup-extend';
-import monacoEditorPlugin from "vite-plugin-monaco-editor"
-
-// import MonacoEditorNlsPlugin, {esbuildPluginMonacoEditorNls, Languages,} from '/@/components/monaco/nls';
-
-// const zh_CN = require('/@/components/monaco/nls/zh-hans.json')
-
+import monacoEditorPlugin from 'vite-plugin-monaco-editor';
 
 const pathResolve = (dir: string) => {
-  return resolve(__dirname, '.', dir);
+	return resolve(__dirname, '.', dir);
 };
 
 const alias: Record<string, string> = {
-  '/@': pathResolve('./src/'),
-  '@': pathResolve('./src/'),
+	'/@': pathResolve('./src/'),
+	'@': pathResolve('./src/'),
 };
 
 const viteConfig = defineConfig((mode: ConfigEnv) => {
-  const env = loadEnv(mode.mode, process.cwd());
-  return {
-    plugins: [
-      vue(),
-      vueSetupExtend(), monacoEditorPlugin(),
-      // MonacoEditorNlsPlugin({
-      //   locale: Languages.zh_hans,
-      //   /**
-      //    * The weight of `localedata` is higher than that of `locale`
-      //    */
-      //   localeData: zh_CN.contents
-      // })
-    ],
-    // 注意：企业级工程不允许跨目录导入旧工程源码
-    optimizeDeps: {
-      /** vite >= 2.3.0 */
-      include: [
+	const env = loadEnv(mode.mode, process.cwd());
+	return {
+		plugins: [
+			vue(),
+			vueSetupExtend(),
+			// Vite 8：插件入参不可省略，否则读取 languageWorkers 会报错
+			monacoEditorPlugin({
+				languageWorkers: ['editorWorkerService', 'css', 'html', 'json', 'typescript'],
+			}),
+		],
+		optimizeDeps: {
+			include: [
 				'vue',
 				'vue-router',
 				'@vueuse/core',
@@ -74,87 +64,75 @@ const viteConfig = defineConfig((mode: ConfigEnv) => {
 				'element-plus/es/components/option/style/index',
 				'@element-plus/icons-vue',
 			],
-      esbuildOptions: {
-        plugins: [
-          // esbuildPluginMonacoEditorNls({
-          //   locale: Languages.zh_hans,
-          //   /**
-          //    * The weight of `localedata` is higher than that of `locale`
-          //    */
-          //   localeData: zh_CN.contents
-          // }),
-        ],
-      },
-    },
-    root: process.cwd(),
-    resolve: {alias},
-    base: mode.command === 'serve' ? './' : env.VITE_PUBLIC_PATH,
-    server: {
-      host: '0.0.0.0',
-      port: env.VITE_PORT as unknown as number,
-      open: env.VITE_OPEN?.toLowerCase() === 'true',
-      hmr: true,
-      proxy: {
-        // '/gitee': {
-        // 	target: 'https://gitee.com',
-        // 	ws: true,
-        // 	changeOrigin: true,
-        // 	rewrite: (path) => path.replace(/^\/gitee/, ''),
-        // },
-      },
-    },
-    build: {
-      outDir: 'dist',
-      chunkSizeWarningLimit: 1500,
-      rollupOptions: {
-        output: {
-          entryFileNames: `assets/[name].[hash].js`,
-          chunkFileNames: `assets/[name].[hash].js`,
-          assetFileNames: `assets/[name].[hash].[ext]`,
-          compact: true,
-          manualChunks: {
-            vue: ['vue', 'vue-router', 'pinia'],
-            echarts: ['echarts'],
-          },
-        },
-      },
-    },
-    css: {
-      preprocessorOptions: {
-        css: {charset: false},
-        scss: {
-          // 静默所有弃用警告
-          silenceDeprecations: ['legacy-js-api', 'import'],
-          // 静默依赖警告
-          quietDeps: true,
-          // 设置字符集
-          charset: false,
-          // 额外的Sass选项
-          additionalData: `
+		},
+		root: process.cwd(),
+		resolve: { alias },
+		base: mode.command === 'serve' ? './' : env.VITE_PUBLIC_PATH,
+		server: {
+			host: '0.0.0.0',
+			port: env.VITE_PORT as unknown as number,
+			open: env.VITE_OPEN?.toLowerCase() === 'true',
+			hmr: true,
+			proxy: {},
+		},
+		build: {
+			outDir: 'dist',
+			chunkSizeWarningLimit: 1500,
+			// Lightning CSS 对历史写法更严格
+			cssMinify: 'esbuild',
+			// Vite 8 / Rolldown：rollupOptions → rolldownOptions，manualChunks → codeSplitting
+			rolldownOptions: {
+				output: {
+					entryFileNames: `assets/[name].[hash].js`,
+					chunkFileNames: `assets/[name].[hash].js`,
+					assetFileNames: `assets/[name].[hash].[ext]`,
+					codeSplitting: {
+						groups: [
+							{
+								name: 'vue',
+								test: /[\\/]node_modules[\\/](vue|vue-router|pinia)([\\/]|$)/,
+							},
+							{
+								name: 'echarts',
+								test: /[\\/]node_modules[\\/]echarts([\\/]|$)/,
+							},
+						],
+					},
+				},
+			},
+		},
+		css: {
+			preprocessorOptions: {
+				css: { charset: false },
+				scss: {
+					silenceDeprecations: ['legacy-js-api', 'import'],
+					quietDeps: true,
+					charset: false,
+					additionalData: `
             // 全局变量可以在这里定义
-            // $primary-color: #409eff;
-          `
-        }
-      },
-      postcss: {
-        plugins: [
-          {
-            postcssPlugin: 'internal:charset-removal',
-            AtRule: {
-              charset: (atRule) => {
-                if (atRule.name === 'charset') {
-                  atRule.remove();
-                }
-              },
-            },
-          },
-        ],
-      },
-    },
-    define: {
-      __VERSION__: JSON.stringify(process.env.npm_package_version),
-    },
-  };
+            // $primary-color:rgb(243, 75, 9);
+          `,
+				},
+			},
+			postcss: {
+				plugins: [
+					{
+						postcssPlugin: 'internal:charset-removal',
+						AtRule: {
+							charset: (atRule) => {
+								if (atRule.name === 'charset') {
+									atRule.remove();
+								}
+							},
+						},
+					},
+				],
+			},
+		},
+		define: {
+			__VERSION__: JSON.stringify(process.env.npm_package_version),
+		},
+	};
 });
 
 export default viteConfig;

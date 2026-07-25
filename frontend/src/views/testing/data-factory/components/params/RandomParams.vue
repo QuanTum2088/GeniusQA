@@ -254,9 +254,9 @@ const localData = reactive<Record<string, any>>({
 const startDate = ref('2020-01-01');
 const endDate = ref('2030-12-31');
 
-// 字符类型数组
-const charTypeArray = reactive<string[]>(['letters', 'numbers']);
-const passwordCharTypes = reactive<string[]>(['uppercase', 'lowercase', 'numbers', 'symbols']);
+// 字符类型数组（需用 ref：v-model 会整体赋值，Rolldown 不允许对 const reactive 再赋值）
+const charTypeArray = ref<string[]>(['letters', 'numbers']);
+const passwordCharTypes = ref<string[]>(['uppercase', 'lowercase', 'numbers', 'symbols']);
 
 // 计算属性 - 根据工具类型显示不同参数
 const needsCount = computed(() => {
@@ -425,17 +425,19 @@ watch(
 		if (newValue.end_date) endDate.value = newValue.end_date;
 		
 		// 更新字符类型数组
-		charTypeArray.splice(0, charTypeArray.length);
-		if (newValue.include_letters) charTypeArray.push('letters');
-		if (newValue.include_numbers) charTypeArray.push('numbers');
-		if (newValue.include_symbols) charTypeArray.push('symbols');
-		
+		const nextCharTypes: string[] = [];
+		if (newValue.include_letters) nextCharTypes.push('letters');
+		if (newValue.include_numbers) nextCharTypes.push('numbers');
+		if (newValue.include_symbols) nextCharTypes.push('symbols');
+		charTypeArray.value = nextCharTypes;
+
 		// 更新密码字符类型数组
-		passwordCharTypes.splice(0, passwordCharTypes.length);
-		if (newValue.include_uppercase) passwordCharTypes.push('uppercase');
-		if (newValue.include_lowercase) passwordCharTypes.push('lowercase');
-		if (newValue.include_numbers) passwordCharTypes.push('numbers');
-		if (newValue.include_symbols) passwordCharTypes.push('symbols');
+		const nextPasswordTypes: string[] = [];
+		if (newValue.include_uppercase) nextPasswordTypes.push('uppercase');
+		if (newValue.include_lowercase) nextPasswordTypes.push('lowercase');
+		if (newValue.include_numbers) nextPasswordTypes.push('numbers');
+		if (newValue.include_symbols) nextPasswordTypes.push('symbols');
+		passwordCharTypes.value = nextPasswordTypes;
 	},
 	{ deep: true }
 );
