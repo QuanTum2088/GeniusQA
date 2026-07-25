@@ -11,7 +11,7 @@ import paramiko
 
 from app.common import SSH_CONN_ERROR_SIGNS
 from config import config
-from app.corelibs.logger import logger
+from app.core.logger import logger
 
 
 def _is_ssh_conn_error(exit_code: int, stderr: str) -> bool:

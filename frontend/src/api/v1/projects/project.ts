@@ -15,7 +15,7 @@ export function useProjectApi() {
       status?: string;
     }) => {
       return request({
-        url: '/v1/projects/',
+        url: '/v1/Ntesterc_project/',
         method: 'GET',
         params,
       });
@@ -24,7 +24,7 @@ export function useProjectApi() {
     // 获取项目详情
     getDetail: (id: number) => {
       return request({
-        url: `/v1/projects/${id}`,
+        url: `/v1/Ntesterc_project/${id}`,
         method: 'GET',
       });
     },
@@ -36,7 +36,7 @@ export function useProjectApi() {
       status?: string;
     }) => {
       return request({
-        url: '/v1/projects/',
+        url: '/v1/Ntesterc_project/',
         method: 'POST',
         data,
       });
@@ -49,7 +49,7 @@ export function useProjectApi() {
       status?: string;
     }) => {
       return request({
-        url: `/v1/projects/${id}`,
+        url: `/v1/Ntesterc_project/${id}`,
         method: 'PUT',
         data,
       });
@@ -58,7 +58,7 @@ export function useProjectApi() {
     // 删除项目
     delete: (id: number) => {
       return request({
-        url: `/v1/projects/${id}`,
+        url: `/v1/Ntesterc_project/${id}`,
         method: 'DELETE',
       });
     },
@@ -68,7 +68,7 @@ export function useProjectApi() {
     // 获取项目成员列表
     getMemberList: (projectId: number) => {
       return request({
-        url: `/v1/projects/${projectId}/members`,
+        url: `/v1/Ntesterc_project/${projectId}/members`,
         method: 'GET',
       });
     },
@@ -79,7 +79,7 @@ export function useProjectApi() {
       role: string;
     }) => {
       return request({
-        url: `/v1/projects/${projectId}/members`,
+        url: `/v1/Ntesterc_project/${projectId}/members`,
         method: 'POST',
         data,
       });
@@ -90,7 +90,7 @@ export function useProjectApi() {
       role: string;
     }) => {
       return request({
-        url: `/v1/projects/${projectId}/members/${memberId}`,
+        url: `/v1/Ntesterc_project/${projectId}/members/${memberId}`,
         method: 'PUT',
         data,
       });
@@ -99,7 +99,7 @@ export function useProjectApi() {
     // 移除项目成员
     removeMember: (projectId: number, memberId: number) => {
       return request({
-        url: `/v1/projects/${projectId}/members/${memberId}`,
+        url: `/v1/Ntesterc_project/${projectId}/members/${memberId}`,
         method: 'DELETE',
       });
     },
@@ -109,7 +109,7 @@ export function useProjectApi() {
     // 获取项目环境列表
     getEnvironmentList: (projectId: number) => {
       return request({
-        url: `/v1/projects/${projectId}/environments`,
+        url: `/v1/Ntesterc_project/${projectId}/environments`,
         method: 'GET',
       });
     },
@@ -123,7 +123,7 @@ export function useProjectApi() {
       is_default?: boolean;
     }) => {
       return request({
-        url: `/v1/projects/${projectId}/environments`,
+        url: `/v1/Ntesterc_project/${projectId}/environments`,
         method: 'POST',
         data,
       });
@@ -138,7 +138,7 @@ export function useProjectApi() {
       is_default?: boolean;
     }) => {
       return request({
-        url: `/v1/projects/${projectId}/environments/${envId}`,
+        url: `/v1/Ntesterc_project/${projectId}/environments/${envId}`,
         method: 'PUT',
         data,
       });
@@ -147,7 +147,7 @@ export function useProjectApi() {
     // 删除项目环境
     deleteEnvironment: (projectId: number, envId: number) => {
       return request({
-        url: `/v1/projects/${projectId}/environments/${envId}`,
+        url: `/v1/Ntesterc_project/${projectId}/environments/${envId}`,
         method: 'DELETE',
       });
     },

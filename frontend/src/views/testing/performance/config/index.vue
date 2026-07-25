@@ -647,7 +647,7 @@ const handleWorkerCopy = (row: any) => {
 
 /**
  * 删除压力机（二次确认 → 软删除）
- * DELETE /v1/performance/config/machines/delete/{id}
+ * DELETE /v1/Ntesterc_performance/config/machines/delete/{id}
  * 后端实现软删除（enabled_flag=0），数据不会物理清除
  */
 const handleWorkerDelete = (row: any) => {
@@ -700,11 +700,11 @@ const handleWorkerSubmit = async () => {
 		try {
 			const payload = denormalizeMachine(workerForm);
 			if (currentWorkerId.value) {
-				// 编辑：PUT /v1/performance/config/machines/update/{id}
+				// 编辑：PUT /v1/Ntesterc_performance/config/machines/update/{id}
 				await api.updateMachine(currentWorkerId.value, payload);
 				ElMessage.success('修改成功');
 			} else {
-				// 新增：POST /v1/performance/config/machines/add
+				// 新增：POST /v1/Ntesterc_performance/config/machines/add
 				await api.addMachine(payload);
 				ElMessage.success('新增成功');
 			}
@@ -778,7 +778,7 @@ const denormalizeParam = (form: typeof paramForm) => ({
 
 /**
  * 查询参数配置列表
- * GET /v1/performance/config/params/list
+ * GET /v1/Ntesterc_performance/config/params/list
  * name 参数在后端会模糊匹配 name 和 param_key 两个字段
  */
 const handleParamQuery = async () => {
@@ -807,7 +807,7 @@ const resetParamQuery = () => {
 
 /**
  * el-switch 状态切换（乐观更新，失败回滚）
- * PUT /v1/performance/config/params/update/{id}  body: { status }
+ * PUT /v1/Ntesterc_performance/config/params/update/{id}  body: { status }
  */
 const handleParamStatusChange = async (row: any) => {
 	try {
@@ -876,7 +876,7 @@ const handleParamEdit = (row: any) => {
 
 /**
  * 删除参数（二次确认 → 软删除）
- * DELETE /v1/performance/config/params/delete/{id}
+ * DELETE /v1/Ntesterc_performance/config/params/delete/{id}
  */
 const handleParamDelete = (row: any) => {
 	ElMessageBox.confirm(`确定要删除参数「${row.key}」吗？`, '提示', {
@@ -906,11 +906,11 @@ const handleParamSubmit = async () => {
 		try {
 			const payload = denormalizeParam(paramForm);
 			if (currentParamId.value) {
-				// 编辑：PUT /v1/performance/config/params/update/{id}
+				// 编辑：PUT /v1/Ntesterc_performance/config/params/update/{id}
 				await api.updateParam(currentParamId.value, payload);
 				ElMessage.success('修改成功');
 			} else {
-				// 新增：POST /v1/performance/config/params/add
+				// 新增：POST /v1/Ntesterc_performance/config/params/add
 				await api.addParam(payload);
 				ElMessage.success('新增成功');
 			}

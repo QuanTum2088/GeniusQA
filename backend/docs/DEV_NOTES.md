@@ -83,7 +83,7 @@ backend/
 │       ├── base.py             # Base（所有模型继承自此）
 │       ├── rbac_models.py      # RBAC 相关模型
 │       └── api_models.py       # 通用 API 模型
-├── celery_worker/              # Celery 异步任务
+├── celery_app.py               # Celery CLI 入口（实现在 Ntesterc_task_scheduler）
 ├── db_script/
 │   └── db_init.sql             # 全量初始化 SQL（新部署时使用）
 ├── config.py                   # 全局配置（pydantic_settings，读 .env）

@@ -126,39 +126,39 @@ export function useDashboardApi() {
   return {
     getOverview: () =>
       request({
-        url: '/v1/dashboard/overview',
+        url: '/v1/Ntesterc_dashboard/overview',
         method: 'GET',
       }),
     getExecutionTrends: (params?: { days?: number }) =>
       request({
-        url: '/v1/dashboard/execution-trends',
+        url: '/v1/Ntesterc_dashboard/execution-trends',
         method: 'GET',
         params,
       }),
     getDataFactoryStats: () =>
       request({
-        url: '/v1/dashboard/data-factory-stats',
+        url: '/v1/Ntesterc_dashboard/data-factory-stats',
         method: 'GET',
       }),
     getReviewStats: () =>
       request({
-        url: '/v1/dashboard/review-stats',
+        url: '/v1/Ntesterc_dashboard/review-stats',
         method: 'GET',
       }),
     getProjectActivity: () =>
       request({
-        url: '/v1/dashboard/project-activity',
+        url: '/v1/Ntesterc_dashboard/project-activity',
         method: 'GET',
       }),
     getRecentNotifications: (params?: { limit?: number }) =>
       request({
-        url: '/v1/dashboard/recent-notifications',
+        url: '/v1/Ntesterc_dashboard/recent-notifications',
         method: 'GET',
         params,
       }),
     getApiInterfaceStats: () =>
       request({
-        url: '/v1/dashboard/api-interface-stats',
+        url: '/v1/Ntesterc_dashboard/api-interface-stats',
         method: 'GET',
       }),
   };

@@ -3,7 +3,7 @@
 # @author: Rebort
 
 from sqlalchemy import Column, String, Integer, DateTime, Text, LargeBinary
-from app.models.base import Base
+from app.core.db_base import Base
 
 # MySQL 默认 BLOB 仅 64KB；显式长度映射为 MEDIUMBLOB（16MB），避免较大图片/文件插入失败
 _FILE_CONTENT_MAX = 16 * 1024 * 1024

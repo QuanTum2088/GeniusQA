@@ -10,73 +10,73 @@ export function useTestcaseApi() {
 	return {
 		createTestCase: (projectId: number, data: any) =>
 			request({
-				url: `/v1/testcases?project_id=${projectId}`,
+				url: `/v1/Ntesterc_testcases?project_id=${projectId}`,
 				method: 'POST',
 				data,
 			}),
 
 		getTestCaseList: (params: any) =>
 			request({
-				url: '/v1/testcases',
+				url: '/v1/Ntesterc_testcases',
 				method: 'GET',
 				params,
 			}),
 
 		getTestCaseDetail: (id: number) =>
 			request({
-				url: `/v1/testcases/${id}`,
+				url: `/v1/Ntesterc_testcases/${id}`,
 				method: 'GET',
 			}),
 
 		updateTestCase: (id: number, data: any) =>
 			request({
-				url: `/v1/testcases/${id}`,
+				url: `/v1/Ntesterc_testcases/${id}`,
 				method: 'PUT',
 				data,
 			}),
 
 		deleteTestCase: (id: number) =>
 			request({
-				url: `/v1/testcases/${id}`,
+				url: `/v1/Ntesterc_testcases/${id}`,
 				method: 'DELETE',
 			}),
 
 		createVersion: (data: any) =>
 			request({
-				url: '/v1/testcases/versions',
+				url: '/v1/Ntesterc_testcases/versions',
 				method: 'POST',
 				data,
 			}),
 
 		getVersionList: (params: any) =>
 			request({
-				url: '/v1/testcases/versions',
+				url: '/v1/Ntesterc_testcases/versions',
 				method: 'GET',
 				params,
 			}),
 
 		getVersionDetail: (id: number) =>
 			request({
-				url: `/v1/testcases/versions/${id}`,
+				url: `/v1/Ntesterc_testcases/versions/${id}`,
 				method: 'GET',
 			}),
 
 		updateVersion: (id: number, data: any) =>
 			request({
-				url: `/v1/testcases/versions/${id}`,
+				url: `/v1/Ntesterc_testcases/versions/${id}`,
 				method: 'PUT',
 				data,
 			}),
 
 		deleteVersion: (id: number) =>
 			request({
-				url: `/v1/testcases/versions/${id}`,
+				url: `/v1/Ntesterc_testcases/versions/${id}`,
 				method: 'DELETE',
 			}),
 
 		associateTestCases: (data: any) =>
 			request({
-				url: '/v1/testcases/versions/associate',
+				url: '/v1/Ntesterc_testcases/versions/associate',
 				method: 'POST',
 				data,
 			}),
@@ -89,7 +89,7 @@ export function useTestcaseApi() {
 				formData.append('module_id', module_id.toString());
 			}
 			return request({
-				url: '/v1/testcases/import-from-excel',
+				url: '/v1/Ntesterc_testcases/import-from-excel',
 				method: 'POST',
 				data: formData,
 				headers: { 'Content-Type': 'multipart/form-data' },
@@ -98,7 +98,7 @@ export function useTestcaseApi() {
 
 		exportTestCasesToExcel: (params: any) =>
 			request({
-				url: '/v1/testcases/export-to-excel',
+				url: '/v1/Ntesterc_testcases/export-to-excel',
 				method: 'GET',
 				params,
 				responseType: 'blob',

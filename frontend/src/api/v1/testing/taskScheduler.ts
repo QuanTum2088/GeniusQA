@@ -68,7 +68,7 @@ export function useTaskSchedulerApi() {
     status?: number;
   }) => {
     return request<ListResponse>({
-      url: '/v1/task_scheduler/task_list',
+      url: '/v1/Ntesterc_task_scheduler/task_list',
       method: 'post',
       data: {
         page: params.page ?? 1,
@@ -89,7 +89,7 @@ export function useTaskSchedulerApi() {
     description?: string;
   }) => {
     return request<CommonResponse>({
-      url: '/v1/task_scheduler/add_task',
+      url: '/v1/Ntesterc_task_scheduler/add_task',
       method: 'post',
       data,
     });
@@ -106,7 +106,7 @@ export function useTaskSchedulerApi() {
     description?: string;
   }) => {
     return request<CommonResponse>({
-      url: '/v1/task_scheduler/edit_task',
+      url: '/v1/Ntesterc_task_scheduler/edit_task',
       method: 'post',
       data,
     });
@@ -114,7 +114,7 @@ export function useTaskSchedulerApi() {
 
   deleteTask: (task_id: number) => {
     return request<CommonResponse>({
-      url: '/v1/task_scheduler/del_task',
+      url: '/v1/Ntesterc_task_scheduler/del_task',
       method: 'post',
       data: { task_id },
     });
@@ -127,7 +127,7 @@ export function useTaskSchedulerApi() {
     size?: number;
   }) => {
     return request<ListResponse>({
-      url: '/v1/task_scheduler/task_history',
+      url: '/v1/Ntesterc_task_scheduler/task_history',
       method: 'post',
       data: {
         task_id: params.task_id ?? null,
@@ -146,7 +146,7 @@ export function useTaskSchedulerApi() {
     status?: number;
   }) => {
     return request<ListResponse>({
-      url: '/v1/task_scheduler/notice_list',
+      url: '/v1/Ntesterc_task_scheduler/notice_list',
       method: 'post',
       data: {
         page: params.page ?? 1,
@@ -166,7 +166,7 @@ export function useTaskSchedulerApi() {
     description?: string;
   }) => {
     return request<CommonResponse>({
-      url: '/v1/task_scheduler/add_notice',
+      url: '/v1/Ntesterc_task_scheduler/add_notice',
       method: 'post',
       data,
     });
@@ -182,7 +182,7 @@ export function useTaskSchedulerApi() {
     description?: string;
   }) => {
     return request<CommonResponse>({
-      url: '/v1/task_scheduler/edit_notice',
+      url: '/v1/Ntesterc_task_scheduler/edit_notice',
       method: 'post',
       data,
     });
@@ -190,7 +190,7 @@ export function useTaskSchedulerApi() {
 
   deleteNotice: (notice_id: number) => {
     return request<CommonResponse>({
-      url: '/v1/task_scheduler/del_notice',
+      url: '/v1/Ntesterc_task_scheduler/del_notice',
       method: 'post',
       data: { notice_id },
     });
@@ -198,28 +198,28 @@ export function useTaskSchedulerApi() {
 
   getSchedulerStatus: () => {
     return request<CommonResponse>({
-      url: '/v1/task_scheduler/scheduler/status',
+      url: '/v1/Ntesterc_task_scheduler/scheduler/status',
       method: 'get',
     });
   },
 
   getSchedulerJobs: () => {
     return request<CommonResponse>({
-      url: '/v1/task_scheduler/scheduler/jobs',
+      url: '/v1/Ntesterc_task_scheduler/scheduler/jobs',
       method: 'get',
     });
   },
 
   reloadScheduler: () => {
     return request<CommonResponse>({
-      url: '/v1/task_scheduler/scheduler/reload',
+      url: '/v1/Ntesterc_task_scheduler/scheduler/reload',
       method: 'post',
     });
   },
 
   pauseJob: (job_id: string | number) => {
     return request<CommonResponse>({
-      url: '/v1/task_scheduler/job/pause',
+      url: '/v1/Ntesterc_task_scheduler/job/pause',
       method: 'post',
       data: { job_id },
     });
@@ -227,7 +227,7 @@ export function useTaskSchedulerApi() {
 
   resumeJob: (job_id: string | number) => {
     return request<CommonResponse>({
-      url: '/v1/task_scheduler/job/resume',
+      url: '/v1/Ntesterc_task_scheduler/job/resume',
       method: 'post',
       data: { job_id },
     });
@@ -235,7 +235,7 @@ export function useTaskSchedulerApi() {
 
   runJobNow: (job_id: string | number) => {
     return request<CommonResponse>({
-      url: '/v1/task_scheduler/job/run_now',
+      url: '/v1/Ntesterc_task_scheduler/job/run_now',
       method: 'post',
       data: { job_id },
     });
@@ -243,7 +243,7 @@ export function useTaskSchedulerApi() {
 
   removeJob: (job_id: string | number) => {
     return request<CommonResponse>({
-      url: '/v1/task_scheduler/job/remove',
+      url: '/v1/Ntesterc_task_scheduler/job/remove',
       method: 'post',
       data: { job_id },
     });

@@ -1,18 +1,21 @@
 # -*- coding: utf-8 -*-
 # @author: Rebort
 from contextlib import asynccontextmanager
+import asyncio
+import os
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-from app.corelibs.logger import init_logger, logger
-from app.init.cors import init_cors
-from app.init.exception import init_exception
-from app.init.middleware import init_middleware
-from app.init.minio import init_minio
-from app.init.scheduler import init_scheduler, shutdown_scheduler, load_perf_pending_jobs
-from app.init.routers import init_router
-from app.init.mount import init_mount
-from app.init.limiter import init_limiter
+from app.core.logger import init_logger, logger
+from app.bootstrap.cors import init_cors
+from app.bootstrap.exception import init_exception
+from app.bootstrap.middleware import init_middleware
+from app.bootstrap.minio import init_minio
+from app.bootstrap.scheduler import init_scheduler, shutdown_scheduler, load_perf_pending_jobs
+from app.bootstrap.routers import init_router
+from app.bootstrap.mount import init_mount
+from app.bootstrap.limiter import init_limiter
 from config import config
 
 
@@ -20,7 +23,7 @@ from config import config
 async def start_app(app: FastAPI):
     """ 注册中心 """
     # 获取Redis连接池（延迟初始化）
-    from app.db import get_redis_pool
+    from app.infra.db import get_redis_pool
     redis_pool_instance = get_redis_pool()
     redis_pool_instance.init_by_config(config=config)
 
@@ -41,10 +44,31 @@ async def start_app(app: FastAPI):
 
     yield
 
-    # 关闭 APScheduler 定时任务调度器
-    shutdown_scheduler()
+    
+    try:
+        shutdown_scheduler()
+    except Exception as e:
+        logger.warning(f"关闭 APScheduler 失败: {e}")
 
-    await redis_pool_instance.redis.close()
+    try:
+        redis = redis_pool_instance.redis
+        if redis is not None:
+            close = getattr(redis, "aclose", None) or redis.close
+            await asyncio.wait_for(close(), timeout=3)
+    except Exception as e:
+        logger.warning(f"关闭 Redis 失败: {e}")
+
+    try:
+        from app.infra.db.sqlalchemy import engine
+        await asyncio.wait_for(engine.dispose(), timeout=5)
+    except Exception as e:
+        logger.warning(f"关闭数据库引擎失败: {e}")
+
+    # loguru enqueue=True 时需 complete，否则后台写日志线程会拖住进程
+    try:
+        await asyncio.wait_for(logger.complete(), timeout=2)
+    except Exception:
+        pass
 
 
 def create_app() -> FastAPI:
@@ -83,5 +107,8 @@ app = create_app()
 
 
 if __name__ == '__main__':
-    uvicorn.run(app='main:app', host="0.0.0.0", port=8100, reload=True)
+    # Windows 下 reload=True（WatchFiles 父子进程）Ctrl+C 后父进程经常挂死；
+    # 默认关闭热重载；需要时设置环境变量 UVICORN_RELOAD=1
+    _reload = os.getenv("UVICORN_RELOAD", "0").strip().lower() in {"1", "true", "yes", "on"}
+    uvicorn.run(app='main:app', host="0.0.0.0", port=8100, reload=_reload)
     # gunicorn main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8101

@@ -7,7 +7,7 @@ from pydantic import AnyHttpUrl, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 project_desc = """
-    🎉 N-Tester2.0 接口文档汇总 🎉
+    🎉 N-Tester2.0.1 接口文档汇总 🎉
     ✨ 账号: admin ✨
     ✨ 密码: 123456 ✨
     ✨ 权限(scopes): admin ✨
@@ -66,9 +66,9 @@ class Configs(BaseSettings):
         return self
 
     # logger
-    LOGGER_DIR: str = "logs"  # 日志文件夹名
-    LOGGER_NAME: str = 'N-Tetser.log'  # 日志文件名  (时间格式 {time:YYYY-MM-DD_HH-mm-ss}.log)
-    LOGGER_LEVEL: str = 'INFO'  # 日志等级: ['DEBUG' | 'INFO']
+    LOGGER_DIR: str = "logs"  # 日志目录（相对 backend 根目录）
+    LOGGER_NAME: str = "N-Tester.log"  # 全量日志文件名
+    LOGGER_LEVEL: str = "INFO"  # 日志等级: ['DEBUG' | 'INFO']
     LOGGER_ROTATION: str = "10 MB"  # 日志分片: 按 时间段/文件大小 切分日志. 例如 ["500 MB" | "12:00" | "1 week"]
     LOGGER_RETENTION: str = "7 days"  # 日志保留的时间: 超出将删除最早的日志. 例如 ["1 days"]
 
@@ -93,8 +93,7 @@ class Configs(BaseSettings):
     # 传递给底层传输的附加选项的字典。设置可见性超时的示例（Redis 和 SQS 传输支持）
     result_backend_transport_options: typing.Dict[str, typing.Any] = {'visibility_timeout': 3600}
     include: typing.List[typing.Any] = [
-        'celery_worker.tasks.test_case',
-        'celery_worker.tasks.common',
+        'app.api.v1.Ntesterc_module.Ntesterc_task_scheduler.celery_worker.tasks.common',
     ]
     # task_queues = (
     #     Queue("case", )

@@ -102,7 +102,7 @@ class Permission:
         if accessible_dept_ids:
             # 尝试使用关系过滤（性能更好）
             try:
-                from app.models.rbac_models import User
+                from app.api.v1.system.user.model import UserModel as User
                 if hasattr(self.model, "creator"):
                     return self.model.creator.has(
                         User.dept_id.in_(list(accessible_dept_ids))
@@ -130,7 +130,7 @@ class Permission:
             部门ID列表（包括自身）
         """
         try:
-            from app.models.rbac_models import Dept
+            from app.api.v1.system.dept.model import DeptModel as Dept
             
             result = [dept_id]
             stmt = select(Dept).where(Dept.parent_id == dept_id)

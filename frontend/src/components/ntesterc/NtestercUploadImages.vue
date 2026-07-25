@@ -1,4 +1,4 @@
-﻿<template>
+<template>
 	<div class="upload-box">
 		<el-upload
 			v-model:file-list="_fileList"
@@ -126,7 +126,7 @@ const handleHttpUpload = async (options: UploadRequestOptions) => {
 			form.append('file', options.file as any);
 			form.append('menu_id', String(props.app_menu_id));
 			res = await request({
-				url: '/v1/app_management/add_img',
+				url: '/v1/Ntesterc_app/add_img',
 				method: 'POST',
 				data: form,
 				headers: {

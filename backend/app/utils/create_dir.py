@@ -4,26 +4,15 @@
 from pathlib import Path
 
 
-def create_dir(file_name: str) -> Path:
-    """ 创建文件夹 """
-    path = Path(file_name).absolute().parent / file_name  # 拼接日志文件夹的路径
-    if not Path(path).exists():  # 文件是否存在
-        Path.mkdir(path)
-
+def create_dir(dir_name: str) -> Path:
+    """
+    在 backend 根目录下创建文件夹（相对路径时），绝对路径则原样创建。
+    用于 logs 等运行时目录，不依赖进程 cwd。
+    """
+    path = Path(dir_name)
+    if not path.is_absolute():
+        # app/utils/create_dir.py -> backend
+        backend_root = Path(__file__).resolve().parents[2]
+        path = backend_root / dir_name
+    path.mkdir(parents=True, exist_ok=True)
     return path
-
-# import os
-
-
-# # 请不要随意移动该文件,创建文件夹是根据当前文件位置来创建
-# def create_dir(file_name: str) -> str:
-#     """ 创建文件夹 """
-#     current_path = os.path.dirname(__file__)  # 获取当前文件夹
-
-#     base_path = os.path.abspath(os.path.join(current_path, ".."))  # 获取当前文件夹的上一层文件
-
-#     path = base_path + os.sep + file_name + os.sep  # 拼接日志文件夹的路径
-
-#     os.makedirs(path, exist_ok=True)  # 如果文件夹不存在就创建
-
-#     return path

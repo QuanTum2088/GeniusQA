@@ -6,41 +6,41 @@ import request from '/@/utils/request';
 export const requirementDocumentApi = {
   list: (params?: any) =>
     request({ 
-      url: '/v1/ai_intelligence/requirement-documents', 
+      url: '/v1/Ntesterc_intel/requirement-documents', 
       method: 'get', 
       params 
     }),
   upload: (data: FormData) =>
     request({
-      url: '/v1/ai_intelligence/requirement-documents',
+      url: '/v1/Ntesterc_intel/requirement-documents',
       method: 'post',
       data,
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
   get: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/requirement-documents/${id}`, 
+      url: `/v1/Ntesterc_intel/requirement-documents/${id}`, 
       method: 'get' 
     }),
   update: (id: number, data: any) =>
     request({ 
-      url: `/v1/ai_intelligence/requirement-documents/${id}`, 
+      url: `/v1/Ntesterc_intel/requirement-documents/${id}`, 
       method: 'put', 
       data 
     }),
   delete: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/requirement-documents/${id}`, 
+      url: `/v1/Ntesterc_intel/requirement-documents/${id}`, 
       method: 'delete' 
     }),
   analyze: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/requirement-documents/${id}/analyze`, 
+      url: `/v1/Ntesterc_intel/requirement-documents/${id}/analyze`, 
       method: 'post' 
     }),
   getAnalysis: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/requirement-documents/${id}/analysis`, 
+      url: `/v1/Ntesterc_intel/requirement-documents/${id}/analysis`, 
       method: 'get' 
     }),
 };
@@ -52,30 +52,30 @@ export function useRequirementDocumentApi() {
 export const aiModelConfigApi = {
   list: (params?: any) =>
     request({ 
-      url: '/v1/ai_intelligence/ai-model-configs', 
+      url: '/v1/Ntesterc_intel/ai-model-configs', 
       method: 'get', 
       params 
     }),
   create: (data: any) =>
     request({ 
-      url: '/v1/ai_intelligence/ai-model-configs', 
+      url: '/v1/Ntesterc_intel/ai-model-configs', 
       method: 'post', 
       data 
     }),
   get: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/ai-model-configs/${id}`, 
+      url: `/v1/Ntesterc_intel/ai-model-configs/${id}`, 
       method: 'get' 
     }),
   update: (id: number, data: any) =>
     request({ 
-      url: `/v1/ai_intelligence/ai-model-configs/${id}`, 
+      url: `/v1/Ntesterc_intel/ai-model-configs/${id}`, 
       method: 'put', 
       data 
     }),
   delete: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/ai-model-configs/${id}`, 
+      url: `/v1/Ntesterc_intel/ai-model-configs/${id}`, 
       method: 'delete' 
     }),
 };
@@ -87,30 +87,30 @@ export function useAiModelConfigApi() {
 export const promptConfigApi = {
   list: (params?: any) =>
     request({ 
-      url: '/v1/ai_intelligence/prompt-configs', 
+      url: '/v1/Ntesterc_intel/prompt-configs', 
       method: 'get', 
       params 
     }),
   create: (data: any) =>
     request({ 
-      url: '/v1/ai_intelligence/prompt-configs', 
+      url: '/v1/Ntesterc_intel/prompt-configs', 
       method: 'post', 
       data 
     }),
   get: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/prompt-configs/${id}`, 
+      url: `/v1/Ntesterc_intel/prompt-configs/${id}`, 
       method: 'get' 
     }),
   update: (id: number, data: any) =>
     request({ 
-      url: `/v1/ai_intelligence/prompt-configs/${id}`, 
+      url: `/v1/Ntesterc_intel/prompt-configs/${id}`, 
       method: 'put', 
       data 
     }),
   delete: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/prompt-configs/${id}`, 
+      url: `/v1/Ntesterc_intel/prompt-configs/${id}`, 
       method: 'delete' 
     }),
 };
@@ -122,33 +122,33 @@ export function usePromptConfigApi() {
 export const generationTaskApi = {
   list: (params?: any) =>
     request({ 
-      url: '/v1/ai_intelligence/generation-tasks', 
+      url: '/v1/Ntesterc_intel/generation-tasks', 
       method: 'get', 
       params 
     }),
   create: (data: any) =>
     request({ 
-      url: '/v1/ai_intelligence/generation-tasks', 
+      url: '/v1/Ntesterc_intel/generation-tasks', 
       method: 'post', 
       data 
     }),
   get: (taskId: string) =>
     request({ 
-      url: `/v1/ai_intelligence/generation-tasks/${taskId}`, 
+      url: `/v1/Ntesterc_intel/generation-tasks/${taskId}`, 
       method: 'get' 
     }),
-  stream: (taskId: string) => `/v1/ai_intelligence/generation-tasks/${taskId}/stream`,
+  stream: (taskId: string) => `/v1/Ntesterc_intel/generation-tasks/${taskId}/stream`,
   saveToTestcases: (taskId: string, data: any) =>
     request({
-      url: `/v1/ai_intelligence/generation-tasks/${taskId}/save-to-testcases`,
+      url: `/v1/Ntesterc_intel/generation-tasks/${taskId}/save-to-testcases`,
       method: 'post',
       data,
     }),
   delete: (taskId: string) =>
-    request({ url: `/v1/ai_intelligence/generation-tasks/${taskId}`, method: 'delete' }),
+    request({ url: `/v1/Ntesterc_intel/generation-tasks/${taskId}`, method: 'delete' }),
   batchDelete: (taskIds: string[]) =>
     request({
-      url: '/v1/ai_intelligence/generation-tasks/batch-delete',
+      url: '/v1/Ntesterc_intel/generation-tasks/batch-delete',
       method: 'post',
       data: taskIds,
     }),
@@ -161,7 +161,7 @@ export function useGenerationTaskApi() {
 export const projectApi = {
   getSubProjects: (projectId: number, params?: any) =>
     request({
-      url: `/v1/ai_intelligence/projects/${projectId}/sub-projects`,
+      url: `/v1/Ntesterc_intel/projects/${projectId}/sub-projects`,
       method: 'get',
       params,
     }),
@@ -174,35 +174,35 @@ export function useAiIntelligenceProjectApi() {
 export const testcaseTemplateApi = {
   list: (params?: any) =>
     request({ 
-      url: '/v1/ai_intelligence/testcase-templates', 
+      url: '/v1/Ntesterc_intel/testcase-templates', 
       method: 'get', 
       params 
     }),
   get: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/testcase-templates/${id}`, 
+      url: `/v1/Ntesterc_intel/testcase-templates/${id}`, 
       method: 'get' 
     }),
   create: (data: any) =>
     request({ 
-      url: '/v1/ai_intelligence/testcase-templates', 
+      url: '/v1/Ntesterc_intel/testcase-templates', 
       method: 'post', 
       data 
     }),
   update: (id: number, data: any) =>
     request({ 
-      url: `/v1/ai_intelligence/testcase-templates/${id}`, 
+      url: `/v1/Ntesterc_intel/testcase-templates/${id}`, 
       method: 'put', 
       data 
     }),
   delete: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/testcase-templates/${id}`, 
+      url: `/v1/Ntesterc_intel/testcase-templates/${id}`, 
       method: 'delete' 
     }),
   export: (id: number) =>
     request({
-      url: `/v1/ai_intelligence/testcase-templates/${id}/export`,
+      url: `/v1/Ntesterc_intel/testcase-templates/${id}/export`,
       method: 'get',
       responseType: 'blob',
     }),
@@ -210,7 +210,7 @@ export const testcaseTemplateApi = {
     const formData = new FormData();
     formData.append('file', file);
     return request({
-      url: '/v1/ai_intelligence/testcase-templates/import',
+      url: '/v1/Ntesterc_intel/testcase-templates/import',
       method: 'post',
       data: formData,
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -218,7 +218,7 @@ export const testcaseTemplateApi = {
   },
   preview: (id: number, sampleData: any) =>
     request({
-      url: `/v1/ai_intelligence/testcase-templates/${id}/preview`,
+      url: `/v1/Ntesterc_intel/testcase-templates/${id}/preview`,
       method: 'post',
       data: sampleData,
     }),
@@ -231,41 +231,41 @@ export function useTestcaseTemplateApi() {
 export const aiCaseApi = {
   list: (params?: any) =>
     request({ 
-      url: '/v1/ai_intelligence/ai-cases', 
+      url: '/v1/Ntesterc_intel/ai-cases', 
       method: 'get', 
       params 
     }),
   create: (data: any) =>
     request({ 
-      url: '/v1/ai_intelligence/ai-cases', 
+      url: '/v1/Ntesterc_intel/ai-cases', 
       method: 'post', 
       data 
     }),
   get: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/ai-cases/${id}`, 
+      url: `/v1/Ntesterc_intel/ai-cases/${id}`, 
       method: 'get' 
     }),
   update: (id: number, data: any) =>
     request({ 
-      url: `/v1/ai_intelligence/ai-cases/${id}`, 
+      url: `/v1/Ntesterc_intel/ai-cases/${id}`, 
       method: 'put', 
       data 
     }),
   delete: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/ai-cases/${id}`, 
+      url: `/v1/Ntesterc_intel/ai-cases/${id}`, 
       method: 'delete' 
     }),
   batchDelete: (case_ids: number[]) =>
     request({
-      url: '/v1/ai_intelligence/ai-cases/batch-delete',
+      url: '/v1/Ntesterc_intel/ai-cases/batch-delete',
       method: 'post',
       data: { case_ids },
     }),
   execute: (id: number, headless: boolean = false) =>
     request({
-      url: `/v1/ai_intelligence/ai-cases/${id}/execute`,
+      url: `/v1/Ntesterc_intel/ai-cases/${id}/execute`,
       method: 'post',
       params: { headless },
     }),
@@ -275,13 +275,13 @@ export const aiCaseApi = {
     parallel_count: number;
     case_ids: number[];
   }) => request({ 
-    url: '/v1/ai_intelligence/ai-cases/batch-execute', 
+    url: '/v1/Ntesterc_intel/ai-cases/batch-execute', 
     method: 'post', 
     data 
   }),
   importFromModules: (data: { project_id: number; module_ids: number[] }) =>
     request({
-      url: '/v1/ai_intelligence/ai-cases/import-from-modules',
+      url: '/v1/Ntesterc_intel/ai-cases/import-from-modules',
       method: 'post',
       data,
     }),
@@ -295,7 +295,7 @@ export const aiCaseApi = {
       formData.append('module_id', module_id.toString());
     }
     return request({
-      url: '/v1/ai_intelligence/ai-cases/import-from-excel',
+      url: '/v1/Ntesterc_intel/ai-cases/import-from-excel',
       method: 'post',
       data: formData,
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -310,29 +310,29 @@ export function useAiCaseApi() {
 export const aiExecutionRecordApi = {
   list: (params?: any) =>
     request({ 
-      url: '/v1/ai_intelligence/ai-execution-records', 
+      url: '/v1/Ntesterc_intel/ai-execution-records', 
       method: 'get', 
       params 
     }),
   create: (data: any) =>
     request({ 
-      url: '/v1/ai_intelligence/ai-execution-records', 
+      url: '/v1/Ntesterc_intel/ai-execution-records', 
       method: 'post', 
       data 
     }),
   get: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/ai-execution-records/${id}`, 
+      url: `/v1/Ntesterc_intel/ai-execution-records/${id}`, 
       method: 'get' 
     }),
   delete: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/ai-execution-records/${id}`, 
+      url: `/v1/Ntesterc_intel/ai-execution-records/${id}`, 
       method: 'delete' 
     }),
   getStatus: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/ai-execution-records/${id}/status`, 
+      url: `/v1/Ntesterc_intel/ai-execution-records/${id}/status`, 
       method: 'get' 
     }),
 };
@@ -344,35 +344,35 @@ export function useAiExecutionRecordApi() {
 export const figmaConfigApi = {
   list: (params?: any) =>
     request({ 
-      url: '/v1/ai_intelligence/figma-configs', 
+      url: '/v1/Ntesterc_intel/figma-configs', 
       method: 'get', 
       params 
     }),
   create: (data: any) =>
     request({ 
-      url: '/v1/ai_intelligence/figma-configs', 
+      url: '/v1/Ntesterc_intel/figma-configs', 
       method: 'post', 
       data 
     }),
   get: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/figma-configs/${id}`, 
+      url: `/v1/Ntesterc_intel/figma-configs/${id}`, 
       method: 'get' 
     }),
   update: (id: number, data: any) =>
     request({ 
-      url: `/v1/ai_intelligence/figma-configs/${id}`, 
+      url: `/v1/Ntesterc_intel/figma-configs/${id}`, 
       method: 'put', 
       data 
     }),
   delete: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/figma-configs/${id}`, 
+      url: `/v1/Ntesterc_intel/figma-configs/${id}`, 
       method: 'delete' 
     }),
   extract: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/figma-configs/${id}/extract`, 
+      url: `/v1/Ntesterc_intel/figma-configs/${id}/extract`, 
       method: 'post' 
     }),
   extractWithMode: (
@@ -381,45 +381,45 @@ export const figmaConfigApi = {
     forceRefresh: boolean = false,
   ) =>
     request({
-      url: `/v1/ai_intelligence/figma-configs/${configId}/extract-with-mode`,
+      url: `/v1/Ntesterc_intel/figma-configs/${configId}/extract-with-mode`,
       method: 'post',
       params: { extraction_mode: mode, force_refresh: forceRefresh },
     }),
   getTaskStatus: (taskId: string) =>
     request({ 
-      url: `/v1/ai_intelligence/figma-extraction-tasks/${taskId}`, 
+      url: `/v1/Ntesterc_intel/figma-extraction-tasks/${taskId}`, 
       method: 'get' 
     }),
   getLatestTask: (configId: number) =>
     request({
-      url: `/v1/ai_intelligence/figma-configs/${configId}/latest-task`,
+      url: `/v1/Ntesterc_intel/figma-configs/${configId}/latest-task`,
       method: 'get',
     }),
   preview: (configId: number) =>
     request({ 
-      url: `/v1/ai_intelligence/figma-configs/${configId}/preview`, 
+      url: `/v1/Ntesterc_intel/figma-configs/${configId}/preview`, 
       method: 'get' 
     }),
   getRateLimitStatus: (configId: number) =>
     request({
-      url: `/v1/ai_intelligence/figma-configs/${configId}/rate-limit-status`,
+      url: `/v1/Ntesterc_intel/figma-configs/${configId}/rate-limit-status`,
       method: 'get',
     }),
   getCacheInfo: (configId: number) =>
     request({
-      url: `/v1/ai_intelligence/figma-configs/${configId}/cache-info`,
+      url: `/v1/Ntesterc_intel/figma-configs/${configId}/cache-info`,
       method: 'get',
     }),
   getCachedData: (configId: number) =>
     request({
-      url: `/v1/ai_intelligence/figma-configs/${configId}/cached-data`,
+      url: `/v1/Ntesterc_intel/figma-configs/${configId}/cached-data`,
       method: 'get',
     }),
   clearCache: (configId: number) =>
-    request({ url: `/v1/ai_intelligence/figma-configs/${configId}/cache`, method: 'delete' }),
+    request({ url: `/v1/Ntesterc_intel/figma-configs/${configId}/cache`, method: 'delete' }),
   checkUpdates: (configId: number) =>
     request({
-      url: `/v1/ai_intelligence/figma-configs/${configId}/check-updates`,
+      url: `/v1/Ntesterc_intel/figma-configs/${configId}/check-updates`,
       method: 'get',
     }),
 };
@@ -431,47 +431,47 @@ export function useFigmaConfigApi() {
 export const aiTestSuiteApi = {
   list: (params?: any) =>
     request({ 
-      url: '/v1/ai_intelligence/ai-test-suites', 
+      url: '/v1/Ntesterc_intel/ai-test-suites', 
       method: 'get', 
       params 
     }),
   create: (data: any) =>
     request({ 
-      url: '/v1/ai_intelligence/ai-test-suites', 
+      url: '/v1/Ntesterc_intel/ai-test-suites', 
       method: 'post', 
       data 
     }),
   get: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/ai-test-suites/${id}`, 
+      url: `/v1/Ntesterc_intel/ai-test-suites/${id}`, 
       method: 'get' 
     }),
   update: (id: number, data: any) =>
     request({ 
-      url: `/v1/ai_intelligence/ai-test-suites/${id}`, 
+      url: `/v1/Ntesterc_intel/ai-test-suites/${id}`, 
       method: 'put', 
       data 
     }),
   delete: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/ai-test-suites/${id}`, 
+      url: `/v1/Ntesterc_intel/ai-test-suites/${id}`, 
       method: 'delete' 
     }),
   execute: (id: number, data: { execution_name?: string; execution_mode: string }) =>
     request({ 
-      url: `/v1/ai_intelligence/ai-test-suites/${id}/execute`, 
+      url: `/v1/Ntesterc_intel/ai-test-suites/${id}/execute`, 
       method: 'post', 
       data 
     }),
   getExecutions: (params?: any) =>
     request({ 
-      url: '/v1/ai_intelligence/ai-test-suite-executions', 
+      url: '/v1/Ntesterc_intel/ai-test-suite-executions', 
       method: 'get', 
       params 
     }),
   getExecutionDetail: (id: number) =>
     request({ 
-      url: `/v1/ai_intelligence/ai-test-suite-executions/${id}`, 
+      url: `/v1/Ntesterc_intel/ai-test-suite-executions/${id}`, 
       method: 'get' 
     }),
 };
@@ -483,19 +483,19 @@ export function useAiTestSuiteApi() {
 export const aiTestReportApi = {
   list: (params?: any) =>
     request({ 
-      url: '/v1/ai_intelligence/ai-test-reports', 
+      url: '/v1/Ntesterc_intel/ai-test-reports', 
       method: 'get', 
       params 
     }),
   create: (data: any) =>
     request({ 
-      url: '/v1/ai_intelligence/ai-test-reports', 
+      url: '/v1/Ntesterc_intel/ai-test-reports', 
       method: 'post', 
       data 
     }),
   delete: (reportId: string) =>
     request({ 
-      url: `/v1/ai_intelligence/ai-test-reports/${reportId}`, 
+      url: `/v1/Ntesterc_intel/ai-test-reports/${reportId}`, 
       method: 'delete' 
     }),
 };

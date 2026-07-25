@@ -11,7 +11,7 @@ from typing import Callable
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.sqlalchemy import get_db
+from app.infra.db.sqlalchemy import get_db
 from app.api.v1.system.log.service import OperationLogService
 
 

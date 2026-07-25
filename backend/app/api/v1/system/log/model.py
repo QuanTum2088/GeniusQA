@@ -3,7 +3,7 @@
 # @author: Rebort
 
 from sqlalchemy import Column, String, Integer, BigInteger, DateTime, Text, JSON
-from app.models.base import Base
+from app.core.db_base import Base
 
 
 class OperationLogModel(Base):

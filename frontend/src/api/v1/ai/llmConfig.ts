@@ -11,7 +11,7 @@ export function useLLMConfigApi() {
       is_active?: boolean
     }) => {
       return request({
-        url: '/v1/ai/llm-config',
+        url: '/v1/Ntesterc_ai/llm-config',
         method: 'GET',
         params
       })
@@ -20,7 +20,7 @@ export function useLLMConfigApi() {
 
     getDefault: () => {
       return request({
-        url: '/v1/ai/llm-config/default',
+        url: '/v1/Ntesterc_ai/llm-config/default',
         method: 'GET'
       })
     },
@@ -28,7 +28,7 @@ export function useLLMConfigApi() {
 
     getDetail: (id: number) => {
       return request({
-        url: `/v1/ai/llm-config/${id}`,
+        url: `/v1/Ntesterc_ai/llm-config/${id}`,
         method: 'GET'
       })
     },
@@ -36,7 +36,7 @@ export function useLLMConfigApi() {
 
     create: (data: LLMConfigCreateData) => {
       return request({
-        url: '/v1/ai/llm-config',
+        url: '/v1/Ntesterc_ai/llm-config',
         method: 'POST',
         data
       })
@@ -45,7 +45,7 @@ export function useLLMConfigApi() {
 
     update: (id: number, data: LLMConfigUpdateData) => {
       return request({
-        url: `/v1/ai/llm-config/${id}`,
+        url: `/v1/Ntesterc_ai/llm-config/${id}`,
         method: 'PUT',
         data
       })
@@ -54,7 +54,7 @@ export function useLLMConfigApi() {
 
     delete: (id: number) => {
       return request({
-        url: `/v1/ai/llm-config/${id}`,
+        url: `/v1/Ntesterc_ai/llm-config/${id}`,
         method: 'DELETE'
       })
     },
@@ -62,7 +62,7 @@ export function useLLMConfigApi() {
 
     setDefault: (id: number) => {
       return request({
-        url: `/v1/ai/llm-config/${id}/set-default`,
+        url: `/v1/Ntesterc_ai/llm-config/${id}/set-default`,
         method: 'POST'
       })
     },
@@ -70,7 +70,7 @@ export function useLLMConfigApi() {
 
     test: (data: LLMConfigTestData) => {
       return request({
-        url: '/v1/ai/llm-config/test',
+        url: '/v1/Ntesterc_ai/llm-config/test',
         method: 'POST',
         data
       })

@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { MsgBox, MsgSuccess, NoticeError } from "@/utils/ntesterc.ts";
 import { delete_img, img_list } from "@/api/api_app/img.ts";
@@ -150,7 +150,7 @@ const add_Confirm = async () => {
       form.append("file", raw);
       form.append("menu_id", String(mid));
       await request({
-        url: "/v1/app_management/add_img",
+        url: "/v1/Ntesterc_app/add_img",
         method: "POST",
         data: form,
         headers: { "Content-Type": "multipart/form-data" }

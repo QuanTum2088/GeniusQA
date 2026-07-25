@@ -7,24 +7,24 @@ export function useAiKnowledgeConfigApi() {
   return {
     getGlobal: () =>
       request({ 
-        url: '/v1/ai/knowledge-config/global', 
+        url: '/v1/Ntesterc_ai/knowledge-config/global', 
         method: 'GET' 
       }),
     saveGlobal: (data: any) =>
       request({ 
-        url: '/v1/ai/knowledge-config/global', 
+        url: '/v1/Ntesterc_ai/knowledge-config/global', 
         method: 'PUT', 
         data 
       }),
     testEmbedding: (data: any) =>
       request({ 
-        url: '/v1/ai/knowledge-config/test-embedding', 
+        url: '/v1/Ntesterc_ai/knowledge-config/test-embedding', 
         method: 'POST', 
         data 
       }),
     testVectorDb: (data: any) =>
       request({ 
-        url: '/v1/ai/knowledge-config/test-vector-db', 
+        url: '/v1/Ntesterc_ai/knowledge-config/test-vector-db', 
         method: 'POST', 
         data 
       }),

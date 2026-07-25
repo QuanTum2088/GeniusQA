@@ -17,20 +17,20 @@ export function useModuleApi() {
 			include_children?: boolean;
 		}) =>
 			request({
-				url: '/v1/testcases/modules',
+				url: '/v1/Ntesterc_testcases/modules',
 				method: 'GET',
 				params,
 			}),
 
 		getModuleTree: (projectId: number) =>
 			request({
-				url: `/v1/testcases/modules/tree/${projectId}`,
+				url: `/v1/Ntesterc_testcases/modules/tree/${projectId}`,
 				method: 'GET',
 			}),
 
 		getModuleDetail: (moduleId: number) =>
 			request({
-				url: `/v1/testcases/modules/${moduleId}`,
+				url: `/v1/Ntesterc_testcases/modules/${moduleId}`,
 				method: 'GET',
 			}),
 
@@ -42,7 +42,7 @@ export function useModuleApi() {
 			sort_order?: number;
 		}) =>
 			request({
-				url: '/v1/testcases/modules',
+				url: '/v1/Ntesterc_testcases/modules',
 				method: 'POST',
 				data,
 			}),
@@ -57,20 +57,20 @@ export function useModuleApi() {
 			}
 		) =>
 			request({
-				url: `/v1/testcases/modules/${moduleId}`,
+				url: `/v1/Ntesterc_testcases/modules/${moduleId}`,
 				method: 'PUT',
 				data,
 			}),
 
 		deleteModule: (moduleId: number) =>
 			request({
-				url: `/v1/testcases/modules/${moduleId}`,
+				url: `/v1/Ntesterc_testcases/modules/${moduleId}`,
 				method: 'DELETE',
 			}),
 
 		moveModule: (moduleId: number, targetParentId?: number) =>
 			request({
-				url: `/v1/testcases/modules/${moduleId}/move`,
+				url: `/v1/Ntesterc_testcases/modules/${moduleId}/move`,
 				method: 'PUT',
 				params: {
 					target_parent_id: targetParentId,
@@ -83,7 +83,7 @@ export function useModuleApi() {
 			include_testcases?: boolean;
 		}) =>
 			request({
-				url: '/v1/testcases/modules/export',
+				url: '/v1/Ntesterc_testcases/modules/export',
 				method: 'POST',
 				params,
 			}),
@@ -94,7 +94,7 @@ export function useModuleApi() {
 			override?: boolean;
 		}) =>
 			request({
-				url: '/v1/testcases/modules/import',
+				url: '/v1/Ntesterc_testcases/modules/import',
 				method: 'POST',
 				data,
 			}),

@@ -98,7 +98,7 @@ export function useNotificationConfigApi() {
     limit?: number
   }) => {
     return request({
-      url: '/v1/notifications/configs',
+      url: '/v1/Ntesterc_notifications/configs',
       method: 'GET',
       params
     })
@@ -107,7 +107,7 @@ export function useNotificationConfigApi() {
   // 获取配置详情
   getConfig: (id: number) => {
     return request({
-      url: `/v1/notifications/configs/${id}`,
+      url: `/v1/Ntesterc_notifications/configs/${id}`,
       method: 'GET'
     })
   },
@@ -115,7 +115,7 @@ export function useNotificationConfigApi() {
   // 创建配置
   createConfig: (data: NotificationConfigCreate) => {
     return request({
-      url: '/v1/notifications/configs',
+      url: '/v1/Ntesterc_notifications/configs',
       method: 'POST',
       data
     })
@@ -124,7 +124,7 @@ export function useNotificationConfigApi() {
   // 更新配置
   updateConfig: (id: number, data: NotificationConfigUpdate) => {
     return request({
-      url: `/v1/notifications/configs/${id}`,
+      url: `/v1/Ntesterc_notifications/configs/${id}`,
       method: 'PUT',
       data
     })
@@ -133,7 +133,7 @@ export function useNotificationConfigApi() {
   // 删除配置
   deleteConfig: (id: number) => {
     return request({
-      url: `/v1/notifications/configs/${id}`,
+      url: `/v1/Ntesterc_notifications/configs/${id}`,
       method: 'DELETE'
     })
   },
@@ -141,7 +141,7 @@ export function useNotificationConfigApi() {
   // 批量删除配置
   batchDeleteConfigs: (ids: number[]) => {
     return request({
-      url: '/v1/notifications/configs',
+      url: '/v1/Ntesterc_notifications/configs',
       method: 'DELETE',
       data: { ids }
     })
@@ -150,7 +150,7 @@ export function useNotificationConfigApi() {
   // 设置默认配置
   setDefaultConfig: (id: number) => {
     return request({
-      url: `/v1/notifications/configs/${id}/set-default`,
+      url: `/v1/Ntesterc_notifications/configs/${id}/set-default`,
       method: 'POST'
     })
   },
@@ -158,7 +158,7 @@ export function useNotificationConfigApi() {
   // 测试配置
   testConfig: (id: number) => {
     return request({
-      url: `/v1/notifications/configs/${id}/test`,
+      url: `/v1/Ntesterc_notifications/configs/${id}/test`,
       method: 'POST'
     })
   }
@@ -177,7 +177,7 @@ export function useNotificationHistoryApi() {
     limit?: number
   }) => {
     return request({
-      url: '/v1/notifications/histories',
+      url: '/v1/Ntesterc_notifications/histories',
       method: 'GET',
       params
     })
@@ -186,7 +186,7 @@ export function useNotificationHistoryApi() {
   // 删除通知历史记录
   deleteHistory: (id: number) => {
     return request({
-      url: `/v1/notifications/histories/${id}`,
+      url: `/v1/Ntesterc_notifications/histories/${id}`,
       method: 'DELETE'
     })
   },
@@ -194,7 +194,7 @@ export function useNotificationHistoryApi() {
   // 批量删除通知历史记录
   batchDeleteHistories: (ids: number[]) => {
     return request({
-      url: '/v1/notifications/histories',
+      url: '/v1/Ntesterc_notifications/histories',
       method: 'DELETE',
       data: { ids }
     })
@@ -214,7 +214,7 @@ export function useTaskNotificationApi() {
     limit?: number
   }) => {
     return request({
-      url: '/v1/notifications/task-settings',
+      url: '/v1/Ntesterc_notifications/task-settings',
       method: 'GET',
       params
     })
@@ -223,7 +223,7 @@ export function useTaskNotificationApi() {
   // 创建任务通知设置
   createTaskSetting: (data: TaskNotificationSettingCreate) => {
     return request({
-      url: '/v1/notifications/task-settings',
+      url: '/v1/Ntesterc_notifications/task-settings',
       method: 'POST',
       data
     })
@@ -232,7 +232,7 @@ export function useTaskNotificationApi() {
   // 更新任务通知设置
   updateTaskSetting: (id: number, data: TaskNotificationSettingUpdate) => {
     return request({
-      url: `/v1/notifications/task-settings/${id}`,
+      url: `/v1/Ntesterc_notifications/task-settings/${id}`,
       method: 'PUT',
       data
     })
@@ -241,7 +241,7 @@ export function useTaskNotificationApi() {
   // 删除任务通知设置
   deleteTaskSetting: (id: number) => {
     return request({
-      url: `/v1/notifications/task-settings/${id}`,
+      url: `/v1/Ntesterc_notifications/task-settings/${id}`,
       method: 'DELETE'
     })
   },
@@ -249,7 +249,7 @@ export function useTaskNotificationApi() {
   // 批量删除任务通知设置
   batchDeleteTaskSettings: (ids: number[]) => {
     return request({
-      url: '/v1/notifications/task-settings',
+      url: '/v1/Ntesterc_notifications/task-settings',
       method: 'DELETE',
       data: { ids }
     })
@@ -263,7 +263,7 @@ export function useNotificationSendApi() {
   // 发送通知
   sendNotification: (data: SendNotificationRequest) => {
     return request({
-      url: '/v1/notifications/send',
+      url: '/v1/Ntesterc_notifications/send',
       method: 'POST',
       data
     })
@@ -272,7 +272,7 @@ export function useNotificationSendApi() {
   // 获取支持的通知类型
   getNotificationTypes: () => {
     return request({
-      url: '/v1/notifications/types',
+      url: '/v1/Ntesterc_notifications/types',
       method: 'GET'
     })
   }

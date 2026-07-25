@@ -14,7 +14,7 @@ export function useOperationsApi() {
 			page_size?: number;
 		}) =>
 			request({
-				url: '/v1/api_testing/public-scripts',
+				url: '/v1/Ntesterc_api_testing/public-scripts',
 				method: 'GET',
 				params,
 			}),
@@ -29,27 +29,27 @@ export function useOperationsApi() {
 			is_active?: boolean;
 		}) =>
 			request({
-				url: '/v1/api_testing/public-scripts',
+				url: '/v1/Ntesterc_api_testing/public-scripts',
 				method: 'POST',
 				data,
 			}),
 
 		updatePublicScript: (id: number, data: any) =>
 			request({
-				url: `/v1/api_testing/public-scripts/${id}`,
+				url: `/v1/Ntesterc_api_testing/public-scripts/${id}`,
 				method: 'PUT',
 				data,
 			}),
 
 		deletePublicScript: (id: number) =>
 			request({
-				url: `/v1/api_testing/public-scripts/${id}`,
+				url: `/v1/Ntesterc_api_testing/public-scripts/${id}`,
 				method: 'DELETE',
 			}),
 
 		getPublicScriptDetail: (id: number) =>
 			request({
-				url: `/v1/api_testing/public-scripts/${id}`,
+				url: `/v1/Ntesterc_api_testing/public-scripts/${id}`,
 				method: 'GET',
 			}),
 
@@ -59,7 +59,7 @@ export function useOperationsApi() {
 			page_size?: number;
 		}) =>
 			request({
-				url: '/v1/api_testing/database-configs',
+				url: '/v1/Ntesterc_api_testing/database-configs',
 				method: 'GET',
 				params,
 			}),
@@ -78,33 +78,33 @@ export function useOperationsApi() {
 			is_active?: boolean;
 		}) =>
 			request({
-				url: '/v1/api_testing/database-configs',
+				url: '/v1/Ntesterc_api_testing/database-configs',
 				method: 'POST',
 				data,
 			}),
 
 		updateDatabaseConfig: (id: number, data: any) =>
 			request({
-				url: `/v1/api_testing/database-configs/${id}`,
+				url: `/v1/Ntesterc_api_testing/database-configs/${id}`,
 				method: 'PUT',
 				data,
 			}),
 
 		deleteDatabaseConfig: (id: number) =>
 			request({
-				url: `/v1/api_testing/database-configs/${id}`,
+				url: `/v1/Ntesterc_api_testing/database-configs/${id}`,
 				method: 'DELETE',
 			}),
 
 		getDatabaseConfigDetail: (id: number) =>
 			request({
-				url: `/v1/api_testing/database-configs/${id}`,
+				url: `/v1/Ntesterc_api_testing/database-configs/${id}`,
 				method: 'GET',
 			}),
 
 		testDatabaseConnection: (id: number) =>
 			request({
-				url: `/v1/api_testing/database-configs/${id}/test`,
+				url: `/v1/Ntesterc_api_testing/database-configs/${id}/test`,
 				method: 'POST',
 			}),
 	};

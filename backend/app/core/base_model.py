@@ -9,7 +9,7 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, BigInteger, DateTime, String
 from sqlalchemy.ext.declarative import declared_attr
-from app.models.base import Base
+from app.core.db_base import Base
 
 
 class TimestampMixin:

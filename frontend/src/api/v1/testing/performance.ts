@@ -6,33 +6,33 @@ export function usePerformanceApi() {
 	return {
 		// 配置管理
 		getConfigList: (params?: any) => {
-			return request({ url: '/v1/performance/configs', method: 'GET', params });
+			return request({ url: '/v1/Ntesterc_performance/configs', method: 'GET', params });
 		},
 		// ========================== 压测场景接口映射 ==========================
 		getScenarioList: (params?: any) => {
-			return request({ url: '/v1/performance/scenario/list', method: 'GET', params });
+			return request({ url: '/v1/Ntesterc_performance/scenario/list', method: 'GET', params });
 		},
 		addScenario: (data: any) => {
-			return request({ url: '/v1/performance/scenario/add', method: 'POST', data });
+			return request({ url: '/v1/Ntesterc_performance/scenario/add', method: 'POST', data });
 		},
 		updateScenario: (id: number, data: any) => {
-			return request({ url: `/v1/performance/scenario/update/${id}`, method: 'PUT', data });
+			return request({ url: `/v1/Ntesterc_performance/scenario/update/${id}`, method: 'PUT', data });
 		},
 		deleteScenario: (id: number) => {
-			return request({ url: `/v1/performance/scenario/delete/${id}`, method: 'DELETE' });
+			return request({ url: `/v1/Ntesterc_performance/scenario/delete/${id}`, method: 'DELETE' });
 		},
 		// 场景子配置接口
 		getScenarioConfigList: (scenarioId: number) => {
-			return request({ url: `/v1/performance/scenario/${scenarioId}/config/list`, method: 'GET' });
+			return request({ url: `/v1/Ntesterc_performance/scenario/${scenarioId}/config/list`, method: 'GET' });
 		},
 		addScenarioConfig: (scenarioId: number, data: any) => {
-			return request({ url: `/v1/performance/scenario/${scenarioId}/config/add`, method: 'POST', data });
+			return request({ url: `/v1/Ntesterc_performance/scenario/${scenarioId}/config/add`, method: 'POST', data });
 		},
 		updateScenarioConfig: (scenarioId: number, configId: number, data: any) => {
-			return request({ url: `/v1/performance/scenario/${scenarioId}/config/update/${configId}`, method: 'PUT', data });
+			return request({ url: `/v1/Ntesterc_performance/scenario/${scenarioId}/config/update/${configId}`, method: 'PUT', data });
 		},
 		deleteScenarioConfig: (scenarioId: number, configId: number) => {
-			return request({ url: `/v1/performance/scenario/${scenarioId}/config/delete/${configId}`, method: 'DELETE' });
+			return request({ url: `/v1/Ntesterc_performance/scenario/${scenarioId}/config/delete/${configId}`, method: 'DELETE' });
 		},
 		/**
 		 * 切换子配置状态并一次性同步场景并发数 + 预计耗时。
@@ -40,14 +40,14 @@ export function usePerformanceApi() {
 		 * 返回 { configs, concurrent_count, estimated_duration, estimated_note }
 		 */
 		syncScenarioStats: (data: { scenario_id: number; config_id: number; status: number; thread_type: string }) => {
-			return request({ url: '/v1/performance/scenario/config/sync_stats', method: 'POST', data });
+			return request({ url: '/v1/Ntesterc_performance/scenario/config/sync_stats', method: 'POST', data });
 		},
 
 		/**
 		 * 更新场景状态。当前支持：status=1（确认联调通过→待开始）。
 		 */
 		updateScenarioStatus: (data: { scenario_id: number; status: number }) => {
-			return request({ url: '/v1/performance/scenario/updateStatus', method: 'PUT', data });
+			return request({ url: '/v1/Ntesterc_performance/scenario/updateStatus', method: 'PUT', data });
 		},
 
 		/**
@@ -58,7 +58,7 @@ export function usePerformanceApi() {
 		 */
 		inspectScenarioStream: (scenarioId: number): Promise<Response> => {
 			const token = Session.get('token');
-			return fetch(`${getApiBaseUrl()}/v1/performance/scenario/${scenarioId}/inspect`, {
+			return fetch(`${getApiBaseUrl()}/v1/Ntesterc_performance/scenario/${scenarioId}/inspect`, {
 				method: 'GET',
 				headers: { 'Authorization': `Bearer ${token}`, 'token': token ?? '' },
 			});
@@ -70,7 +70,7 @@ export function usePerformanceApi() {
 		 * execute：子配置正式参数注入 JMX → 推送 Master → 场景状态置 running。
 		 */
 		executeScenario: (scenarioId: number, data: { action: 'inspect' | 'execute' }) => {
-			return request({ url: `/v1/performance/scenario/${scenarioId}/execute`, method: 'POST', data });
+			return request({ url: `/v1/Ntesterc_performance/scenario/${scenarioId}/execute`, method: 'POST', data });
 		},
 
 		/**
@@ -80,7 +80,7 @@ export function usePerformanceApi() {
 		 */
 		executeScenarioStream: (scenarioId: number, data: { action: 'inspect' | 'execute' | 'recover' }): Promise<Response> => {
 			const token = Session.get('token');
-			return fetch(`${getApiBaseUrl()}/v1/performance/scenario/${scenarioId}/execute`, {
+			return fetch(`${getApiBaseUrl()}/v1/Ntesterc_performance/scenario/${scenarioId}/execute`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
@@ -96,7 +96,7 @@ export function usePerformanceApi() {
 		 * kill JMeter 进程、更新 status=4（已取消）、停止日志收集。
 		 */
 		stopScenario: (scenarioId: number) => {
-			return request({ url: `/v1/performance/scenario/${scenarioId}/stop`, method: 'POST' });
+			return request({ url: `/v1/Ntesterc_performance/scenario/${scenarioId}/stop`, method: 'POST' });
 		},
 
 		/**
@@ -106,7 +106,7 @@ export function usePerformanceApi() {
 		 */
 		monitorScenarioStream: (scenarioId: number, offset = 0, signal?: AbortSignal): Promise<Response> => {
 			const token = Session.get('token');
-			return fetch(`${getApiBaseUrl()}/v1/performance/scenario/${scenarioId}/monitor?offset=${offset}`, {
+			return fetch(`${getApiBaseUrl()}/v1/Ntesterc_performance/scenario/${scenarioId}/monitor?offset=${offset}`, {
 				method: 'GET',
 				headers: {
 					'Authorization': `Bearer ${token}`,
@@ -118,50 +118,50 @@ export function usePerformanceApi() {
 
 		// ========================== 定时任务接口映射 ==========================
 		getSchedulerList: (params?: any) => {
-			return request({ url: '/v1/performance/schedulers/list', method: 'GET', params });
+			return request({ url: '/v1/Ntesterc_performance/schedulers/list', method: 'GET', params });
 		},
 		addScheduler: (data: any) => {
-			return request({ url: '/v1/performance/schedulers/add', method: 'POST', data });
+			return request({ url: '/v1/Ntesterc_performance/schedulers/add', method: 'POST', data });
 		},
 		// id 放请求体
 		updateScheduler: (data: any) => {
-			return request({ url: '/v1/performance/schedulers/update', method: 'PUT', data });
+			return request({ url: '/v1/Ntesterc_performance/schedulers/update', method: 'PUT', data });
 		},
 		// id 放查询参数
 		deleteScheduler: (id: number) => {
-			return request({ url: `/v1/performance/schedulers/delete?id=${id}`, method: 'DELETE' });
+			return request({ url: `/v1/Ntesterc_performance/schedulers/delete?id=${id}`, method: 'DELETE' });
 		},
 		// id 放请求体
 		cancelScheduler: (data: { id: number }) => {
-			return request({ url: '/v1/performance/schedulers/cancel', method: 'PUT', data });
+			return request({ url: '/v1/Ntesterc_performance/schedulers/cancel', method: 'PUT', data });
 		},
 
 		// 测试报告
 		getReportList: (params?: any) => {
-			return request({ url: '/v1/performance/reports/list', method: 'GET', params });
+			return request({ url: '/v1/Ntesterc_performance/reports/list', method: 'GET', params });
 		},
 		getReportDownloadUrl: (id: number, types?: string[]) => {
 			const typesParam = types?.length ? `&types=${types.join(',')}` : '';
-			return request({ url: `/v1/performance/reports/download?id=${id}${typesParam}`, method: 'GET', responseType: 'blob' });
+			return request({ url: `/v1/Ntesterc_performance/reports/download?id=${id}${typesParam}`, method: 'GET', responseType: 'blob' });
 		},
 		getReportLog: (id: number, logType: 'console' | 'collector', filename?: string) => {
 			const fnParam = filename ? `&filename=${encodeURIComponent(filename)}` : '';
-			return request({ url: `/v1/performance/reports/log?id=${id}&log_type=${logType}${fnParam}`, method: 'GET' });
+			return request({ url: `/v1/Ntesterc_performance/reports/log?id=${id}&log_type=${logType}${fnParam}`, method: 'GET' });
 		},
 		deleteReport: (id: number) => {
-			return request({ url: '/v1/performance/reports/delete', method: 'POST', data: { id } });
+			return request({ url: '/v1/Ntesterc_performance/reports/delete', method: 'POST', data: { id } });
 		},
 		/** 强制停止收集中（status=1）的报告 */
 		stopReport: (id: number) => {
-			return request({ url: '/v1/performance/reports/stop', method: 'POST', data: { id } });
+			return request({ url: '/v1/Ntesterc_performance/reports/stop', method: 'POST', data: { id } });
 		},
 		/** 恢复中断（status=3）的报告收集 */
 		resumeReport: (id: number) => {
-			return request({ url: '/v1/performance/reports/resume', method: 'POST', data: { id } });
+			return request({ url: '/v1/Ntesterc_performance/reports/resume', method: 'POST', data: { id } });
 		},
 		/** 在线报告预览 URL，前端通过 window.open 新 Tab 打开 */
 		getReportPreviewUrl: (reportCode: string) => {
-			return `${getApiBaseUrl()}/v1/performance/reports/preview/${reportCode}/index.html`;
+			return `${getApiBaseUrl()}/v1/Ntesterc_performance/reports/preview/${reportCode}/index.html`;
 		},
 		/**
 		 * 报告收集进度 SSE 流式接口（GET /collectProcess?id=xx）。
@@ -170,7 +170,7 @@ export function usePerformanceApi() {
 		 */
 		collectProcessStream: (reportId: number, signal?: AbortSignal): Promise<Response> => {
 			const token = Session.get('token');
-			return fetch(`${getApiBaseUrl()}/v1/performance/reports/collectProcess?id=${reportId}`, {
+			return fetch(`${getApiBaseUrl()}/v1/Ntesterc_performance/reports/collectProcess?id=${reportId}`, {
 				method: 'GET',
 				headers: { 'Authorization': `Bearer ${token}`, 'token': token ?? '' },
 				signal,
@@ -180,16 +180,16 @@ export function usePerformanceApi() {
 
 		// ============================= 文件管理接口 ======================================
 		getFileList: (params?: any) => {
-			return request({ url: '/v1/performance/files/list', method: 'GET', params });
+			return request({ url: '/v1/Ntesterc_performance/files/list', method: 'GET', params });
 		},
 		// 文件下拉选项（轻量，仅 id+name，供表单选择器使用）
 		getFileOptions: (params?: { file_type?: string }) => {
-			return request({ url: '/v1/performance/files/options', method: 'GET', params });
+			return request({ url: '/v1/Ntesterc_performance/files/options', method: 'GET', params });
 		},
 		// 小文件代理上传（≤100MB），支持上传进度回调
 		uploadFile: (formData: FormData, onUploadProgress?: (e: ProgressEvent) => void) => {
 			return request({
-				url: '/v1/performance/files/upload',
+				url: '/v1/Ntesterc_performance/files/upload',
 				method: 'POST',
 				data: formData,
 				// 不手动设置 Content-Type：axios 探测到 FormData 会自动附加含 boundary 的正确值，
@@ -200,20 +200,20 @@ export function usePerformanceApi() {
 		},
 		// 大文件预签名申请（>100MB，第一阶段）
 		presignUpload: (data: { file_name: string; file_size: number; remark?: string }) => {
-			return request({ url: '/v1/performance/files/presignUpload', method: 'POST', data });
+			return request({ url: '/v1/Ntesterc_performance/files/presignUpload', method: 'POST', data });
 		},
 		// 大文件上传确认（第二阶段）
 		confirmUpload: (data: { file_id: number; object_key: string }) => {
-			return request({ url: '/v1/performance/files/confirm', method: 'POST', data });
+			return request({ url: '/v1/Ntesterc_performance/files/confirm', method: 'POST', data });
 		},
 		// 获取预签名下载 URL
 		getDownloadUrl: (fileId: number) => {
-			return request({ url: `/v1/performance/files/${fileId}/downloadUrl`, method: 'GET' });
+			return request({ url: `/v1/Ntesterc_performance/files/${fileId}/downloadUrl`, method: 'GET' });
 		},
 		// 替换文件（覆盖原 MinIO 对象），支持上传进度回调
 		reuploadFile: (fileId: number, formData: FormData, onUploadProgress?: (e: ProgressEvent) => void) => {
 			return request({
-				url: `/v1/performance/files/reupload/${fileId}`,
+				url: `/v1/Ntesterc_performance/files/reupload/${fileId}`,
 				method: 'PUT',
 				data: formData,
 				// 同上，不手动设置 Content-Type，让 axios 自动处理 FormData boundary
@@ -223,19 +223,19 @@ export function usePerformanceApi() {
 		},
 		// 大文件替换申请预签名（>限制值，第一阶段）；file_id 放请求体
 		presignReupload: (data: { file_id: number; file_name: string; file_size: number; remark?: string }) => {
-			return request({ url: '/v1/performance/files/presignReupload', method: 'POST', data });
+			return request({ url: '/v1/Ntesterc_performance/files/presignReupload', method: 'POST', data });
 		},
 		// 大文件替换确认（第二阶段）；file_id 放请求体
 		confirmReupload: (data: { file_id: number; object_key: string; file_name: string }) => {
-			return request({ url: '/v1/performance/files/confirmReupload', method: 'POST', data });
+			return request({ url: '/v1/Ntesterc_performance/files/confirmReupload', method: 'POST', data });
 		},
 		// 删除文件（MinIO + 软删 DB）
 		deleteFile: (fileId: number) => {
-			return request({ url: `/v1/performance/files/delete/${fileId}`, method: 'DELETE' });
+			return request({ url: `/v1/Ntesterc_performance/files/delete/${fileId}`, method: 'DELETE' });
 		},
 		// 更新 JMX 文件名称及引用的数据文件列表（覆盖式）；clear_dist=true 时同步清除分发记录
 		setFileRefs: (fileId: number, data: { ref_file_ids: number[]; file_name?: string; clear_dist?: boolean }) => {
-			return request({ url: `/v1/performance/files/update/${fileId}`, method: 'PUT', data });
+			return request({ url: `/v1/Ntesterc_performance/files/update/${fileId}`, method: 'PUT', data });
 		},
 
 		/**
@@ -245,7 +245,7 @@ export function usePerformanceApi() {
 		 */
 		shareDistributeStream: (data: { file_id: number; worker_count: number; machine_type: number }): Promise<Response> => {
 			const token = Session.get('token');
-			return fetch(`${getApiBaseUrl()}/v1/performance/files/distribute/share/stream`, {
+			return fetch(`${getApiBaseUrl()}/v1/Ntesterc_performance/files/distribute/share/stream`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
@@ -261,7 +261,7 @@ export function usePerformanceApi() {
 		 */
 		splitDistributeStream: (data: { file_id: number; worker_count: number; machine_type: number }): Promise<Response> => {
 			const token = Session.get('token');
-			return fetch(`${getApiBaseUrl()}/v1/performance/files/distribute/split/stream`, {
+			return fetch(`${getApiBaseUrl()}/v1/Ntesterc_performance/files/distribute/split/stream`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
@@ -277,7 +277,7 @@ export function usePerformanceApi() {
 		 */
 		clearDistributeStream: (data: { file_id: number; worker_count?: number }): Promise<Response> => {
 			const token = Session.get('token');
-			return fetch(`${getApiBaseUrl()}/v1/performance/files/distribute/clear/stream`, {
+			return fetch(`${getApiBaseUrl()}/v1/Ntesterc_performance/files/distribute/clear/stream`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
@@ -291,30 +291,30 @@ export function usePerformanceApi() {
 
 		// ========================== 压力机配置接口映射 =========================
 		getMachineList: (params?: any) => {
-			return request({ url: '/v1/performance/config/machines/list', method: 'GET', params });
+			return request({ url: '/v1/Ntesterc_performance/config/machines/list', method: 'GET', params });
 		},
 		addMachine: (data: any) => {
-			return request({ url: '/v1/performance/config/machines/add', method: 'POST', data });
+			return request({ url: '/v1/Ntesterc_performance/config/machines/add', method: 'POST', data });
 		},
 		updateMachine: (id: number, data: any) => {
-			return request({ url: `/v1/performance/config/machines/update/${id}`, method: 'PUT', data });
+			return request({ url: `/v1/Ntesterc_performance/config/machines/update/${id}`, method: 'PUT', data });
 		},
 		deleteMachine: (id: number) => {
-			return request({ url: `/v1/performance/config/machines/delete/${id}`, method: 'DELETE' });
+			return request({ url: `/v1/Ntesterc_performance/config/machines/delete/${id}`, method: 'DELETE' });
 		},
 
 		// =========================== 参数配置接口映射 ===========================
 		getParamList: (params?: any) => {
-			return request({ url: '/v1/performance/config/params/list', method: 'GET', params });
+			return request({ url: '/v1/Ntesterc_performance/config/params/list', method: 'GET', params });
 		},
 		addParam: (data: any) => {
-			return request({ url: '/v1/performance/config/params/add', method: 'POST', data });
+			return request({ url: '/v1/Ntesterc_performance/config/params/add', method: 'POST', data });
 		},
 		updateParam: (id: number, data: any) => {
-			return request({ url: `/v1/performance/config/params/update/${id}`, method: 'PUT', data });
+			return request({ url: `/v1/Ntesterc_performance/config/params/update/${id}`, method: 'PUT', data });
 		},
 		deleteParam: (id: number) => {
-			return request({ url: `/v1/performance/config/params/delete/${id}`, method: 'DELETE' });
+			return request({ url: `/v1/Ntesterc_performance/config/params/delete/${id}`, method: 'DELETE' });
 		},
 	};
 }

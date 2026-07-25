@@ -10,7 +10,7 @@ import requests
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.sqlalchemy import async_session
+from app.infra.db.sqlalchemy import async_session
 from app.api.v1.system.user.model import UserModel
 from config import config
 
@@ -265,7 +265,7 @@ class BaseOAuthService(ABC):
                     
                     try:
                         from app.api.v1.system.role.model import RoleModel
-                        from app.models.rbac_models import UserRole
+                        from app.api.v1.system.permission.rbac_model import UserRole
                         
                         # 检查用户是否已有角色
                         print(f"[DEBUG] 查询用户角色...")
@@ -367,7 +367,7 @@ class BaseOAuthService(ABC):
                     
                     try:
                         from app.api.v1.system.role.model import RoleModel
-                        from app.models.rbac_models import UserRole
+                        from app.api.v1.system.permission.rbac_model import UserRole
                         
                         # 查找管理员角色（支持多种角色名称）
                         print(f"[DEBUG] 查找管理员角色...")

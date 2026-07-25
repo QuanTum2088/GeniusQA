@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 # @author: Rebort
 """
-通用模块提供枚举、常量、响应格式等
+跨域契约：枚举、常量、Redis key、统一业务响应 dict、响应 Schema（response_schema）。
+不放 HTTP JSONResponse 实现与 IO 工具。
 """
 
 from app.common.enums import *

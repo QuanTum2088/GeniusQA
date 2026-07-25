@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="images-page">
     <!-- 顶部标题栏 -->
     <el-card class="box-card">
@@ -311,7 +311,7 @@ const add_Confirm = async () => {
       form.append("file", raw);
       form.append("menu_id", String(mid));
       await request({
-        url: "/v1/app_management/add_img",
+        url: "/v1/Ntesterc_app/add_img",
         method: "POST",
         data: form,
         headers: { "Content-Type": "multipart/form-data" }

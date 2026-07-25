@@ -2,7 +2,7 @@
 # @author: rebort
 import typing
 
-from app.corelibs.codes import CodeEnum
+from app.core.codes import CodeEnum
 
 
 class MyBaseException(Exception):

@@ -3,7 +3,7 @@ import request from '/@/utils/request';
 const post = <T = any>(url: string, data?: object) =>
 	request<T>({ url, method: 'post', data });
 
-const base = '/v1/app_management/device';
+const base = '/v1/Ntesterc_app/device';
 
 /** APP 设备中心 API */
 export function useAppManagementDeviceApi() {

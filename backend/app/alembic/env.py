@@ -27,16 +27,19 @@ target_metadata = None
 
 try:
     # 导入 Base 和所有模型
-    from app.models.base import Base
+    from app.core.db_base import Base
     target_metadata = Base.metadata
     
 
-    from app.models import rbac_models, celery_beat_models, api_models
-    
+    from app.api.v1.system.permission import rbac_model
+    from app.api.v1.Ntesterc_module.Ntesterc_task_scheduler import celery_beat_model
+    from app.api.v1.Ntesterc_module.Ntesterc_project import legacy_api_model
+
     # 导入 AI 模型
-    from app.models.ai.conversation import ConversationModel
-    from app.models.ai.message import MessageModel
-    from app.models.ai.llm_config import LLMConfigModel
+    from app.api.v1.Ntesterc_module.Ntesterc_ai.conversation.model import ConversationModel
+    from app.api.v1.Ntesterc_module.Ntesterc_ai.conversation.message_model import MessageModel
+    from app.api.v1.Ntesterc_module.Ntesterc_ai.conversation.mcp_execution_record import MCPExecutionRecordModel
+    from app.api.v1.Ntesterc_module.Ntesterc_ai.llm_config.model import LLMConfigModel
     
     # 直接导入模型模块，避免触发 controller 和 service 的导入
     import sys
@@ -55,24 +58,24 @@ try:
     from app.api.v1.system.log import model as log_model
     from app.api.v1.system.file import model as file_model
     from app.api.v1.system.code_generator import model as code_gen_model
-    from app.api.v1.ai_intelligence import model as ai_intelligence_model
-    from app.api.v1.projects import model as projects_model
-    from app.api.v1.testcases import model as testcases_model
-    from app.api.v1.api_testing import model as api_testing_model
-    from app.api.v1.automation_api import model as api_automation_model
-    from app.api.v1.automation_ui import model as ui_automation_model
-    from app.api.v1.app_management import model as app_management_model
-    from app.api.v1.web_management import model as web_management_model
-    from app.api.v1.notifications import model as notifications_model
-    from app.api.v1.task_scheduler import model as task_scheduler_model
-    from app.api.v1.reviews import model as reviews_model
-    from app.api.v1.assistant import model as assistant_model
-    from app.api.v1.data_factory import model as data_factory_model
-    from app.api.v1.desktop_automation import model as desktop_automation_model
-    from app.api.v1.miniprogram_automation import model as miniprogram_automation_model
-    from app.api.v1.performance.config import model as perf_config_model
-    from app.api.v1.performance.files import model as perf_files_model
-    from app.api.v1.performance.scenario import model as perf_scenario_model
+    from app.api.v1.Ntesterc_module.Ntesterc_intel import model as ai_intelligence_model
+    from app.api.v1.Ntesterc_module.Ntesterc_project import model as projects_model
+    from app.api.v1.Ntesterc_module.Ntesterc_testcases import model as testcases_model
+    from app.api.v1.Ntesterc_module.Ntesterc_api_testing import model as api_testing_model
+    from app.api.v1.Ntesterc_module.Ntesterc_api import model as api_automation_model
+    from app.api.v1.Ntesterc_module.Ntesterc_ui import model as ui_automation_model
+    from app.api.v1.Ntesterc_module.Ntesterc_app import model as app_management_model
+    from app.api.v1.Ntesterc_module.Ntesterc_web import model as web_management_model
+    from app.api.v1.Ntesterc_module.Ntesterc_notifications import model as notifications_model
+    from app.api.v1.Ntesterc_module.Ntesterc_task_scheduler import model as task_scheduler_model
+    from app.api.v1.Ntesterc_module.Ntesterc_reviews import model as reviews_model
+    from app.api.v1.Ntesterc_module.Ntesterc_assistant import model as assistant_model
+    from app.api.v1.Ntesterc_module.Ntesterc_data_factory import model as data_factory_model
+    from app.api.v1.Ntesterc_module.Ntesterc_desk import model as desktop_automation_model
+    from app.api.v1.Ntesterc_module.Ntesterc_mini import model as miniprogram_automation_model
+    from app.api.v1.Ntesterc_module.Ntesterc_performance.config import model as perf_config_model
+    from app.api.v1.Ntesterc_module.Ntesterc_performance.files import model as perf_files_model
+    from app.api.v1.Ntesterc_module.Ntesterc_performance.scenario import model as perf_scenario_model
 
     print(f"成功导入 {len(target_metadata.tables)} 个表")
 

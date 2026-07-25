@@ -84,7 +84,7 @@ export function useDataFactoryApi() {
 	return {
 		getToolCategories: () =>
 			request({
-				url: '/v1/data-factory/categories',
+				url: '/v1/Ntesterc_data_factory/categories',
 				method: 'GET',
 			}),
 
@@ -97,7 +97,7 @@ export function useDataFactoryApi() {
 			tags?: string[];
 		}) =>
 			request({
-				url: '/v1/data-factory/execute',
+				url: '/v1/Ntesterc_data_factory/execute',
 				method: 'POST',
 				data,
 			}),
@@ -112,7 +112,7 @@ export function useDataFactoryApi() {
 			tags?: string[];
 		}) =>
 			request({
-				url: '/v1/data-factory/batch-generate',
+				url: '/v1/Ntesterc_data_factory/batch-generate',
 				method: 'POST',
 				data,
 			}),
@@ -124,39 +124,39 @@ export function useDataFactoryApi() {
 			tool_name?: string;
 		}) =>
 			request({
-				url: '/v1/data-factory/records',
+				url: '/v1/Ntesterc_data_factory/records',
 				method: 'GET',
 				params,
 			}),
 
 		getRecordDetail: (id: number) =>
 			request({
-				url: `/v1/data-factory/records/${id}`,
+				url: `/v1/Ntesterc_data_factory/records/${id}`,
 				method: 'GET',
 			}),
 
 		deleteRecord: (id: number) =>
 			request({
-				url: `/v1/data-factory/records/${id}`,
+				url: `/v1/Ntesterc_data_factory/records/${id}`,
 				method: 'DELETE',
 			}),
 
 		batchDeleteRecords: (ids: number[]) =>
 			request({
-				url: '/v1/data-factory/records/batch-delete',
+				url: '/v1/Ntesterc_data_factory/records/batch-delete',
 				method: 'POST',
 				data: { ids },
 			}),
 
 		getStatistics: () =>
 			request({
-				url: '/v1/data-factory/statistics',
+				url: '/v1/Ntesterc_data_factory/statistics',
 				method: 'GET',
 			}),
 
 		getTagList: () =>
 			request({
-				url: '/v1/data-factory/tags',
+				url: '/v1/Ntesterc_data_factory/tags',
 				method: 'GET',
 			}),
 	};

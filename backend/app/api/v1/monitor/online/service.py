@@ -8,8 +8,8 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, desc
 
-from app.db.sqlalchemy import get_db
-from app.db import get_redis_pool
+from app.infra.db.sqlalchemy import get_db
+from app.infra.db import get_redis_pool
 from app.api.v1.system.user.model import UserModel
 from app.api.v1.monitor.online.model import OnlineUserInfo, OnlineUserStats
 from app.utils.common import parse_user_agent, get_location_by_ip

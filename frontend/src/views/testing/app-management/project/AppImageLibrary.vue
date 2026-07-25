@@ -267,7 +267,7 @@ async function loadList() {
 	listLoading.value = true;
 	try {
 		const res: unknown = await request({
-			url: '/v1/app_management/img_list',
+			url: '/v1/Ntesterc_app/img_list',
 			method: 'post',
 			data: { ...query.value },
 		});
@@ -346,7 +346,7 @@ async function submitUpload() {
 			form.append('file', raw);
 			form.append('menu_id', String(menuId));
 			await request({
-				url: '/v1/app_management/add_img',
+				url: '/v1/Ntesterc_app/add_img',
 				method: 'post',
 				data: form,
 				headers: { 'Content-Type': 'multipart/form-data' },
@@ -376,7 +376,7 @@ function confirmDelete(row: ImageRow) {
 			}
 			try {
 				const res: unknown = await request({
-					url: '/v1/app_management/delete_img',
+					url: '/v1/Ntesterc_app/delete_img',
 					method: 'post',
 					data: { id },
 				});

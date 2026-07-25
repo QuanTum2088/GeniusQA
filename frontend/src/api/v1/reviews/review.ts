@@ -115,14 +115,14 @@ export function useReviewApi() {
 			priority?: string;
 		}) =>
 			request({
-				url: '/v1/reviews',
+				url: '/v1/Ntesterc_reviews',
 				method: 'GET',
 				params,
 			}),
 
 		getReviewDetail: (id: number) =>
 			request({
-				url: `/v1/reviews/${id}`,
+				url: `/v1/Ntesterc_reviews/${id}`,
 				method: 'GET',
 			}),
 
@@ -137,7 +137,7 @@ export function useReviewApi() {
 			reviewer_ids: number[];
 		}) =>
 			request({
-				url: '/v1/reviews',
+				url: '/v1/Ntesterc_reviews',
 				method: 'POST',
 				data,
 			}),
@@ -153,20 +153,20 @@ export function useReviewApi() {
 			}
 		) =>
 			request({
-				url: `/v1/reviews/${id}`,
+				url: `/v1/Ntesterc_reviews/${id}`,
 				method: 'PUT',
 				data,
 			}),
 
 		deleteReview: (id: number) =>
 			request({
-				url: `/v1/reviews/${id}`,
+				url: `/v1/Ntesterc_reviews/${id}`,
 				method: 'DELETE',
 			}),
 
 		getReviewStatistics: (params: { project_id?: number }) =>
 			request({
-				url: '/v1/reviews/statistics',
+				url: '/v1/Ntesterc_reviews/statistics',
 				method: 'GET',
 				params,
 			}),
@@ -179,20 +179,20 @@ export function useReviewApi() {
 			keyword?: string;
 		}) =>
 			request({
-				url: '/v1/reviews/my-tasks',
+				url: '/v1/Ntesterc_reviews/my-tasks',
 				method: 'GET',
 				params,
 			}),
 
 		startReviewTask: (reviewId: number) =>
 			request({
-				url: `/v1/reviews/${reviewId}/start`,
+				url: `/v1/Ntesterc_reviews/${reviewId}/start`,
 				method: 'POST',
 			}),
 
 		getMyReviewResults: (reviewId: number) =>
 			request({
-				url: `/v1/reviews/${reviewId}/my-results`,
+				url: `/v1/Ntesterc_reviews/${reviewId}/my-results`,
 				method: 'GET',
 			}),
 
@@ -206,7 +206,7 @@ export function useReviewApi() {
 			}
 		) =>
 			request({
-				url: `/v1/reviews/${reviewId}/results`,
+				url: `/v1/Ntesterc_reviews/${reviewId}/results`,
 				method: 'GET',
 				params,
 			}),
@@ -220,26 +220,26 @@ export function useReviewApi() {
 			}
 		) =>
 			request({
-				url: `/v1/reviews/${reviewId}/testcases/${testCaseId}/review`,
+				url: `/v1/Ntesterc_reviews/${reviewId}/testcases/${testCaseId}/review`,
 				method: 'POST',
 				data,
 			}),
 
 		completeReview: (reviewId: number) =>
 			request({
-				url: `/v1/reviews/${reviewId}/complete`,
+				url: `/v1/Ntesterc_reviews/${reviewId}/complete`,
 				method: 'POST',
 			}),
 
 		getReviewTestCases: (reviewId: number) =>
 			request({
-				url: `/v1/reviews/${reviewId}/test-cases`,
+				url: `/v1/Ntesterc_reviews/${reviewId}/test-cases`,
 				method: 'GET',
 			}),
 
 		getReviewReviewers: (reviewId: number) =>
 			request({
-				url: `/v1/reviews/${reviewId}/reviewers`,
+				url: `/v1/Ntesterc_reviews/${reviewId}/reviewers`,
 				method: 'GET',
 			}),
 
@@ -253,40 +253,40 @@ export function useReviewApi() {
 			}
 		) =>
 			request({
-				url: `/v1/reviews/${reviewId}/comments`,
+				url: `/v1/Ntesterc_reviews/${reviewId}/comments`,
 				method: 'GET',
 				params,
 			}),
 
 		checkAIReviewAvailability: (reviewId: number) =>
 			request({
-				url: `/v1/reviews/${reviewId}/ai-review/availability`,
+				url: `/v1/Ntesterc_reviews/${reviewId}/ai-review/availability`,
 				method: 'GET',
 			}),
 
 		aiReviewSingleTestCase: (reviewId: number, testCaseData: any) =>
 			request({
-				url: `/v1/reviews/${reviewId}/ai-review/single`,
+				url: `/v1/Ntesterc_reviews/${reviewId}/ai-review/single`,
 				method: 'POST',
 				data: testCaseData,
 			}),
 
 		aiReviewBatchTestCases: (reviewId: number, testCaseIds: number[]) =>
 			request({
-				url: `/v1/reviews/${reviewId}/ai-review/batch`,
+				url: `/v1/Ntesterc_reviews/${reviewId}/ai-review/batch`,
 				method: 'POST',
 				data: { test_case_ids: testCaseIds },
 			}),
 
 		aiPreReviewAllCases: (reviewId: number) =>
 			request({
-				url: `/v1/reviews/my-tasks/${reviewId}/ai-pre-review`,
+				url: `/v1/Ntesterc_reviews/my-tasks/${reviewId}/ai-pre-review`,
 				method: 'POST',
 			}),
 
 		getAIPreReviewSummary: (reviewId: number) =>
 			request({
-				url: `/v1/reviews/my-tasks/${reviewId}/ai-pre-review/summary`,
+				url: `/v1/Ntesterc_reviews/my-tasks/${reviewId}/ai-pre-review/summary`,
 				method: 'GET',
 			}),
 
@@ -297,7 +297,7 @@ export function useReviewApi() {
 			}
 		) =>
 			request({
-				url: `/v1/reviews/${reviewId}/assign`,
+				url: `/v1/Ntesterc_reviews/${reviewId}/assign`,
 				method: 'POST',
 				data,
 			}),
@@ -311,7 +311,7 @@ export function useReviewApi() {
 			}
 		) =>
 			request({
-				url: `/v1/reviews/${reviewId}/submit`,
+				url: `/v1/Ntesterc_reviews/${reviewId}/submit`,
 				method: 'POST',
 				data,
 			}),
@@ -326,14 +326,14 @@ export function useReviewApi() {
 			}
 		) =>
 			request({
-				url: `/v1/reviews/${reviewId}/comments`,
+				url: `/v1/Ntesterc_reviews/${reviewId}/comments`,
 				method: 'POST',
 				data,
 			}),
 
 		resolveComment: (commentId: number) =>
 			request({
-				url: `/v1/reviews/comments/${commentId}/resolve`,
+				url: `/v1/Ntesterc_reviews/comments/${commentId}/resolve`,
 				method: 'POST',
 			}),
 
@@ -342,14 +342,14 @@ export function useReviewApi() {
 			page_size?: number;
 		}) =>
 			request({
-				url: '/v1/reviews/templates',
+				url: '/v1/Ntesterc_reviews/templates',
 				method: 'GET',
 				params,
 			}),
 
 		getTemplateDetail: (id: number) =>
 			request({
-				url: `/v1/reviews/templates/${id}`,
+				url: `/v1/Ntesterc_reviews/templates/${id}`,
 				method: 'GET',
 			}),
 
@@ -361,7 +361,7 @@ export function useReviewApi() {
 			default_reviewer_ids?: number[];
 		}) =>
 			request({
-				url: '/v1/reviews/templates',
+				url: '/v1/Ntesterc_reviews/templates',
 				method: 'POST',
 				data,
 			}),
@@ -376,14 +376,14 @@ export function useReviewApi() {
 			}
 		) =>
 			request({
-				url: `/v1/reviews/templates/${id}`,
+				url: `/v1/Ntesterc_reviews/templates/${id}`,
 				method: 'PUT',
 				data,
 			}),
 
 		deleteTemplate: (id: number) =>
 			request({
-				url: `/v1/reviews/templates/${id}`,
+				url: `/v1/Ntesterc_reviews/templates/${id}`,
 				method: 'DELETE',
 			}),
 	};

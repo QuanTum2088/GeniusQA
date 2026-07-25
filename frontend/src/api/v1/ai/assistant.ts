@@ -95,14 +95,14 @@ export function useAssistantApi() {
 			page_size?: number;
 		}) =>
 			request({
-				url: '/v1/assistant/configs',
+				url: '/v1/Ntesterc_assistant/configs',
 				method: 'GET',
 				params,
 			}),
 
 		getConfigDetail: (id: number) =>
 			request({
-				url: `/v1/assistant/configs/${id}`,
+				url: `/v1/Ntesterc_assistant/configs/${id}`,
 				method: 'GET',
 			}),
 
@@ -113,7 +113,7 @@ export function useAssistantApi() {
 			assistant_type?: string;
 		}) =>
 			request({
-				url: '/v1/assistant/configs',
+				url: '/v1/Ntesterc_assistant/configs',
 				method: 'POST',
 				data,
 			}),
@@ -129,14 +129,14 @@ export function useAssistantApi() {
 			}
 		) =>
 			request({
-				url: `/v1/assistant/configs/${id}`,
+				url: `/v1/Ntesterc_assistant/configs/${id}`,
 				method: 'PUT',
 				data,
 			}),
 
 		deleteConfig: (id: number) =>
 			request({
-				url: `/v1/assistant/configs/${id}`,
+				url: `/v1/Ntesterc_assistant/configs/${id}`,
 				method: 'DELETE',
 			}),
 
@@ -146,14 +146,14 @@ export function useAssistantApi() {
 			assistant_config_id?: number;
 		}) =>
 			request({
-				url: '/v1/assistant/conversations',
+				url: '/v1/Ntesterc_assistant/conversations',
 				method: 'GET',
 				params,
 			}),
 
 		getConversationDetail: (id: number) =>
 			request({
-				url: `/v1/assistant/conversations/${id}`,
+				url: `/v1/Ntesterc_assistant/conversations/${id}`,
 				method: 'GET',
 			}),
 
@@ -162,7 +162,7 @@ export function useAssistantApi() {
 			title?: string;
 		}) =>
 			request({
-				url: '/v1/assistant/conversations',
+				url: '/v1/Ntesterc_assistant/conversations',
 				method: 'POST',
 				data,
 			}),
@@ -174,14 +174,14 @@ export function useAssistantApi() {
 			}
 		) =>
 			request({
-				url: `/v1/assistant/conversations/${id}`,
+				url: `/v1/Ntesterc_assistant/conversations/${id}`,
 				method: 'PUT',
 				data,
 			}),
 
 		deleteConversation: (id: number) =>
 			request({
-				url: `/v1/assistant/conversations/${id}`,
+				url: `/v1/Ntesterc_assistant/conversations/${id}`,
 				method: 'DELETE',
 			}),
 
@@ -193,7 +193,7 @@ export function useAssistantApi() {
 			}
 		) =>
 			request({
-				url: `/v1/assistant/conversations/${conversationId}/messages`,
+				url: `/v1/Ntesterc_assistant/conversations/${conversationId}/messages`,
 				method: 'GET',
 				params,
 			}),
@@ -206,7 +206,7 @@ export function useAssistantApi() {
 			}
 		) =>
 			request({
-				url: `/v1/assistant/conversations/${conversationId}/messages`,
+				url: `/v1/Ntesterc_assistant/conversations/${conversationId}/messages`,
 				method: 'GET',
 				params,
 			}),
@@ -218,7 +218,7 @@ export function useAssistantApi() {
 			}
 		) =>
 			request({
-				url: `/v1/assistant/conversations/${conversationId}/messages`,
+				url: `/v1/Ntesterc_assistant/conversations/${conversationId}/messages`,
 				method: 'POST',
 				data,
 			}),
@@ -230,14 +230,14 @@ export function useAssistantApi() {
 			user_id?: number;
 		}) =>
 			request({
-				url: '/v1/assistant/chat',
+				url: '/v1/Ntesterc_assistant/chat',
 				method: 'POST',
 				data,
 			}),
 
 		getStatistics: () =>
 			request({
-				url: '/v1/assistant/statistics',
+				url: '/v1/Ntesterc_assistant/statistics',
 				method: 'GET',
 			}),
 	};

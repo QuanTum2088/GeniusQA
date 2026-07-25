@@ -144,7 +144,7 @@ export const useConversationApi = () => {
    */
   const createConversation = (data: ConversationCreateRequest) => {
     return request<ConversationData>({
-      url: '/v1/ai/conversation',
+      url: '/v1/Ntesterc_ai/conversation',
       method: 'post',
       data
     })
@@ -155,7 +155,7 @@ export const useConversationApi = () => {
    */
   const getConversationList = (params?: { skip?: number; limit?: number }) => {
     return request<ConversationListResponse>({
-      url: '/v1/ai/conversation',
+      url: '/v1/Ntesterc_ai/conversation',
       method: 'get',
       params
     })
@@ -166,7 +166,7 @@ export const useConversationApi = () => {
    */
   const getConversation = (id: number) => {
     return request<ConversationData>({
-      url: `/v1/ai/conversation/${id}`,
+      url: `/v1/Ntesterc_ai/conversation/${id}`,
       method: 'get'
     })
   }
@@ -176,7 +176,7 @@ export const useConversationApi = () => {
    */
   const updateConversation = (id: number, data: ConversationUpdateRequest) => {
     return request<ConversationData>({
-      url: `/v1/ai/conversation/${id}`,
+      url: `/v1/Ntesterc_ai/conversation/${id}`,
       method: 'put',
       data
     })
@@ -187,7 +187,7 @@ export const useConversationApi = () => {
    */
   const deleteConversation = (id: number) => {
     return request<void>({
-      url: `/v1/ai/conversation/${id}`,
+      url: `/v1/Ntesterc_ai/conversation/${id}`,
       method: 'delete'
     })
   }
@@ -197,7 +197,7 @@ export const useConversationApi = () => {
    */
   const getMessageList = (conversationId: number, params?: { skip?: number; limit?: number }) => {
     return request<MessageListResponse>({
-      url: `/v1/ai/conversation/${conversationId}/messages`,
+      url: `/v1/Ntesterc_ai/conversation/${conversationId}/messages`,
       method: 'get',
       params
     })
@@ -208,7 +208,7 @@ export const useConversationApi = () => {
    */
   const getMcpRecords = (conversationId: number, params?: { limit?: number }) => {
     return request<{ records: any[]; total: number }>({
-      url: `/v1/ai/conversation/${conversationId}/mcp-records`,
+      url: `/v1/Ntesterc_ai/conversation/${conversationId}/mcp-records`,
       method: 'get',
       params
     })
@@ -217,7 +217,7 @@ export const useConversationApi = () => {
 
   const sendMessage = (conversationId: number, data: SendMessageRequest) => {
     return request<SendMessageResponse>({
-      url: `/v1/ai/conversation/${conversationId}/messages`,
+      url: `/v1/Ntesterc_ai/conversation/${conversationId}/messages`,
       method: 'post',
       data
     })
@@ -243,7 +243,7 @@ export const useConversationApi = () => {
     const token = Session.get('token') || ''
     
  
-    const url = `${baseURL}/api/v1/ai/conversation/${conversationId}/messages/stream`
+    const url = `${baseURL}/api/v1/Ntesterc_ai/conversation/${conversationId}/messages/stream`
     
 
     let aborted = false
@@ -352,12 +352,12 @@ export const useConversationApi = () => {
       // 开发环境：使用环境变量中的地址（因为前后端端口不同）
       const protocol = baseURL.startsWith('https') ? 'wss:' : 'ws:'
       const host = baseURL.replace(/^https?:\/\//, '').replace(/\/$/, '')
-      wsUrl = `${protocol}//${host}/api/v1/ai/conversation/${conversationId}/ws?token=${encodeURIComponent(token)}`
+      wsUrl = `${protocol}//${host}/api/v1/Ntesterc_ai/conversation/${conversationId}/ws?token=${encodeURIComponent(token)}`
     } else {
       // 生产环境：使用当前页面的 host（前后端同域，通过 Nginx 代理）
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
       const host = window.location.host
-      wsUrl = `${protocol}//${host}/api/v1/ai/conversation/${conversationId}/ws?token=${encodeURIComponent(token)}`
+      wsUrl = `${protocol}//${host}/api/v1/Ntesterc_ai/conversation/${conversationId}/ws?token=${encodeURIComponent(token)}`
     }
     
     console.log('Connecting to WebSocket:', wsUrl)

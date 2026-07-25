@@ -37,7 +37,7 @@ import re
 import threading
 from datetime import datetime
 
-from app.corelibs.logger import logger
+from app.core.logger import logger
 from app.common.rediskeys import (
     _log_key, _offset_key, _pid_key, _evicted_key, _metric_series_key, _jtl_offset_key, _label_samples_key,
     _label_errors_key, _label_error_detail_key, _top5_key, _last_threads_key,
@@ -321,10 +321,10 @@ async def collect_jmeter_log(
         exec_machine_ip:       执行机 IP（分布式=Master，单机=单机压力机）
         exec_machine_ssh_port: 执行机 SSH 端口
     """
-    from app.db import get_redis_pool
-    from app.db.sqlalchemy import async_session_factory
+    from app.infra.db import get_redis_pool
+    from app.infra.db.sqlalchemy import async_session_factory
     from app.core.base_crud import BaseCRUD
-    from app.api.v1.performance.scenario.model import PerfScenarioModel
+    from app.api.v1.Ntesterc_module.Ntesterc_performance.scenario.model import PerfScenarioModel
 
     redis = get_redis_pool().get_redis()
     log_key    = _log_key(scenario_id)
@@ -543,7 +543,7 @@ async def collect_jmeter_log(
             target_threads = 0
             try:
                 from sqlalchemy import select as _sa_select, and_ as _sa_and_
-                from app.api.v1.performance.scenario.model import PerfScenarioConfigModel
+                from app.api.v1.Ntesterc_module.Ntesterc_performance.scenario.model import PerfScenarioConfigModel
                 cfg_stmt = _sa_select(PerfScenarioConfigModel).where(
                     _sa_and_(
                         PerfScenarioConfigModel.scenario_id == scenario_id,
@@ -588,7 +588,7 @@ async def collect_jmeter_log(
             trigger_type = 1  # 默认手动触发
             try:
                 from sqlalchemy import select, and_
-                from app.api.v1.performance.scheduler.model import PerfSchedulerModel
+                from app.api.v1.Ntesterc_module.Ntesterc_performance.scheduler.model import PerfSchedulerModel
                 sched_crud = BaseCRUD(PerfSchedulerModel, db)
                 stmt = (
                     select(PerfSchedulerModel)
@@ -618,7 +618,7 @@ async def collect_jmeter_log(
                 if not fresh_scenario or fresh_scenario.status == 4:
                     logger.info(f'[LogCollector] 场景已被强制停止，跳过报告收集 scenario_id={scenario_id}')
                 else:
-                    from app.api.v1.performance.report.collector import (
+                    from app.api.v1.Ntesterc_module.Ntesterc_performance.report.collector import (
                         create_collecting_record, collect_report_async,
                     )
                     # 先写 DB status=1(收集中)，再更新场景完成状态，消除时序窗口：
@@ -656,7 +656,7 @@ async def collect_jmeter_log(
     if not process_running:
         _remove_job(scenario_id)
         try:
-            from app.db import get_redis_pool
+            from app.infra.db import get_redis_pool
             _redis = get_redis_pool().get_redis()
             await _redis.delete(
                 _log_key(scenario_id), _offset_key(scenario_id),
@@ -673,7 +673,7 @@ def _remove_job(scenario_id: int) -> None:
     """安全移除 APScheduler 日志收集任务并释放 SSH 连接池。"""
     _release_connection(scenario_id)
     try:
-        from app.api.v1.task_scheduler.scheduler import get_scheduler
+        from app.api.v1.Ntesterc_module.Ntesterc_task_scheduler.scheduler import get_scheduler
         scheduler = get_scheduler()
         job_id = f'perf_log_{scenario_id}'
         if scheduler.get_job(job_id):
@@ -707,7 +707,7 @@ def start_log_collector(
         poll_interval:         轮询间隔秒数（从 DB 参数读取后传入）
     """
     from apscheduler.triggers.interval import IntervalTrigger
-    from app.api.v1.task_scheduler.scheduler import get_scheduler
+    from app.api.v1.Ntesterc_module.Ntesterc_task_scheduler.scheduler import get_scheduler
 
     scheduler = get_scheduler()
     job_id = f'perf_log_{scenario_id}'

@@ -41,7 +41,7 @@ export function useOAuthApi() {
      */
     getProviders: () => {
       return request({
-        url: '/v1/oauth/providers',
+        url: '/v1/Ntesterc_oauth/providers',
         method: 'GET',
       });
     },
@@ -53,7 +53,7 @@ export function useOAuthApi() {
      */
     getAuthorizeUrl: (provider: OAuthProvider, state?: string) => {
       return request({
-        url: `/v1/oauth/${provider}/authorize`,
+        url: `/v1/Ntesterc_oauth/${provider}/authorize`,
         method: 'GET',
         params: state ? { state } : undefined,
       });
@@ -67,7 +67,7 @@ export function useOAuthApi() {
      */
     callback: (provider: OAuthProvider, code: string, state?: string) => {
       return request({
-        url: `/v1/oauth/${provider}/callback`,
+        url: `/v1/Ntesterc_oauth/${provider}/callback`,
         method: 'POST',
         data: {
           code,

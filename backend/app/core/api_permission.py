@@ -10,9 +10,9 @@ from typing import List, Set, Optional, Callable
 from fastapi import HTTPException, status, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from app.db.sqlalchemy import get_db
+from app.infra.db.sqlalchemy import get_db
 from app.api.v1.system.user.model import UserModel
-from app.models.rbac_models import Permission, RolePermission, UserRole
+from app.api.v1.system.permission.rbac_model import Permission, RolePermission, UserRole
 
 
 class ApiPermission:

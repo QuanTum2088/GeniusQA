@@ -1,19 +1,19 @@
 import axios from '@/utils/axios.ts';
 
 enum API {
-	DEVICES_LIST = '/api/v1/cloud_device/device_list',
-	DEVICES_INSTALL = '/api/v1/cloud_device/device_install',
-	DEVICES_UNINSTALL = '/api/v1/cloud_device/device_uninstall',
-	DEVICE_INFO_LIST = '/api/v1/cloud_device/device_info_list',
-	USE_DEVICE = '/api/v1/cloud_device/use_device',
-	STOP_DEVICE = '/api/v1/cloud_device/stop_device',
-	GET_DEVICES_LOG = '/api/v1/cloud_device/get_device_log',
-	GET_HISTORY_LIST = '/api/v1/cloud_device/get_history_list',
-	DEVICE_INSTALL_APP = '/api/v1/cloud_device/device_install_app',
-	DIRECT_INSTALL_APP = '/api/v1/cloud_device/direct_install_app',
-	APP_VIEW_DEVICE = '/api/v1/cloud_device/app_view_device',
-	ADD_DEVICE = '/api/v1/cloud_device/add_device',
-	DEVICE_PERFORMANCE = '/api/v1/cloud_device/device_performance',
+	DEVICES_LIST = '/api/v1/Ntesterc_cloud_device/device_list',
+	DEVICES_INSTALL = '/api/v1/Ntesterc_cloud_device/device_install',
+	DEVICES_UNINSTALL = '/api/v1/Ntesterc_cloud_device/device_uninstall',
+	DEVICE_INFO_LIST = '/api/v1/Ntesterc_cloud_device/device_info_list',
+	USE_DEVICE = '/api/v1/Ntesterc_cloud_device/use_device',
+	STOP_DEVICE = '/api/v1/Ntesterc_cloud_device/stop_device',
+	GET_DEVICES_LOG = '/api/v1/Ntesterc_cloud_device/get_device_log',
+	GET_HISTORY_LIST = '/api/v1/Ntesterc_cloud_device/get_history_list',
+	DEVICE_INSTALL_APP = '/api/v1/Ntesterc_cloud_device/device_install_app',
+	DIRECT_INSTALL_APP = '/api/v1/Ntesterc_cloud_device/direct_install_app',
+	APP_VIEW_DEVICE = '/api/v1/Ntesterc_cloud_device/app_view_device',
+	ADD_DEVICE = '/api/v1/Ntesterc_cloud_device/add_device',
+	DEVICE_PERFORMANCE = '/api/v1/Ntesterc_cloud_device/device_performance',
 }
 
 export const get_device_list = (params: any) => axios.post(API.DEVICES_LIST, params);

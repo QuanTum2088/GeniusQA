@@ -47,40 +47,40 @@ export function useSslCertificateApi() {
   return {
     create(data: SSLCertificateCreate) {
       return request({
-        url: '/v1/api_testing/ssl-certificates',
+        url: '/v1/Ntesterc_api_testing/ssl-certificates',
         method: 'post',
         data,
       });
     },
     list(params: { project_id: number; page?: number; page_size?: number }) {
       return request({
-        url: '/v1/api_testing/ssl-certificates',
+        url: '/v1/Ntesterc_api_testing/ssl-certificates',
         method: 'get',
         params,
       });
     },
     get(id: number) {
       return request({
-        url: `/v1/api_testing/ssl-certificates/${id}`,
+        url: `/v1/Ntesterc_api_testing/ssl-certificates/${id}`,
         method: 'get',
       });
     },
     update(id: number, data: SSLCertificateUpdate) {
       return request({
-        url: `/v1/api_testing/ssl-certificates/${id}`,
+        url: `/v1/Ntesterc_api_testing/ssl-certificates/${id}`,
         method: 'put',
         data,
       });
     },
     delete(id: number) {
       return request({
-        url: `/v1/api_testing/ssl-certificates/${id}`,
+        url: `/v1/Ntesterc_api_testing/ssl-certificates/${id}`,
         method: 'delete',
       });
     },
     toggle(id: number) {
       return request({
-        url: `/v1/api_testing/ssl-certificates/${id}/toggle`,
+        url: `/v1/Ntesterc_api_testing/ssl-certificates/${id}/toggle`,
         method: 'put',
       });
     },

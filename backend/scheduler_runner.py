@@ -7,9 +7,9 @@ from __future__ import annotations
 import asyncio
 import signal
 from typing import Optional
-from app.corelibs.logger import init_logger, logger
-from app.db import get_redis_pool
-from app.db.sqlalchemy import async_session
+from app.core.logger import init_logger, logger
+from app.infra.db import get_redis_pool
+from app.infra.db.sqlalchemy import async_session
 from config import config
 
 
@@ -30,8 +30,8 @@ class SchedulerRunner:
         self._redis = redis_pool_instance.redis
 
         # 启动调度器
-        from app.api.v1.task_scheduler.scheduler import start_scheduler
-        from app.api.v1.task_scheduler.service import TaskSchedulerService
+        from app.api.v1.Ntesterc_module.Ntesterc_task_scheduler.scheduler import start_scheduler
+        from app.api.v1.Ntesterc_module.Ntesterc_task_scheduler.service import TaskSchedulerService
 
         start_scheduler()
 
@@ -60,7 +60,7 @@ class SchedulerRunner:
         except Exception:
             pass
         try:
-            from app.api.v1.task_scheduler.scheduler import shutdown_scheduler
+            from app.api.v1.Ntesterc_module.Ntesterc_task_scheduler.scheduler import shutdown_scheduler
 
             shutdown_scheduler()
         except Exception as e:
@@ -79,8 +79,8 @@ class SchedulerRunner:
         if not self._redis:
             return
 
-        from app.api.v1.task_scheduler.remote_control import QUEUE_KEY
-        from app.api.v1.task_scheduler.scheduler import get_scheduler
+        from app.api.v1.Ntesterc_module.Ntesterc_task_scheduler.remote_control import QUEUE_KEY
+        from app.api.v1.Ntesterc_module.Ntesterc_task_scheduler.scheduler import get_scheduler
         from apscheduler.triggers.date import DateTrigger
         from datetime import datetime, timedelta
         import json
@@ -126,8 +126,8 @@ class SchedulerRunner:
                     }
                 elif action == "scheduler.reload":
                     # 清空现有 job，并从 DB 重新加载启用任务
-                    from app.api.v1.task_scheduler.service import TaskSchedulerService
-                    from app.db.sqlalchemy import async_session
+                    from app.api.v1.Ntesterc_module.Ntesterc_task_scheduler.service import TaskSchedulerService
+                    from app.infra.db.sqlalchemy import async_session
 
                     before_jobs = scheduler.get_jobs()
                     before_ids = [str(j.id) for j in before_jobs]

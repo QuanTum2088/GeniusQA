@@ -9,25 +9,25 @@ const post = <T = any>(url: string, data?: any) =>
 export function useMiniAutomationApi() {
   return {
     // 元数据
-    get_frameworks: () => request({ url: '/v1/miniprogram_automation/frameworks', method: 'get' }),
-    get_platforms:  () => request({ url: '/v1/miniprogram_automation/platforms',  method: 'get' }),
+    get_frameworks: () => request({ url: '/v1/Ntesterc_mini/frameworks', method: 'get' }),
+    get_platforms:  () => request({ url: '/v1/Ntesterc_mini/platforms',  method: 'get' }),
     // 菜单
-    get_menu:    (data: any) => post('/v1/miniprogram_automation/menu', data),
-    add_menu:    (data: any) => post('/v1/miniprogram_automation/add_menu', data),
-    rename_menu: (data: any) => post('/v1/miniprogram_automation/rename_menu', data),
-    del_menu:    (data: any) => post('/v1/miniprogram_automation/del_menu', data),
-    copy_script: (data: any) => post('/v1/miniprogram_automation/copy_script', data),
+    get_menu:    (data: any) => post('/v1/Ntesterc_mini/menu', data),
+    add_menu:    (data: any) => post('/v1/Ntesterc_mini/add_menu', data),
+    rename_menu: (data: any) => post('/v1/Ntesterc_mini/rename_menu', data),
+    del_menu:    (data: any) => post('/v1/Ntesterc_mini/del_menu', data),
+    copy_script: (data: any) => post('/v1/Ntesterc_mini/copy_script', data),
     // 脚本
-    get_script:  (data: any) => post('/v1/miniprogram_automation/get_script', data),
-    save_script: (data: any) => post('/v1/miniprogram_automation/save_script', data),
+    get_script:  (data: any) => post('/v1/Ntesterc_mini/get_script', data),
+    save_script: (data: any) => post('/v1/Ntesterc_mini/save_script', data),
     // 执行
-    run_script:  (data: any) => post('/v1/miniprogram_automation/run_script', data),
-    stop_script: (data: any) => post('/v1/miniprogram_automation/stop_script', data),
-    run_status:  (data: any) => post('/v1/miniprogram_automation/run_status', data),
+    run_script:  (data: any) => post('/v1/Ntesterc_mini/run_script', data),
+    stop_script: (data: any) => post('/v1/Ntesterc_mini/stop_script', data),
+    run_status:  (data: any) => post('/v1/Ntesterc_mini/run_status', data),
     // 结果
-    result_list:   (data: any) => post('/v1/miniprogram_automation/result_list', data),
-    result_detail: (data: any) => post('/v1/miniprogram_automation/result_detail', data),
-    del_result:    (data: any) => post('/v1/miniprogram_automation/del_result', data),
+    result_list:   (data: any) => post('/v1/Ntesterc_mini/result_list', data),
+    result_detail: (data: any) => post('/v1/Ntesterc_mini/result_detail', data),
+    del_result:    (data: any) => post('/v1/Ntesterc_mini/del_result', data),
   };
 }
 
