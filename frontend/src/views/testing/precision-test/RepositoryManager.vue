@@ -199,7 +199,7 @@ import { ref, reactive, onMounted, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Warning } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
-import { usePrecisionTestApi } from '/@/api/v1/precision_test';
+import { usePrecisionTestApi } from '/@/api/v1/testing/precisionTest';
 
 const props = defineProps<{ serviceId: number }>();
 

@@ -482,7 +482,7 @@
 <script setup lang="ts" name="PerformanceConfig">
 import { ref, reactive, computed, onMounted } from 'vue';
 import { ElMessage, ElMessageBox, FormInstance } from 'element-plus';
-import { usePerformanceApi } from '/@/api/v1/performance';
+import { usePerformanceApi } from '/@/api/v1/testing/performance';
 import { useDictDataApi } from '/@/api/v1/system/dict';
 import { formatDateTime } from '/@/utils/formatTime';
 

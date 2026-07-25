@@ -1,117 +1,131 @@
 <template>
   <div class="skill-page">
-    <el-card>
-      <template #header>
-        <div class="header-row">
-          <span>Skill 管理</span>
-          <div class="actions">
-            <el-select v-model="projectId" placeholder="选择项目" style="width: 220px" @change="loadSkills">
-              <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
-            </el-select>
-            <el-button type="success" @click="openEditDialog()">新建 Skill</el-button>
-            <el-button type="primary" @click="openGitDialog">Git 导入</el-button>
-            <el-upload :show-file-list="false" accept=".zip" :before-upload="onUploadZip">
-              <el-button>上传 ZIP</el-button>
-            </el-upload>
-          </div>
-        </div>
-      </template>
+    <div class="skill-toolbar">
+      <div class="toolbar-left">
+        <h2 class="page-title">Skill 管理</h2>
+        <el-select v-model="projectId" placeholder="选择项目" style="width: 220px" @change="onProjectChange">
+          <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
+        </el-select>
+      </div>
+      <div class="toolbar-actions">
+        <el-button type="success" @click="openEditDialog()">新建 Skill</el-button>
+        <el-button type="primary" @click="openGitDialog">Git 导入</el-button>
+        <el-upload :show-file-list="false" accept=".zip" :before-upload="onUploadZip">
+          <el-button>上传 ZIP</el-button>
+        </el-upload>
+      </div>
+    </div>
 
-      <el-form :inline="true">
-        <el-form-item label="名称">
-          <el-input v-model="query.search" clearable placeholder="技能名称" @keyup.enter="loadSkills" />
-        </el-form-item>
-        <el-form-item label="分类">
-          <el-input v-model="query.scenario_category" clearable placeholder="如 agent-browser-skill" @keyup.enter="loadSkills" />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="loadSkills">查询</el-button>
-          <el-button @click="resetQuery">重置</el-button>
-        </el-form-item>
-      </el-form>
+    <div class="skill-filters">
+      <el-input
+        v-model="query.search"
+        clearable
+        placeholder="搜索技能名称"
+        style="width: 220px"
+        @keyup.enter="loadSkills"
+      />
+      <el-input
+        v-model="query.scenario_category"
+        clearable
+        placeholder="场景分类"
+        style="width: 220px"
+        @keyup.enter="loadSkills"
+      />
+      <el-button type="primary" @click="loadSkills">查询</el-button>
+      <el-button @click="resetQuery">重置</el-button>
+    </div>
 
-      <el-card v-loading="toolsetLoading" shadow="never" class="toolset-card">
-        <template #header>
-          <div class="toolset-header">
-            <span>工具集快捷执行</span>
-            <span class="toolset-sub">按场景分类展开，点模板一键进入执行；无模板时用「自定义执行」</span>
-          </div>
-        </template>
-        <div v-if="!projectId" class="toolset-empty">请先选择项目</div>
-        <div v-else-if="!groupedToolsets.length" class="toolset-empty">暂无技能，可先 Git 导入或上传 ZIP</div>
-        <el-collapse v-else v-model="toolsetActiveNames" @change="onToolsetCollapseChange">
-          <el-collapse-item v-for="g in groupedToolsets" :key="g.key" :name="g.key">
-            <template #title>
-              <span class="toolset-group-title">{{ g.name }}</span>
-              <el-tag size="small" type="info" class="toolset-count">{{ g.skills.length }}</el-tag>
-            </template>
-            <div v-for="s in g.skills" :key="s.id" class="toolset-skill">
-              <div class="toolset-skill-head">
-                <div class="toolset-skill-title">
-                  <span class="toolset-name">{{ s.name }}</span>
-                  <span v-if="s.description" class="toolset-desc" :title="s.description">{{ s.description }}</span>
-                </div>
-                <el-button link type="primary" size="small" @click.stop="onRun(s)">自定义执行</el-button>
-              </div>
-              <div v-if="manifestCache[s.id]?.loading" class="toolset-muted">加载模板中…</div>
-              <div v-else class="toolset-actions">
-                <template v-for="qa in quickActionsForSkill(s)" :key="qa.key">
-                  <el-button size="small" type="primary" plain @click.stop="quickRunCommand(s, qa.command, qa.title)">
-                    {{ qa.title }}
-                  </el-button>
-                </template>
-                <template v-if="(manifestCache[s.id]?.templates || []).length">
-                  <el-button
-                    v-for="t in manifestCache[s.id].templates"
-                    :key="t.name"
-                    size="small"
-                    @click.stop="quickRunTemplate(s, t.name)"
-                  >
-                    {{ templateLabel(t.name) }}
-                  </el-button>
-                </template>
-                <span v-else class="toolset-muted">无 templates 目录脚本，请用「自定义执行」或高级 JSON 填写 command</span>
+    <div v-loading="loading" class="skill-grid-wrap">
+      <div v-if="!projectId" class="skill-empty">请先选择项目</div>
+      <div v-else-if="!rows.length" class="skill-empty">暂无 Skill，可新建、Git 导入或上传 ZIP</div>
+      <div v-else class="skill-grid">
+        <article v-for="s in rows" :key="s.id" class="skill-card">
+          <header class="skill-card__head">
+            <div class="skill-card__identity">
+              <h3 class="skill-card__name" :title="s.name">{{ s.name }}</h3>
+              <div class="skill-card__tags">
+                <el-tag size="small" type="info">{{ s.scenario_category || '未分类' }}</el-tag>
+                <el-tag size="small">{{ s.source_type || '-' }}</el-tag>
               </div>
             </div>
-          </el-collapse-item>
-        </el-collapse>
-      </el-card>
+            <el-switch
+              v-model="s.is_active"
+              inline-prompt
+              active-text="开"
+              inactive-text="关"
+              @change="onToggleActive(s)"
+            />
+          </header>
 
-      <div class="section-title">完整列表与编排</div>
+          <p class="skill-card__desc" :title="s.description || ''">
+            {{ s.description || '暂无描述' }}
+          </p>
 
-      <el-table v-loading="loading" :data="rows">
-        <el-table-column prop="name" label="名称" min-width="180" />
-        <el-table-column prop="scenario_category" label="分类" min-width="160" />
-        <el-table-column prop="source_type" label="来源" width="110" />
-        <el-table-column prop="allowed_tools" label="工具列表" min-width="260" show-overflow-tooltip />
-        <el-table-column prop="entry_command" label="执行命令" min-width="220" show-overflow-tooltip />
-        <el-table-column label="状态" width="90" align="center">
-          <template #default="{ row }">
-            <el-switch v-model="row.is_active" @change="onToggleActive(row)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="280" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" @click="onRun(row)">执行</el-button>
-            <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
-            <el-button size="small" @click="onViewContent(row)">查看内容</el-button>
-            <el-button size="small" type="danger" @click="onDelete(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+          <div class="skill-card__meta">
+            <div class="meta-row" :title="s.entry_command || ''">
+              <span class="meta-label">命令</span>
+              <span class="meta-value">{{ s.entry_command || '-' }}</span>
+            </div>
+            <div class="meta-row" :title="s.allowed_tools || ''">
+              <span class="meta-label">工具</span>
+              <span class="meta-value">{{ s.allowed_tools || '-' }}</span>
+            </div>
+          </div>
 
-      <div class="pager">
-        <el-pagination
-          v-model:current-page="query.page"
-          v-model:page-size="query.page_size"
-          :total="total"
-          :page-sizes="[10, 20, 50, 100]"
-          layout="total, sizes, prev, pager, next, jumper"
-          @current-change="loadSkills"
-          @size-change="loadSkills"
-        />
+          <footer class="skill-card__foot">
+            <div class="foot-main">
+              <el-button type="primary" size="small" @click="onRun(s)">执行</el-button>
+              <el-dropdown
+                v-if="hasQuickActions(s) || manifestCache[s.id]?.loading"
+                trigger="click"
+                @command="(cmd) => onQuickCommand(s, cmd)"
+              >
+                <el-button size="small">快捷执行 ▾</el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <template v-if="manifestCache[s.id]?.loading">
+                      <el-dropdown-item disabled>加载中…</el-dropdown-item>
+                    </template>
+                    <template v-else>
+                      <el-dropdown-item
+                        v-for="qa in quickActionsForSkill(s)"
+                        :key="qa.key"
+                        :command="`qa:${qa.key}`"
+                      >
+                        {{ qa.title }}
+                      </el-dropdown-item>
+                      <el-dropdown-item
+                        v-for="(t, idx) in manifestCache[s.id]?.templates || []"
+                        :key="t.name"
+                        :command="`tpl:${t.name}`"
+                        :divided="idx === 0 && quickActionsForSkill(s).length > 0"
+                      >
+                        {{ templateLabel(t.name) }}
+                      </el-dropdown-item>
+                    </template>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+              <el-button link type="primary" @click="openEditDialog(s)">编辑</el-button>
+              <el-button link type="primary" @click="onViewContent(s)">查看内容</el-button>
+            </div>
+            <el-button link type="danger" class="foot-delete" @click="onDelete(s)">删除</el-button>
+          </footer>
+        </article>
       </div>
-    </el-card>
+    </div>
+
+    <div class="pager">
+      <el-pagination
+        v-model:current-page="query.page"
+        v-model:page-size="query.page_size"
+        :total="total"
+        :page-sizes="[12, 24, 48, 96]"
+        layout="total, sizes, prev, pager, next, jumper"
+        @current-change="loadSkills"
+        @size-change="loadSkills"
+      />
+    </div>
 
     <el-dialog v-model="gitDialogVisible" title="Git 导入 Skill" width="560px">
       <el-form label-width="90px">
@@ -290,11 +304,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { UploadRawFile } from 'element-plus';
 import { useProjectApi } from '/@/api/v1/projects/project';
-import { skillsApi } from '/@/api/v1/skills';
+import { skillsApi } from '/@/api/v1/ai/skills';
 import { Session } from '/@/utils/storage';
 import { getApiBaseUrl } from '/@/utils/config';
 
@@ -309,8 +323,9 @@ const query = reactive({
   search: '',
   scenario_category: '',
   page: 1,
-  page_size: 20,
+  page_size: 12,
 });
+const manifestCache = reactive<Record<number, { templates: any[]; loading: boolean; loaded: boolean }>>({});
 
 const gitDialogVisible = ref(false);
 const gitSubmitting = ref(false);
@@ -461,27 +476,6 @@ const pollJobUntilDone = async (jobId: number) => {
   }
 };
 
-const toolsetLoading = ref(false);
-const toolsetRows = ref<any[]>([]);
-const toolsetActiveNames = ref<string[]>([]);
-const manifestCache = reactive<Record<number, { templates: any[]; loading: boolean; loaded: boolean }>>({});
-
-const groupedToolsets = computed(() => {
-  const map = new Map<string, any[]>();
-  for (const row of toolsetRows.value) {
-    const name = String(row.scenario_category || '').trim() || '未分类';
-    if (!map.has(name)) map.set(name, []);
-    map.get(name)!.push(row);
-  }
-  return Array.from(map.entries())
-    .map(([name, skills]) => ({
-      key: name,
-      name,
-      skills: [...skills].sort((a, b) => String(a.name).localeCompare(String(b.name))),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-});
-
 const templateLabel = (fileName: string) =>
   String(fileName || '')
     .replace(/\.(sh|js|bash)$/i, '')
@@ -495,43 +489,9 @@ const loadProjects = async () => {
   }
 };
 
-const loadSkills = async () => {
-  if (!projectId.value) return;
-  loading.value = true;
-  try {
-    const res: any = await skillsApi.list(projectId.value, query);
-    rows.value = res?.data?.items || [];
-    total.value = res?.data?.total || 0;
-  } finally {
-    loading.value = false;
-  }
-  await loadToolsetPanel();
-};
-
-const loadToolsetPanel = async () => {
-  if (!projectId.value) return;
-  toolsetLoading.value = true;
-  try {
-    const res: any = await skillsApi.list(projectId.value, {
-      search: query.search,
-      scenario_category: query.scenario_category,
-      page: 1,
-      page_size: 100,
-    });
-    toolsetRows.value = res?.data?.items || [];
-    for (const k of Object.keys(manifestCache)) delete manifestCache[Number(k)];
-    toolsetActiveNames.value = groupedToolsets.value.length ? [groupedToolsets.value[0].key] : [];
-    if (groupedToolsets.value.length) {
-      await prefetchManifestsForGroup(groupedToolsets.value[0].key);
-    }
-  } finally {
-    toolsetLoading.value = false;
-  }
-};
-
 const ensureManifest = async (skillId: number) => {
   if (!projectId.value) return;
-  let cur = manifestCache[skillId];
+  const cur = manifestCache[skillId];
   if (cur?.loaded || cur?.loading) return;
   manifestCache[skillId] = { templates: [], loading: true, loaded: false };
   try {
@@ -546,21 +506,31 @@ const ensureManifest = async (skillId: number) => {
   }
 };
 
-const prefetchManifestsForGroup = async (groupKey: string) => {
-  const g = groupedToolsets.value.find((x) => x.key === groupKey);
-  if (!g) return;
+const prefetchManifestsForRows = async () => {
   const chunk = 8;
-  for (let i = 0; i < g.skills.length; i += chunk) {
-    const slice = g.skills.slice(i, i + chunk);
+  for (let i = 0; i < rows.value.length; i += chunk) {
+    const slice = rows.value.slice(i, i + chunk);
     await Promise.all(slice.map((s: any) => ensureManifest(s.id)));
   }
 };
 
-const onToolsetCollapseChange = async (active: string | string[]) => {
-  const names = Array.isArray(active) ? active : [active];
-  for (const key of names) {
-    await prefetchManifestsForGroup(key);
+const loadSkills = async () => {
+  if (!projectId.value) return;
+  loading.value = true;
+  try {
+    const res: any = await skillsApi.list(projectId.value, query);
+    rows.value = res?.data?.items || [];
+    total.value = res?.data?.total || 0;
+    for (const k of Object.keys(manifestCache)) delete manifestCache[Number(k)];
+  } finally {
+    loading.value = false;
   }
+  void prefetchManifestsForRows();
+};
+
+const onProjectChange = () => {
+  query.page = 1;
+  loadSkills();
 };
 
 const resetQuery = () => {
@@ -784,6 +754,22 @@ const quickActionsForSkill = (row: any) => {
   return res;
 };
 
+const hasQuickActions = (row: any) =>
+  quickActionsForSkill(row).length > 0 || (manifestCache[row.id]?.templates || []).length > 0;
+
+const onQuickCommand = (row: any, cmd: string) => {
+  if (!cmd) return;
+  if (cmd.startsWith('qa:')) {
+    const key = cmd.slice(3);
+    const qa = quickActionsForSkill(row).find((x) => x.key === key);
+    if (qa) quickRunCommand(row, qa.command, qa.title);
+    return;
+  }
+  if (cmd.startsWith('tpl:')) {
+    quickRunTemplate(row, cmd.slice(4));
+  }
+};
+
 const submitRun = async () => {
   if (!projectId.value || !runTarget.value) return;
   let base: Record<string, any> = {};
@@ -892,92 +878,160 @@ onMounted(async () => {
 
 <style scoped>
 .skill-page {
-  padding: 16px;
+  padding: 16px 20px 24px;
 }
-.header-row {
+.skill-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
 }
-.actions {
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.page-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.toolbar-actions {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
-.pager {
-  margin-top: 14px;
+.skill-filters {
   display: flex;
-  justify-content: flex-end;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
 }
-.section-title {
-  margin: 18px 0 10px;
-  font-weight: 600;
+.skill-grid-wrap {
+  min-height: 220px;
+}
+.skill-empty {
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--el-text-color-secondary);
   font-size: 14px;
-  color: var(--el-text-color-primary);
+  background: var(--el-fill-color-blank);
+  border: 1px dashed var(--el-border-color);
+  border-radius: 10px;
 }
-.toolset-card {
-  margin-bottom: 8px;
+.skill-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
 }
-.toolset-header {
+.skill-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 12px;
+  background: var(--el-bg-color);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.toolset-sub {
-  font-size: 12px;
-  font-weight: normal;
-  color: var(--el-text-color-secondary);
+.skill-card:hover {
+  border-color: var(--el-color-primary-light-5);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
 }
-.toolset-empty {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-  padding: 8px 0;
-}
-.toolset-group-title {
-  font-weight: 600;
-}
-.toolset-count {
-  margin-left: 8px;
-}
-.toolset-skill {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-}
-.toolset-skill:last-child {
-  border-bottom: none;
-}
-.toolset-skill-head {
+.skill-card__head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 8px;
 }
-.toolset-skill-title {
+.skill-card__identity {
   min-width: 0;
   flex: 1;
 }
-.toolset-name {
+.skill-card__name {
+  margin: 0 0 8px;
+  font-size: 16px;
   font-weight: 600;
-  margin-right: 8px;
+  line-height: 1.3;
+  color: var(--el-text-color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.toolset-desc {
-  font-size: 12px;
+.skill-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.skill-card__desc {
+  margin: 0;
+  min-height: 40px;
+  font-size: 13px;
+  line-height: 1.5;
   color: var(--el-text-color-secondary);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.toolset-actions {
+.skill-card__meta {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--el-fill-color-light);
 }
-.toolset-muted {
+.meta-row {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
   font-size: 12px;
+  line-height: 1.4;
+}
+.meta-label {
+  flex: 0 0 32px;
   color: var(--el-text-color-secondary);
+}
+.meta-value {
+  min-width: 0;
+  color: var(--el-text-color-regular);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.skill-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--el-border-color-extra-light);
+}
+.foot-main {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+.foot-main :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+.foot-delete {
+  flex-shrink: 0;
+}
+.pager {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
 }
 .run-advanced {
   width: 100%;
@@ -1004,6 +1058,11 @@ onMounted(async () => {
 }
 :deep(.result-drawer .el-drawer__body) {
   padding: 0 8px 16px;
+}
+@media (max-width: 768px) {
+  .skill-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
 

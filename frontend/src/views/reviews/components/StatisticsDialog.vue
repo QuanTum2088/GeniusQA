@@ -129,7 +129,7 @@
 <script setup lang="ts">
 import { ref, reactive, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { Document, Clock, Loading, Check } from '@element-plus/icons-vue';
-import { getReviewStatistics, type ReviewStatistics } from '/@/api/v1/reviews';
+import { getReviewStatistics, type ReviewStatistics } from '/@/api/v1/reviews/review';
 
 // Props
 interface Props {

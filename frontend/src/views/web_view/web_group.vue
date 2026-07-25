@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="web-group-page">
     <!-- 顶部工具栏 -->
     <div class="group-toolbar">
@@ -364,7 +364,7 @@ import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { DocumentCopy, Monitor, HomeFilled, Folder, ChromeFilled, Delete, Check, Close } from '@element-plus/icons-vue'
 import { logLineClass, parseLogLineForDisplay } from '@/utils/runMonitorLog'
-import { useWebManagementApi } from '/@/api/v1/web_management'
+import { useWebManagementApi } from '/@/api/v1/testing/webManagement'
 import commonFunction from '/@/utils/commonFunction'
 import { formatDateTime } from '/@/utils/formatTime'
 

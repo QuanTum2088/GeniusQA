@@ -327,7 +327,7 @@ import { ElMessageBox } from 'element-plus';
 import PerfConsole from '../components/PerfConsole.vue';
 import MetricChart from '../components/MetricChart.vue';
 import draggable from 'vuedraggable';
-import { usePerformanceApi } from '/@/api/v1/performance';
+import { usePerformanceApi } from '/@/api/v1/testing/performance';
 import { applyStageEvent } from '/@/utils/perfExecState';
 
 const perfApi = usePerformanceApi();

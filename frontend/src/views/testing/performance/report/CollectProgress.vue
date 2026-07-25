@@ -291,7 +291,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { ElMessage } from 'element-plus';
-import { usePerformanceApi } from '/@/api/v1/performance';
+import { usePerformanceApi } from '/@/api/v1/testing/performance';
 
 const perfApi = usePerformanceApi();
 

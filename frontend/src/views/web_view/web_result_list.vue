@@ -177,7 +177,7 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Close } from '@element-plus/icons-vue'
-import { useWebManagementApi } from '/@/api/v1/web_management'
+import { useWebManagementApi } from '/@/api/v1/testing/webManagement'
 import { getExecutionStatusMeta } from '/@/utils/executionStatus'
 
 const { get_web_result_list, run_web_script, stop_web_result, del_web_result } = useWebManagementApi()

@@ -359,7 +359,7 @@ import {
   Picture,
   ArrowDown
 } from '@element-plus/icons-vue'
-import { useUiAutomationApi } from '/@/api/v1/ui_automation'
+import { useUiAutomationApi } from '/@/api/v1/testing/uiAutomation'
 import { formatDateTime } from '/@/utils/formatTime'
 
 const { uiExecutionApi, uiProjectApi } = useUiAutomationApi()

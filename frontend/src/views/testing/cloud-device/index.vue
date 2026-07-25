@@ -1,4 +1,4 @@
-﻿<template>
+<template>
     <div>
         <el-card class="box-card">
             <div style="margin-bottom: 10px;">
@@ -308,7 +308,7 @@
 </template>
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { useCloudDeviceApi } from '/@/api/v1/cloud_device';
+import { useCloudDeviceApi } from '/@/api/v1/testing/cloudDevice';
 import { ElLoading, ElMessage, ElMessageBox, ElNotification } from 'element-plus';
 import { CircleCheck, CircleClose, View, Pointer } from '@element-plus/icons-vue';
 import * as echarts from 'echarts';
@@ -316,7 +316,7 @@ import NtestercUploadFiles from '/@/components/ntesterc/NtestercUploadFiles.vue'
 import devicePlaceholder from '/@/assets/device-placeholder.svg';
 import VueJsonPretty from 'vue-json-pretty';
 import 'vue-json-pretty/lib/styles.css';
-import { useMitmproxyApi } from '/@/api/v1/mitmproxy';
+import { useMitmproxyApi } from '/@/api/v1/testing/mitmproxy';
 
 const {
   mitmproxy_check,

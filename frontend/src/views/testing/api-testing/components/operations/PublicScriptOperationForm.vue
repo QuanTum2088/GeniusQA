@@ -46,7 +46,7 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, onMounted } from 'vue'
-import { getPublicScripts } from '/@/api/v1/operations'
+import { getPublicScripts } from '/@/api/v1/testing/operations'
 import PublicScriptDialog from '../PublicScriptDialog.vue'
 
 const props = defineProps<{

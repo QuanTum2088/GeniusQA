@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="element-manager-container">
     <div style="display: flex; gap: 8px; align-items: flex-start">
         <!-- 左侧元素菜单树 -->
@@ -407,7 +407,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { HomeFilled, Folder, MoreFilled, CirclePlus, Edit, Delete } from '@element-plus/icons-vue'
 import NtestercCard from '/@/components/ntesterc/NtestercCard.vue'
 import NtestercDialog from '/@/components/ntesterc/NtestercDialog.vue'
-import { useWebManagementApi } from '/@/api/v1/web_management'
+import { useWebManagementApi } from '/@/api/v1/testing/webManagement'
 
 const {
   element_tree,

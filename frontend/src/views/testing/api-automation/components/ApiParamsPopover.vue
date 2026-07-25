@@ -57,7 +57,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { api_params, add_params, edit_params, del_params } from '/@/api/v1/api_automation';
+import { api_params, add_params, edit_params, del_params } from '/@/api/v1/testing/apiAutomation';
 
 const searchParams = ref({ currentPage: 1, pageSize: 10, search: { name__contains: '' } });
 const params_list = ref<any[]>([]);

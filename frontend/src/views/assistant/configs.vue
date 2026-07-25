@@ -192,7 +192,7 @@ import {
 	updateConfig, 
 	deleteConfig as deleteConfigApi,
 	type AssistantConfig 
-} from '/@/api/v1/assistant';
+} from '/@/api/v1/ai/assistant';
 
 // 响应式数据
 const loading = ref(false);

@@ -63,7 +63,7 @@
 <script setup lang="ts">
 import { ref, computed, defineProps, defineEmits } from 'vue';
 import { Search, User, Edit, Document, Grid, Setting, Lock, Clock } from '@element-plus/icons-vue';
-import type { ToolCategory, Tool } from '/@/api/v1/data_factory';
+import type { ToolCategory, Tool } from '/@/api/v1/testing/dataFactory';
 import ToolExecutor from './ToolExecutor.vue';
 
 // Props

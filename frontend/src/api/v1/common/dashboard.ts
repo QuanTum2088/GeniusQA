@@ -127,39 +127,39 @@ export function useDashboardApi() {
     getOverview: () =>
       request({
         url: '/v1/dashboard/overview',
-        method: 'get',
+        method: 'GET',
       }),
     getExecutionTrends: (params?: { days?: number }) =>
       request({
         url: '/v1/dashboard/execution-trends',
-        method: 'get',
+        method: 'GET',
         params,
       }),
     getDataFactoryStats: () =>
       request({
         url: '/v1/dashboard/data-factory-stats',
-        method: 'get',
+        method: 'GET',
       }),
     getReviewStats: () =>
       request({
         url: '/v1/dashboard/review-stats',
-        method: 'get',
+        method: 'GET',
       }),
     getProjectActivity: () =>
       request({
         url: '/v1/dashboard/project-activity',
-        method: 'get',
+        method: 'GET',
       }),
     getRecentNotifications: (params?: { limit?: number }) =>
       request({
         url: '/v1/dashboard/recent-notifications',
-        method: 'get',
+        method: 'GET',
         params,
       }),
     getApiInterfaceStats: () =>
       request({
         url: '/v1/dashboard/api-interface-stats',
-        method: 'get',
+        method: 'GET',
       }),
   };
 }

@@ -60,7 +60,7 @@ import { reactive, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { Loading, CircleClose, Clock } from '@element-plus/icons-vue';
-import { useOAuthApi, type OAuthProvider } from '/@/api/v1/oauth';
+import { useOAuthApi, type OAuthProvider } from '/@/api/v1/system/oauth';
 import { Session } from '/@/utils/storage';
 import { useUserStore } from '/@/stores/user';
 import { useMenuInfo } from '/@/stores/menu';

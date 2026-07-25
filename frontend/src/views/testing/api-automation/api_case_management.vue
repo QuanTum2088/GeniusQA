@@ -176,7 +176,7 @@ import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import { Plus, Edit, Delete } from '@element-plus/icons-vue';
-import { useApiAutomationApi } from '/@/api/v1/api_automation';
+import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation';
 import StepEditor from './components/step-editor/StepEditor.vue';
 
 const router = useRouter();

@@ -42,7 +42,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
-import { useApiTestingApi } from '/@/api/v1/api_testing'
+import { useApiTestingApi } from '/@/api/v1/testing/apiTesting'
 
 const { apiCollectionApi, apiEnvironmentApi } = useApiTestingApi()
 

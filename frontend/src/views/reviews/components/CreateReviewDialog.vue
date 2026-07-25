@@ -132,10 +132,10 @@
 <script setup lang="ts">
 import { ref, reactive, watch, onMounted } from 'vue';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
-import { createReview, getTemplateList } from '/@/api/v1/reviews';
-import { getProjectList } from '/@/api/v1/project';
-import { getTestCaseList } from '/@/api/v1/testcases';
-import { getModuleList } from '/@/api/v1/modules';
+import { createReview, getTemplateList } from '/@/api/v1/reviews/review';
+import { getProjectList } from '/@/api/v1/projects/project';
+import { getTestCaseList } from '/@/api/v1/testing/testcases';
+import { getModuleList } from '/@/api/v1/testing/modules';
 import { useUserApi } from '/@/api/v1/system/user';
 
 // Props

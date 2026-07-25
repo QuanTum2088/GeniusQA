@@ -2,7 +2,6 @@ import {defineStore} from 'pinia';
 
 /**
  * 布局配置
- * 2025.12.28 by cj 优化。开发时配置不生效问题
  * 修改配置时：
  * 1、需要每次都清理 `window.localStorage` 浏览器永久缓存
  * 2、或者点击布局配置最底部 `一键恢复默认` 按钮即可看到效果
@@ -143,8 +142,8 @@ export const useThemeConfig = defineStore('themeConfig', {
 			globalViceTitleMsg: '',
 			// 默认初始语言，可选值"<zh-cn|en|zh-tw>"，默认 zh-cn
 			globalI18n: 'zh-cn',
-			// 默认全局组件大小，可选值"<large|'default'|small>"，默认 'large'
-			globalComponentSize: 'small',
+			// 默认全局组件大小，可选值"<large|'default'|small>"，默认 'default'
+			globalComponentSize: 'default',
 		},
 	}),
 	actions: {

@@ -153,3 +153,29 @@ export function useProjectApi() {
     },
   };
 }
+
+export const getProjectList = (params?: {
+  page?: number;
+  page_size?: number;
+  name?: string;
+  status?: string;
+}) => useProjectApi().getList(params);
+
+export const getProjectDetail = (id: number) => useProjectApi().getDetail(id);
+
+export const createProject = (data: {
+  name: string;
+  description?: string;
+  status?: string;
+}) => useProjectApi().create(data);
+
+export const updateProject = (
+  id: number,
+  data: {
+    name?: string;
+    description?: string;
+    status?: string;
+  }
+) => useProjectApi().update(id, data);
+
+export const deleteProject = (id: number) => useProjectApi().delete(id);

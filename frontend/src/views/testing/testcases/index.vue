@@ -256,9 +256,9 @@
 <script setup lang="ts" name="TestCaseList">
 import { ref, reactive, onMounted, computed, nextTick, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { getTestCaseList, deleteTestCase, importTestCasesFromExcel, exportTestCasesToExcel } from '/@/api/v1/testcases';
-import { getProjectList } from '/@/api/v1/project';
-import { getModuleList } from '/@/api/v1/modules';
+import { getTestCaseList, deleteTestCase, importTestCasesFromExcel, exportTestCasesToExcel } from '/@/api/v1/testing/testcases';
+import { getProjectList } from '/@/api/v1/projects/project';
+import { getModuleList } from '/@/api/v1/testing/modules';
 import TestCaseForm from './components/TestCaseForm.vue';
 import TestCaseDetail from './components/TestCaseDetail.vue';
 

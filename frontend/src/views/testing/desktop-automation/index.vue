@@ -359,8 +359,8 @@ import {
   Refresh, Folder, FolderOpened, Document, MoreFilled, Plus, Edit, Delete,
   Check, Close, VideoPlay, ArrowDown, Timer, CopyDocument,
 } from '@element-plus/icons-vue';
-import { useDesktopAutomationApi } from '/@/api/v1/desktop_automation';
-import { getProjectList } from '/@/api/v1/project';
+import { useDesktopAutomationApi } from '/@/api/v1/testing/desktopAutomation';
+import { getProjectList } from '/@/api/v1/projects/project';
 
 const api = useDesktopAutomationApi();
 

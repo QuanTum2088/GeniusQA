@@ -86,7 +86,7 @@ import {
 	getConversationMessages,
 	type AssistantConfig, 
 	type Message 
-} from '/@/api/v1/assistant';
+} from '/@/api/v1/ai/assistant';
 
 // Props
 interface Props {

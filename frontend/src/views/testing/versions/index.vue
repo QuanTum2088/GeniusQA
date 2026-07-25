@@ -85,7 +85,7 @@
 <script setup lang="ts" name="VersionList">
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { getVersionList, deleteVersion } from '/@/api/v1/testcases';
+import { getVersionList, deleteVersion } from '/@/api/v1/testing/testcases';
 import VersionForm from './components/VersionForm.vue';
 import TestCaseAssociation from './components/TestCaseAssociation.vue';
 

@@ -10,14 +10,14 @@
     <template v-for="val in menuLists">
       <el-sub-menu :index="val.path" v-if="val.children && val.children.length > 0" :key="val.path">
         <template #title>
-          <SvgIcon :name="val.meta.icon"/>
+          <SvgIcon :name="val.meta.icon" :size="20"/>
           <span>{{ val.meta.title }}</span>
         </template>
         <SubItem :chil="val.children"/>
       </el-sub-menu>
       <template v-else>
         <el-menu-item :index="val.path" :key="val.path">
-          <SvgIcon :name="val.meta.icon"/>
+          <SvgIcon :name="val.meta.icon" :size="18"/>
           <template #title v-if="!val.meta.isLink || (val.meta.isLink && val.meta.isIframe)">
             <span>{{ val.meta.title }}</span>
           </template>
@@ -66,7 +66,7 @@ const menuLists = computed(() => {
 const getThemeConfig = computed(() => {
   return themeConfig.value;
 });
-// 菜单高亮（详情时，父级高亮）
+// 菜单高亮
 const setParentHighlight = (currentRoute: RouteToFrom) => {
   const {path, meta} = currentRoute;
   const pathSplit = meta?.isDynamic ? meta.isDynamicPath?.split('/') : path?.split('/');

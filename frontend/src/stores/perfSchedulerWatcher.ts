@@ -29,7 +29,7 @@ export const usePerfSchedulerWatcher = defineStore('perfSchedulerWatcher', () =>
     // 场景页 onMounted 时，若 store 无数据（lastChecked===0）则主动拉取一次定时任务列表
     async function refresh() {
         try {
-            const { usePerformanceApi } = await import('/@/api/v1/performance');
+            const { usePerformanceApi } = await import('/@/api/v1/testing/performance');
             const perfApi = usePerformanceApi();
             const res = await perfApi.getSchedulerList({ page: 1, page_size: 100 });
             tasks.value = res.data?.items ?? [];

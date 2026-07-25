@@ -390,8 +390,8 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import { aiCaseApi, aiExecutionRecordApi } from '/@/api/v1/ai_intelligence'
-import { useUiAutomationApi } from '/@/api/v1/ui_automation'
+import { aiCaseApi, aiExecutionRecordApi } from '/@/api/v1/ai/intelligence'
+import { useUiAutomationApi } from '/@/api/v1/testing/uiAutomation'
 import type { AICase, AICaseForm, AIExecutionRecord } from '/@/types/ai_intelligence'
 
 const { uiProjectApi } = useUiAutomationApi()

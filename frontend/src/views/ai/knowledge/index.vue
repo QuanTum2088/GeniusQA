@@ -186,7 +186,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import type { UploadRequestOptions } from 'element-plus';
 import { useProjectApi } from '/@/api/v1/projects/project';
 import { projectPlatformApi } from '/@/api/v1/projects/platform';
-import { aiKnowledgeConfigApi } from '/@/api/v1/ai/knowledge-config';
+import { aiKnowledgeConfigApi } from '/@/api/v1/ai/knowledgeConfig';
 
 const projectApi = useProjectApi();
 const projectId = ref<number | null>(null);

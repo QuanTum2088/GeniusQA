@@ -117,7 +117,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { useApiAutomationApi } from '/@/api/v1/api_automation';
+import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation';
 import ApiManagePanel from './ApiManagePanel.vue';
 import ApiResultList from './api_result_list.vue';
 import ApiCodegen from './api_codegen.vue';

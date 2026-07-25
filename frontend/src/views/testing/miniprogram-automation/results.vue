@@ -136,8 +136,8 @@
 import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Check, Close } from '@element-plus/icons-vue';
-import { useMiniAutomationApi } from '/@/api/v1/miniprogram_automation';
-import { getProjectList } from '/@/api/v1/project';
+import { useMiniAutomationApi } from '/@/api/v1/testing/miniprogramAutomation';
+import { getProjectList } from '/@/api/v1/projects/project';
 
 const api = useMiniAutomationApi();
 

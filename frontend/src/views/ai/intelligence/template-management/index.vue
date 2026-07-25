@@ -276,7 +276,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance } from 'element-plus'
 import { Plus, Search, RefreshLeft, Upload, Download, Edit, Delete, View } from '@element-plus/icons-vue'
-import { testcaseTemplateApi } from '/@/api/v1/ai_intelligence'
+import { testcaseTemplateApi } from '/@/api/v1/ai/intelligence'
 
 // 搜索表单
 const searchForm = reactive({

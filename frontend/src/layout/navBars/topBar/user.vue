@@ -190,7 +190,7 @@ const menuList = computed(() => {
 
 const state = reactive({
   isScreenfull: false,
-  disabledSize: 'large',
+  disabledSize: 'default',
 });
 
 // 设置分割样式

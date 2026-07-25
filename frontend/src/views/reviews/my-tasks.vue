@@ -233,7 +233,7 @@ import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { User, ArrowLeft, Refresh, Clock, Loading, Check, Warning, Search } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
-import { getMyReviewTasks, startReviewTask, aiPreReviewAllCases, getAIPreReviewSummary, checkAIReviewAvailability } from '/@/api/v1/reviews';
+import { getMyReviewTasks, startReviewTask, aiPreReviewAllCases, getAIPreReviewSummary, checkAIReviewAvailability } from '/@/api/v1/reviews/review';
 
 const router = useRouter();
 

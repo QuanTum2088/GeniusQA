@@ -234,7 +234,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import { Plus, Document, Refresh, Delete, Right, CopyDocument, Download, Search, Box } from '@element-plus/icons-vue'
-import { useUiAutomationApi } from '/@/api/v1/ui_automation'
+import { useUiAutomationApi } from '/@/api/v1/testing/uiAutomation'
 import { formatDateTime } from '/@/utils/formatTime'
 
 const { uiPageObjectApi, uiElementApi, uiElementGroupApi } = useUiAutomationApi()

@@ -413,7 +413,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { useNotificationConfigApi, type NotificationConfig, type NotificationConfigCreate } from '/@/api/v1/notifications'
+import { useNotificationConfigApi, type NotificationConfig, type NotificationConfigCreate } from '/@/api/v1/notifications/notification'
 import { formatDateTime } from '/@/utils/formatTime'
 import { useDictCache, type DictOption } from '/@/utils/dictCache'
 

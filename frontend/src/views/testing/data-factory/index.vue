@@ -92,7 +92,7 @@
 import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Tools, Clock, DataAnalysis, ArrowRight, User, Edit, Document, Grid, Setting, Lock } from '@element-plus/icons-vue';
-import { getToolCategories, type ToolCategory } from '/@/api/v1/data_factory';
+import { getToolCategories, type ToolCategory } from '/@/api/v1/testing/dataFactory';
 import ToolList from './components/ToolList.vue';
 import HistoryList from './components/HistoryList.vue';
 import StatisticsView from './components/StatisticsView.vue';

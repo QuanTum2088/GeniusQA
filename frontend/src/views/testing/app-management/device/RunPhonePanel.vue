@@ -169,7 +169,7 @@ import { ElMessage } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import { Iphone, CopyDocument, Rank, QuestionFilled } from '@element-plus/icons-vue';
 import { copyText, parseListPagePayload } from '/@/utils';
-import { appManagementDeviceApi } from '/@/api/v1/app_management_device';
+import { appManagementDeviceApi } from '/@/api/v1/testing/appManagementDevice';
 
 defineOptions({ name: 'RunPhonePanel' });
 

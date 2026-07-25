@@ -63,7 +63,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
-import { getDatabaseConfigs } from '/@/api/v1/operations'
+import { getDatabaseConfigs } from '/@/api/v1/testing/operations'
 import DatabaseConfigDialog from '../DatabaseConfigDialog.vue'
 
 const props = defineProps<{

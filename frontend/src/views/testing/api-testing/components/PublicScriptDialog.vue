@@ -94,7 +94,7 @@ import {
   createPublicScript,
   updatePublicScript,
   deletePublicScript
-} from '/@/api/v1/operations'
+} from '/@/api/v1/testing/operations'
 
 const props = defineProps<{
   modelValue: boolean

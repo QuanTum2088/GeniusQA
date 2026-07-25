@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="codegen-layout">
 
     <!-- 左侧配置面板 -->
@@ -247,7 +247,7 @@ import {
   VideoPlay, Close, ArrowUp, ArrowDown,
 } from '@element-plus/icons-vue';
 import MonacoEditor from '/@/components/monaco/index.vue';
-import { useApiAutomationApi } from '/@/api/v1/api_automation';
+import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation';
 
 // 临时图标占位（项目中无 Python 图标时用文字代替）
 const Python = Setting;

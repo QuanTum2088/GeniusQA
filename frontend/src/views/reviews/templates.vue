@@ -128,7 +128,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Setting, ArrowLeft, Plus } from '@element-plus/icons-vue';
-import { getTemplateList, deleteTemplate as deleteTemplateApi, type ReviewTemplate } from '/@/api/v1/reviews';
+import { getTemplateList, deleteTemplate as deleteTemplateApi, type ReviewTemplate } from '/@/api/v1/reviews/review';
 import TemplateDialog from './components/TemplateDialog.vue';
 
 // 响应式数据

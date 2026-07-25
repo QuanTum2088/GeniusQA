@@ -242,7 +242,7 @@
 import { ref, reactive, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import { Plus, Check, Refresh, Delete } from '@element-plus/icons-vue'
-import { useUiAutomationApi } from '/@/api/v1/ui_automation'
+import { useUiAutomationApi } from '/@/api/v1/testing/uiAutomation'
 
 const { uiElementApi } = useUiAutomationApi()
 

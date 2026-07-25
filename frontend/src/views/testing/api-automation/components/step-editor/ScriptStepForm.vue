@@ -50,7 +50,7 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { useApiAutomationApi } from '/@/api/v1/api_automation'
+import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation'
 
 const props = defineProps<{ step: any; serviceId?: number }>()
 

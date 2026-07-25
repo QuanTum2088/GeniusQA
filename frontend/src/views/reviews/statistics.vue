@@ -142,7 +142,7 @@
 import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
 import { DataAnalysis, ArrowLeft, Refresh, Document, Clock, Loading, Check } from '@element-plus/icons-vue';
-import { getReviewStatistics, type ReviewStatistics } from '/@/api/v1/reviews';
+import { getReviewStatistics, type ReviewStatistics } from '/@/api/v1/reviews/review';
 
 // 响应式数据
 const loading = ref(false);

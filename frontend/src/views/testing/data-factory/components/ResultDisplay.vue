@@ -72,7 +72,7 @@
 import { computed, defineProps } from 'vue';
 import { ElMessage } from 'element-plus';
 import { CircleCheck, DocumentCopy, Download } from '@element-plus/icons-vue';
-import type { Tool } from '/@/api/v1/data_factory';
+import type { Tool } from '/@/api/v1/testing/dataFactory';
 import ResultItem from './ResultItem.vue';
 
 // Props

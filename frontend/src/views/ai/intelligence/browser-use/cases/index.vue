@@ -813,11 +813,11 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Download, Upload, VideoPlay, ArrowDown, Delete, UploadFilled } from '@element-plus/icons-vue'
-import { getProjectList } from '/@/api/v1/project'
-import { getModuleList, getModuleTree } from '/@/api/v1/modules'
-import { getTestCaseList } from '/@/api/v1/testcases'
+import { getProjectList } from '/@/api/v1/projects/project'
+import { getModuleList, getModuleTree } from '/@/api/v1/testing/modules'
+import { getTestCaseList } from '/@/api/v1/testing/testcases'
 
-import { aiCaseApi, aiExecutionRecordApi } from '/@/api/v1/ai_intelligence'
+import { aiCaseApi, aiExecutionRecordApi } from '/@/api/v1/ai/intelligence'
 
 // 数据
 const loading = ref(false)

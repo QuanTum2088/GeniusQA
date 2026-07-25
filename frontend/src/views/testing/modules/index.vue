@@ -1,4 +1,4 @@
-﻿<template>
+<template>
 	<div class="module-tree-container">
 		<!-- 顶部工具栏 -->
 		<el-card shadow="hover" class="toolbar-card">
@@ -271,9 +271,9 @@
 <script setup lang="ts" name="ModuleTreeManagement">
 import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue';
 import { ElMessage, ElMessageBox, FormInstance } from 'element-plus';
-import { getModuleList, createModule, updateModule, deleteModule, getModuleTree, exportModules, importModules } from '/@/api/v1/modules';
-import { getProjectList } from '/@/api/v1/project';
-import { getTestCaseList } from '/@/api/v1/testcases';
+import { getModuleList, createModule, updateModule, deleteModule, getModuleTree, exportModules, importModules } from '/@/api/v1/testing/modules';
+import { getProjectList } from '/@/api/v1/projects/project';
+import { getTestCaseList } from '/@/api/v1/testing/testcases';
 import TestCaseForm from '../testcases/components/TestCaseForm.vue';
 import TestCaseDetail from '../testcases/components/TestCaseDetail.vue';
 

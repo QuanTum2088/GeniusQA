@@ -428,8 +428,8 @@
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance } from 'element-plus'
 import { Plus, ArrowDown } from '@element-plus/icons-vue'
-import { figmaConfigApi } from '/@/api/v1/ai_intelligence'
-import { getProjectList as fetchProjectList } from '/@/api/v1/project'
+import { figmaConfigApi } from '/@/api/v1/ai/intelligence'
+import { getProjectList as fetchProjectList } from '/@/api/v1/projects/project'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()

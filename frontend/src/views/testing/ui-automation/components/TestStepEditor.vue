@@ -186,7 +186,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, DocumentCopy, Sort, Refresh, DCaret } from '@element-plus/icons-vue'
 import draggable from 'vuedraggable'
-import { useUiAutomationApi } from '/@/api/v1/ui_automation'
+import { useUiAutomationApi } from '/@/api/v1/testing/uiAutomation'
 
 const { uiTestStepApi, uiElementApi, uiElementGroupApi } = useUiAutomationApi()
 

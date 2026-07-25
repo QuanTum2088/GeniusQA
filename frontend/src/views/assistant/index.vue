@@ -149,7 +149,7 @@ import {
 	deleteConversation as deleteConversationApi,
 	type AssistantConfig,
 	type Conversation 
-} from '/@/api/v1/assistant';
+} from '/@/api/v1/ai/assistant';
 import ConfigDialog from './components/ConfigDialog.vue';
 import StatisticsDialog from './components/StatisticsDialog.vue';
 import ChatDialog from './components/ChatDialog.vue';

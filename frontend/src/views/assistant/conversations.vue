@@ -199,7 +199,7 @@ import {
 	type Conversation,
 	type AssistantConfig,
 	type Message
-} from '/@/api/v1/assistant';
+} from '/@/api/v1/ai/assistant';
 
 // 响应式数据
 const router = useRouter();

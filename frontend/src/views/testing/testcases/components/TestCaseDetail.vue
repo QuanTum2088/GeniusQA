@@ -58,7 +58,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import { getTestCaseDetail } from '/@/api/v1/testcases';
+import { getTestCaseDetail } from '/@/api/v1/testing/testcases';
 
 const props = defineProps({
 	modelValue: {

@@ -98,7 +98,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { aiTestSuiteApi } from '/@/api/v1/ai_intelligence'
+import { aiTestSuiteApi } from '/@/api/v1/ai/intelligence'
 import ExecutionMonitor from './ExecutionMonitor.vue'
 
 const props = defineProps({

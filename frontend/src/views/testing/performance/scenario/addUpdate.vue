@@ -602,7 +602,7 @@
 <script setup lang="ts" name="PerfSceneAddUpdate">
 import { ref, reactive, computed, watchEffect, onMounted, onUnmounted } from 'vue';
 import { ElMessage, FormInstance } from 'element-plus';
-import { usePerformanceApi } from '/@/api/v1/performance';
+import { usePerformanceApi } from '/@/api/v1/testing/performance';
 import { useDictCache } from '/@/utils/dictCache';
 import { THREAD_TYPE_LABELS, normalizeConfig, normalizeUltimateRows, buildConfigPayload, buildGroupPreviewPoints } from './utils';
 import GroupPreviewChart from '../components/GroupPreviewChart.vue';

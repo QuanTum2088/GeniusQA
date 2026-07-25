@@ -54,8 +54,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { getProjectList } from '/@/api/v1/project';
-import { getTestCaseList, associateTestCases } from '/@/api/v1/testcases';
+import { getProjectList } from '/@/api/v1/projects/project';
+import { getTestCaseList, associateTestCases } from '/@/api/v1/testing/testcases';
 
 const props = defineProps({
 	modelValue: {

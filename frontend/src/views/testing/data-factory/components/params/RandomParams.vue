@@ -219,7 +219,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, watch, ref, defineProps, defineEmits } from 'vue';
-import type { Tool } from '/@/api/v1/data_factory';
+import type { Tool } from '/@/api/v1/testing/dataFactory';
 
 // Props
 const props = defineProps<{

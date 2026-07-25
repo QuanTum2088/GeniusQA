@@ -284,8 +284,8 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance } from 'element-plus'
 import { Upload } from '@element-plus/icons-vue'
 import { useRoute } from 'vue-router'
-import { requirementDocumentApi } from '/@/api/v1/ai_intelligence'
-import { getProjectList as fetchProjectList } from '/@/api/v1/project'
+import { requirementDocumentApi } from '/@/api/v1/ai/intelligence'
+import { getProjectList as fetchProjectList } from '/@/api/v1/projects/project'
 import type { RequirementDocument } from '/@/types/ai_intelligence'
 
 // 查询表单

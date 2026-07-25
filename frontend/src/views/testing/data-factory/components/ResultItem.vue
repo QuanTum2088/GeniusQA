@@ -194,7 +194,7 @@
 import { computed, ref, defineProps } from 'vue';
 import { ElMessage } from 'element-plus';
 import { DocumentCopy } from '@element-plus/icons-vue';
-import type { Tool } from '/@/api/v1/data_factory';
+import type { Tool } from '/@/api/v1/testing/dataFactory';
 
 // 为了支持递归组件，需要定义组件名称
 defineOptions({

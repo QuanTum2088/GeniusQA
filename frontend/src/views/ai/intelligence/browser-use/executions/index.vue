@@ -308,9 +308,9 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 
-import { aiExecutionRecordApi } from '/@/api/v1/ai_intelligence'
+import { aiExecutionRecordApi } from '/@/api/v1/ai/intelligence'
 
-import { getProjectList } from '/@/api/v1/project'
+import { getProjectList } from '/@/api/v1/projects/project'
 
 const loading = ref(false)
 const tableData = ref([])

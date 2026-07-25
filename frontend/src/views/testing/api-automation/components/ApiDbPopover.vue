@@ -77,7 +77,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { api_db_list, add_api_db, edit_api_db, del_api_db, test_db_conn } from '/@/api/v1/api_automation';
+import { api_db_list, add_api_db, edit_api_db, del_api_db, test_db_conn } from '/@/api/v1/testing/apiAutomation';
 
 const searchParams = ref({ currentPage: 1, pageSize: 10, search: { name__contains: '' } });
 const db_list = ref<any[]>([]);

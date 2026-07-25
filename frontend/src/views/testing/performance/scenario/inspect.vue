@@ -535,7 +535,7 @@
 <script setup lang="ts">
 import { ref, computed, reactive } from 'vue';
 import { ElMessage } from 'element-plus';
-import { usePerformanceApi } from '/@/api/v1/performance';
+import { usePerformanceApi } from '/@/api/v1/testing/performance';
 import OverflowTip from '../components/OverflowTip.vue';
 
 const perfApi = usePerformanceApi();

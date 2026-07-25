@@ -37,8 +37,8 @@
 <script setup lang="ts">
 import { ref, reactive, watch, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { createVersion, updateVersion, getVersionDetail } from '/@/api/v1/testcases';
-import { getProjectList } from '/@/api/v1/project';
+import { createVersion, updateVersion, getVersionDetail } from '/@/api/v1/testing/testcases';
+import { getProjectList } from '/@/api/v1/projects/project';
 
 const props = defineProps({
 	modelValue: {

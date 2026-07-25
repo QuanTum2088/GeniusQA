@@ -22,7 +22,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { Document } from '@element-plus/icons-vue';
-import { req_history } from '/@/api/v1/api_automation';
+import { req_history } from '/@/api/v1/testing/apiAutomation';
 
 const list = ref<any[]>([]);
 const load = async () => {

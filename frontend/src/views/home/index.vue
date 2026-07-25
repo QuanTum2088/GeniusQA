@@ -267,10 +267,10 @@ import { storeToRefs } from 'pinia';
 import { useUserStore } from '/@/stores/user';
 import { useThemeConfig } from '/@/stores/themeConfig';
 import * as echarts from 'echarts';
-import { useDashboardApi } from '/@/api/v1/dashboard';
-import { useApiAutomationApi } from '/@/api/v1/api_automation';
-import { useWebManagementApi } from '/@/api/v1/web_management';
-import { getReviewStatistics } from '/@/api/v1/reviews';
+import { useDashboardApi } from '/@/api/v1/common/dashboard';
+import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation';
+import { useWebManagementApi } from '/@/api/v1/testing/webManagement';
+import { getReviewStatistics } from '/@/api/v1/reviews/review';
 import {
   Bell, Top, Bottom, Folder, Document, MagicStick, UserFilled,
   Connection, DataAnalysis, Collection, Monitor,
@@ -804,7 +804,7 @@ const dfCategoryNameMap = ref<Record<string, string>>({});
 const loadDfStats = async () => {
   dfStatsLoading.value = true;
   try {
-    const { getStatistics, getToolCategories } = await import('/@/api/v1/data_factory');
+    const { getStatistics, getToolCategories } = await import('/@/api/v1/testing/dataFactory');
     const [statsRes, catsRes] = await Promise.allSettled([getStatistics(), getToolCategories()]);
 
     if (catsRes.status === 'fulfilled' && catsRes.value?.data?.categories) {

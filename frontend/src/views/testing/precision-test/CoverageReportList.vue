@@ -63,7 +63,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { usePrecisionTestApi } from '/@/api/v1/precision_test';
+import { usePrecisionTestApi } from '/@/api/v1/testing/precisionTest';
 
 const props = defineProps<{ serviceId: number }>();
 

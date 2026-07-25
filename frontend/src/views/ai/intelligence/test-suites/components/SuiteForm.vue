@@ -106,9 +106,9 @@
 <script setup lang="ts">
 import { ref, reactive, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { aiTestSuiteApi, aiCaseApi } from '/@/api/v1/ai_intelligence'
-import { getProjectList } from '/@/api/v1/project'
-import { getModuleList } from '/@/api/v1/modules'
+import { aiTestSuiteApi, aiCaseApi } from '/@/api/v1/ai/intelligence'
+import { getProjectList } from '/@/api/v1/projects/project'
+import { getModuleList } from '/@/api/v1/testing/modules'
 
 const props = defineProps({
   modelValue: {

@@ -168,7 +168,7 @@
 <script setup lang="ts">
 import { ref, reactive, watch, onMounted, nextTick } from 'vue';
 import { Avatar, Check, ChatDotRound, ChatLineRound, Calendar } from '@element-plus/icons-vue';
-import { getStatistics, type AssistantStatistics } from '/@/api/v1/assistant';
+import { getStatistics, type AssistantStatistics } from '/@/api/v1/ai/assistant';
 import * as echarts from 'echarts';
 
 // Props

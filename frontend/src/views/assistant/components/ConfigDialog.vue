@@ -55,7 +55,7 @@
 <script setup lang="ts">
 import { ref, reactive, watch, computed, onMounted } from 'vue';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
-import { createConfig, updateConfig, type AssistantConfig } from '/@/api/v1/assistant';
+import { createConfig, updateConfig, type AssistantConfig } from '/@/api/v1/ai/assistant';
 
 // Props
 interface Props {

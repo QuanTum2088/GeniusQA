@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="case-layout">
 
     <!-- 左侧脚本树 -->
@@ -364,8 +364,8 @@ import { computed, onMounted, ref, watch } from "vue";
 import { ElTree, TabsPaneContext } from "element-plus";
 import { useRoute } from "vue-router";
 import { MsgBox, MsgError, MsgSuccess, NoticeError } from "@/utils/ntesterc.ts";
-import { appManagementDeviceApi } from "/@/api/v1/app_management_device";
-import { useAppManagementApi } from "/@/api/v1/app_management";
+import { appManagementDeviceApi } from "/@/api/v1/testing/appManagementDevice";
+import { useAppManagementApi } from "/@/api/v1/testing/appManagement";
 
 const appMgmtApi = useAppManagementApi();
 import {

@@ -36,7 +36,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useApiTestingApi } from '/@/api/v1/api_testing'
+import { useApiTestingApi } from '/@/api/v1/testing/apiTesting'
 
 const { apiCollectionApi } = useApiTestingApi()
 

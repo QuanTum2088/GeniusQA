@@ -132,7 +132,7 @@
 import { onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { useAppManagementApi } from "/@/api/v1/app_management";
+import { useAppManagementApi } from "/@/api/v1/testing/appManagement";
 import { getExecutionStatusMeta } from "/@/utils/executionStatus";
 
 const route = useRoute();

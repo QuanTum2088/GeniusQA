@@ -396,9 +396,9 @@ import { ref, reactive, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Document, ArrowDown } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
-import { getProjectList } from '/@/api/v1/project'
+import { getProjectList } from '/@/api/v1/projects/project'
 // 导入AI智能浏览器API
-import { aiExecutionRecordApi, aiTestReportApi } from '/@/api/v1/ai_intelligence'
+import { aiExecutionRecordApi, aiTestReportApi } from '/@/api/v1/ai/intelligence'
 
 const loading = ref(false)
 const reportList = ref([])

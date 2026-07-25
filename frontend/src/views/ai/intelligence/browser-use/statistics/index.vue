@@ -224,9 +224,9 @@ import {
   Download 
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
-import { getProjectList } from '/@/api/v1/project'
+import { getProjectList } from '/@/api/v1/projects/project'
 
-import { aiExecutionRecordApi } from '/@/api/v1/ai_intelligence'
+import { aiExecutionRecordApi } from '/@/api/v1/ai/intelligence'
 
 const loading = ref(false)
 const statisticsData = ref([])

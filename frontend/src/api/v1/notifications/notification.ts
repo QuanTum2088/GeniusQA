@@ -99,7 +99,7 @@ export function useNotificationConfigApi() {
   }) => {
     return request({
       url: '/v1/notifications/configs',
-      method: 'get',
+      method: 'GET',
       params
     })
   },
@@ -108,7 +108,7 @@ export function useNotificationConfigApi() {
   getConfig: (id: number) => {
     return request({
       url: `/v1/notifications/configs/${id}`,
-      method: 'get'
+      method: 'GET'
     })
   },
 
@@ -116,7 +116,7 @@ export function useNotificationConfigApi() {
   createConfig: (data: NotificationConfigCreate) => {
     return request({
       url: '/v1/notifications/configs',
-      method: 'post',
+      method: 'POST',
       data
     })
   },
@@ -125,7 +125,7 @@ export function useNotificationConfigApi() {
   updateConfig: (id: number, data: NotificationConfigUpdate) => {
     return request({
       url: `/v1/notifications/configs/${id}`,
-      method: 'put',
+      method: 'PUT',
       data
     })
   },
@@ -134,7 +134,7 @@ export function useNotificationConfigApi() {
   deleteConfig: (id: number) => {
     return request({
       url: `/v1/notifications/configs/${id}`,
-      method: 'delete'
+      method: 'DELETE'
     })
   },
 
@@ -142,7 +142,7 @@ export function useNotificationConfigApi() {
   batchDeleteConfigs: (ids: number[]) => {
     return request({
       url: '/v1/notifications/configs',
-      method: 'delete',
+      method: 'DELETE',
       data: { ids }
     })
   },
@@ -151,7 +151,7 @@ export function useNotificationConfigApi() {
   setDefaultConfig: (id: number) => {
     return request({
       url: `/v1/notifications/configs/${id}/set-default`,
-      method: 'post'
+      method: 'POST'
     })
   },
 
@@ -159,7 +159,7 @@ export function useNotificationConfigApi() {
   testConfig: (id: number) => {
     return request({
       url: `/v1/notifications/configs/${id}/test`,
-      method: 'post'
+      method: 'POST'
     })
   }
   }
@@ -178,7 +178,7 @@ export function useNotificationHistoryApi() {
   }) => {
     return request({
       url: '/v1/notifications/histories',
-      method: 'get',
+      method: 'GET',
       params
     })
   },
@@ -187,7 +187,7 @@ export function useNotificationHistoryApi() {
   deleteHistory: (id: number) => {
     return request({
       url: `/v1/notifications/histories/${id}`,
-      method: 'delete'
+      method: 'DELETE'
     })
   },
 
@@ -195,7 +195,7 @@ export function useNotificationHistoryApi() {
   batchDeleteHistories: (ids: number[]) => {
     return request({
       url: '/v1/notifications/histories',
-      method: 'delete',
+      method: 'DELETE',
       data: { ids }
     })
   }
@@ -215,7 +215,7 @@ export function useTaskNotificationApi() {
   }) => {
     return request({
       url: '/v1/notifications/task-settings',
-      method: 'get',
+      method: 'GET',
       params
     })
   },
@@ -224,7 +224,7 @@ export function useTaskNotificationApi() {
   createTaskSetting: (data: TaskNotificationSettingCreate) => {
     return request({
       url: '/v1/notifications/task-settings',
-      method: 'post',
+      method: 'POST',
       data
     })
   },
@@ -233,7 +233,7 @@ export function useTaskNotificationApi() {
   updateTaskSetting: (id: number, data: TaskNotificationSettingUpdate) => {
     return request({
       url: `/v1/notifications/task-settings/${id}`,
-      method: 'put',
+      method: 'PUT',
       data
     })
   },
@@ -242,7 +242,7 @@ export function useTaskNotificationApi() {
   deleteTaskSetting: (id: number) => {
     return request({
       url: `/v1/notifications/task-settings/${id}`,
-      method: 'delete'
+      method: 'DELETE'
     })
   },
 
@@ -250,7 +250,7 @@ export function useTaskNotificationApi() {
   batchDeleteTaskSettings: (ids: number[]) => {
     return request({
       url: '/v1/notifications/task-settings',
-      method: 'delete',
+      method: 'DELETE',
       data: { ids }
     })
   }
@@ -264,7 +264,7 @@ export function useNotificationSendApi() {
   sendNotification: (data: SendNotificationRequest) => {
     return request({
       url: '/v1/notifications/send',
-      method: 'post',
+      method: 'POST',
       data
     })
   },
@@ -273,7 +273,7 @@ export function useNotificationSendApi() {
   getNotificationTypes: () => {
     return request({
       url: '/v1/notifications/types',
-      method: 'get'
+      method: 'GET'
     })
   }
   }

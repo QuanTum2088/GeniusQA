@@ -265,7 +265,7 @@
 import { ref, reactive, onMounted, defineEmits } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Search, Delete } from '@element-plus/icons-vue';
-import { getRecordList, deleteRecord as deleteRecordAPI, batchDeleteRecords, getTagList, getToolCategories, type ToolRecord, type Tool, type ToolCategory } from '/@/api/v1/data_factory';
+import { getRecordList, deleteRecord as deleteRecordAPI, batchDeleteRecords, getTagList, getToolCategories, type ToolRecord, type Tool, type ToolCategory } from '/@/api/v1/testing/dataFactory';
 import ToolExecutor from './ToolExecutor.vue';
 
 // Emits

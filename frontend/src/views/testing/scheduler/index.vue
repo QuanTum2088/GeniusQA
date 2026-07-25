@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="scheduler-page">
     <el-card class="box-card">
       <template #header>
@@ -475,10 +475,10 @@ import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Search, Refresh, Edit, Delete } from '@element-plus/icons-vue';
 import type { FormInstance } from 'element-plus';
-import { useTaskSchedulerApi, type SchedulerTask } from '/@/api/v1/task_scheduler';
-import { useNotificationConfigApi } from '/@/api/v1/notifications';
-import { useApiAutomationApi } from '/@/api/v1/api_automation';
-import { useWebManagementApi } from '/@/api/v1/web_management';
+import { useTaskSchedulerApi, type SchedulerTask } from '/@/api/v1/testing/taskScheduler';
+import { useNotificationConfigApi } from '/@/api/v1/notifications/notification';
+import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation';
+import { useWebManagementApi } from '/@/api/v1/testing/webManagement';
 
 const taskSchedulerApi = useTaskSchedulerApi();
 const notificationConfigApi = useNotificationConfigApi();

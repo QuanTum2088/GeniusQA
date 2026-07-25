@@ -90,7 +90,6 @@
           <el-button-group>
             <el-button
                 v-for="(btn, index) in col.buttons"
-                size="small"
                 :key="index"
                 :type="btn.type"
                 @click="handleAction(btn.command, scope)"

@@ -173,7 +173,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import { aiModelConfigApi } from '/@/api/v1/ai_intelligence'
+import { aiModelConfigApi } from '/@/api/v1/ai/intelligence'
 import { useLLMConfigApi } from '/@/api/v1/ai/llmConfig'
 import type { LLMConfigData } from '/@/api/v1/ai/llmConfig'
 

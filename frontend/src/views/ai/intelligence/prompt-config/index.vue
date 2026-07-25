@@ -109,7 +109,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import { promptConfigApi } from '/@/api/v1/ai_intelligence'
+import { promptConfigApi } from '/@/api/v1/ai/intelligence'
 import type { PromptConfig, PromptConfigForm } from '/@/types/ai_intelligence'
 
 // 查询表单

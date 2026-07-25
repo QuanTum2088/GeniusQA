@@ -159,7 +159,7 @@ import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { Upload, QuestionFilled } from '@element-plus/icons-vue';
-import { usePrecisionTestApi } from '/@/api/v1/precision_test';
+import { usePrecisionTestApi } from '/@/api/v1/testing/precisionTest';
 import CodeView from './CodeView.vue';
 
 // ---- Inline CoverageBar component ----

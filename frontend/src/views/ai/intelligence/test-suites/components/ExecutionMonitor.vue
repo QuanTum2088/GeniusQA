@@ -149,7 +149,7 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { CircleCheck, CircleClose, Warning } from '@element-plus/icons-vue'
-import { aiTestSuiteApi } from '/@/api/v1/ai_intelligence'
+import { aiTestSuiteApi } from '/@/api/v1/ai/intelligence'
 
 const props = defineProps({
   modelValue: {

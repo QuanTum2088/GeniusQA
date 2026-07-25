@@ -195,7 +195,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useApiAutomationApi } from '/@/api/v1/api_automation'
+import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation'
 
 const props = defineProps<{ serviceId: number }>()
 

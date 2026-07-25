@@ -1,4 +1,4 @@
-﻿﻿<<template>
+﻿<<template>
 	<div class="api-detail-container" :class="{'is-embedded': props.embedded}">
 		<el-card class="api-detail-card">
 			<!-- 顶部大 Tab（嵌入模式下隐藏）-->
@@ -709,7 +709,7 @@ import VueJsonPretty from 'vue-json-pretty';
 import JsonEditor from '/@/components/code-editor/JsonEditor.vue';
 import 'vue-json-pretty/lib/styles.css';
 import { ArrowDown, Operation, Clock, CircleCheck, Coin, Delete, Connection, EditPen, Document, InfoFilled, View, Folder } from '@element-plus/icons-vue';
-import { api_send, save_api, save_api_case, req_history, edit_history, api_params, apiAutomationApi } from '/@/api/v1/api_automation';
+import { api_send, save_api, save_api_case, req_history, edit_history, api_params, apiAutomationApi } from '/@/api/v1/testing/apiAutomation';
 import { useFileApi } from '/@/api/v1/common/file';
 import OperationPanel from './components/OperationPanel.vue';
 import { ElMessage, ElMessageBox } from 'element-plus';

@@ -27,7 +27,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { apiAutomationApi } from '/@/api/v1/api_automation'
+import { apiAutomationApi } from '/@/api/v1/testing/apiAutomation'
 
 const props = defineProps<{ step: any }>()
 

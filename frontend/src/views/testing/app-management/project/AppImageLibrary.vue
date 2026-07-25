@@ -136,7 +136,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import type { UploadFile, UploadInstance, UploadProps } from 'element-plus';
 import { Plus, UploadFilled } from '@element-plus/icons-vue';
 import request from '/@/utils/request';
-import { useAppManagementApi } from '/@/api/v1/app_management';
+import { useAppManagementApi } from '/@/api/v1/testing/appManagement';
 import { formatDateTime } from '/@/utils/formatTime';
 
 defineOptions({ name: 'AppImageLibrary' });

@@ -697,7 +697,7 @@ function formatFileSize(bytes: number): string {
 	return (bytes / Math.pow(1024, i)).toFixed(1).replace(/\.0$/, '') + ' ' + units[i];
 }
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { usePerformanceApi } from '/@/api/v1/performance';
+import { usePerformanceApi } from '/@/api/v1/testing/performance';
 import { useDictCache } from '/@/utils/dictCache';
 
 const route = useRoute();

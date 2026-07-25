@@ -50,7 +50,7 @@
 import { reactive, ref, onMounted, onUnmounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue';
-import { useOAuthApi, type OAuthProvider } from '/@/api/v1/oauth';
+import { useOAuthApi, type OAuthProvider } from '/@/api/v1/system/oauth';
 import { Icon } from '@iconify/vue';
 
 // OAuth 提供商配置

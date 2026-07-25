@@ -92,7 +92,7 @@
 import { ref, reactive, computed, onMounted, watch, defineProps, defineEmits } from 'vue';
 import { ElMessage } from 'element-plus';
 import { User, Edit, Document, Grid, Setting, Lock, Clock } from '@element-plus/icons-vue';
-import { executeTool as executeToolAPI, batchGenerate, getTagList, type Tool, type ToolCategory } from '/@/api/v1/data_factory';
+import { executeTool as executeToolAPI, batchGenerate, getTagList, type Tool, type ToolCategory } from '/@/api/v1/testing/dataFactory';
 import ResultDisplay from './ResultDisplay.vue';
 // 导入参数组件
 import TestDataParams from './params/TestDataParams.vue';

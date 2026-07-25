@@ -207,7 +207,7 @@
 import { ref, reactive, computed, onMounted, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Download, Refresh, User, Edit, Document, DataAnalysis, Grid, Lock, Clock } from '@element-plus/icons-vue';
-import { getStatistics, type Statistics } from '/@/api/v1/data_factory';
+import { getStatistics, type Statistics } from '/@/api/v1/testing/dataFactory';
 
 // 响应式数据
 const loading = ref(false);

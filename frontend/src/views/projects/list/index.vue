@@ -75,7 +75,6 @@
         <el-table-column label="操作" width="380" align="center" fixed="right">
           <template #default="{ row }">
             <el-button
-              size="small"
               type="primary"
               @click="handleEdit(row)"
               v-auth="'projects:list:edit'"
@@ -84,7 +83,6 @@
               编辑
             </el-button>
             <el-button
-              size="small"
               type="success"
               @click="handleMembers(row)"
               v-auth="'projects:member:manage'"
@@ -93,7 +91,6 @@
               成员
             </el-button>
             <el-button
-              size="small"
               type="warning"
               @click="handleEnvironments(row)"
               v-auth="'projects:environment:manage'"
@@ -102,7 +99,6 @@
               环境
             </el-button>
             <el-button
-              size="small"
               type="danger"
               @click="handleDelete(row)"
               v-auth="'projects:list:delete'"

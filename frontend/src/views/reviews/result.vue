@@ -287,7 +287,7 @@ import {
 	getReviewTestCases,
 	getReviewResults,
 	getMyReviewTasks
-} from '/@/api/v1/reviews';
+} from '/@/api/v1/reviews/review';
 
 const route = useRoute();
 const router = useRouter();

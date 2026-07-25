@@ -108,8 +108,8 @@
 import { ref, reactive, watch, computed, onMounted } from 'vue';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
-import { createTemplate, updateTemplate, getTemplateDetail, type ReviewTemplate } from '/@/api/v1/reviews';
-import { getProjectList } from '/@/api/v1/project';
+import { createTemplate, updateTemplate, getTemplateDetail, type ReviewTemplate } from '/@/api/v1/reviews/review';
+import { getProjectList } from '/@/api/v1/projects/project';
 import { useUserApi } from '/@/api/v1/system/user';
 
 // Props

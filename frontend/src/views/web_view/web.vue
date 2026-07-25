@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="web-automation-page">
     <el-container class="wa-container" direction="vertical">
       <el-header class="wa-page-header">
@@ -1423,7 +1423,7 @@ import {
 } from '@element-plus/icons-vue'
 import NtestercDialog from '/@/components/ntesterc/NtestercDialog.vue'
 import NtestercUploadFiles from '/@/components/ntesterc/NtestercUploadFiles.vue'
-import { useWebManagementApi } from '/@/api/v1/web_management'
+import { useWebManagementApi } from '/@/api/v1/testing/webManagement'
 import { logLineClass, parseLogLineForDisplay } from '@/utils/runMonitorLog'
 
 const {

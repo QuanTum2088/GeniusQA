@@ -205,7 +205,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { ArrowRight } from '@element-plus/icons-vue';
-import { useWebManagementApi } from '/@/api/v1/web_management';
+import { useWebManagementApi } from '/@/api/v1/testing/webManagement';
 import { getBaseApiUrl } from '/@/utils/config';
 
 const { get_web_result_report, get_web_result_detail } = useWebManagementApi();

@@ -215,7 +215,7 @@ import {
   useNotificationSendApi,
   type NotificationHistory,
   type NotificationConfig 
-} from '/@/api/v1/notifications'
+} from '/@/api/v1/notifications/notification'
 import { formatDateTime } from '/@/utils/formatTime'
 
 const notificationHistoryApi = useNotificationHistoryApi()

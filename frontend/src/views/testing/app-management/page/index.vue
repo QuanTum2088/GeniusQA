@@ -287,7 +287,7 @@ import {
 	Grid, Upload, Download,
 } from '@element-plus/icons-vue';
 import { copyText } from '/@/utils';
-import { useAppManagementApi } from '/@/api/v1/app_management';
+import { useAppManagementApi } from '/@/api/v1/testing/appManagement';
 
 const api = useAppManagementApi();
 

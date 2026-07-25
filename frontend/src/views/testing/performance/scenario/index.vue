@@ -624,7 +624,7 @@ import SceneMonitor from './monitor.vue';
 import AddUpdate from './addUpdate.vue';
 import { normalizeConfig } from './utils';
 import { applyStageEvent } from '/@/utils/perfExecState';
-import { usePerformanceApi } from '/@/api/v1/performance';
+import { usePerformanceApi } from '/@/api/v1/testing/performance';
 import { useDictCache } from '/@/utils/dictCache';
 import { usePerfSchedulerWatcher } from '/@/stores/perfSchedulerWatcher';
 

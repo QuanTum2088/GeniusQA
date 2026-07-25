@@ -165,7 +165,7 @@ import ApiMockPanel from './components/ApiMockPanel.vue';
 import {
 	api_tree, api_info, add_menu, del_menu, edit_menu, copy_menu,
 	pull_api_doc, params_select,
-} from '/@/api/v1/api_automation';
+} from '/@/api/v1/testing/apiAutomation';
 
 const props = defineProps<{
 	serviceId: number;

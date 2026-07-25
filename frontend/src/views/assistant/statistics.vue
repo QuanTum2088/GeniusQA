@@ -160,7 +160,7 @@ import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
 import { DataAnalysis, Refresh, Download, Avatar, Check, ChatDotRound, ChatLineRound } from '@element-plus/icons-vue';
 import * as echarts from 'echarts';
-import { getStatistics, type AssistantStatistics } from '/@/api/v1/assistant';
+import { getStatistics, type AssistantStatistics } from '/@/api/v1/ai/assistant';
 
 // 响应式数据
 const loading = ref(false);

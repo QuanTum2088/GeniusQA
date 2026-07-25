@@ -1,4 +1,4 @@
-﻿<template>
+<template>
 	<div class="case-runner-page">
 		<!-- 顶部工具栏 -->
 		<div class="case-runner-toolbar">
@@ -291,7 +291,7 @@ import { Session } from '/@/utils/storage';
 import { logLineClass, parseLogLineForDisplay } from '@/utils/runMonitorLog';
 import ApiDetail from './api_detail.vue';
 import StepEditor from './components/step-editor/StepEditor.vue';
-import { useApiAutomationApi } from '/@/api/v1/api_automation';
+import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation';
 
 const {
 	api_service,

@@ -263,7 +263,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useApiTestingApi } from '/@/api/v1/api_testing'
+import { useApiTestingApi } from '/@/api/v1/testing/apiTesting'
 import { useProjectApi } from '/@/api/v1/projects/project'
 import RequestEditor from './components/RequestEditor.vue'
 import ApiProjectDialog from './components/ApiProjectDialog.vue'

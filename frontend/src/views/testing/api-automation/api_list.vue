@@ -1,4 +1,4 @@
-﻿<template>
+<template>
 	<div class="api-list-container">
 		<el-card shadow="hover" :body-style="{ paddingBottom: '0' }">
 			<el-form :inline="true" :model="searchParams">
@@ -94,9 +94,10 @@
 						{{ row.manager_name || '-' }}
 					</template>
 				</el-table-column>
-				<el-table-column label="操作" width="280" align="center" fixed="right">
+				<el-table-column label="操作" width="340" align="center" fixed="right">
 					<template #default="{ row }">
 						<span class="action-cell">
+							<el-button type="primary" size="small" plain @click.stop="openServiceDetail(row)">详情</el-button>
 							<el-button
 								v-if="row.source_addr"
 								type="primary"
@@ -243,7 +244,7 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import Sortable from 'sortablejs';
-import { useApiAutomationApi } from '/@/api/v1/api_automation';
+import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation';
 import { useUserApi } from '/@/api/v1/system/user';
 import { useProjectApi } from '/@/api/v1/projects/project';
 
@@ -389,8 +390,12 @@ const resetSearch = () => {
 };
 
 // ---- 双击行进入详情 ----
-const onRowDblClick = (row: any) => {
+const openServiceDetail = (row: any) => {
 	emit('select-service', { id: row.id, name: row.name });
+};
+
+const onRowDblClick = (row: any) => {
+	openServiceDetail(row);
 };
 
 // ---- 拉取文档 ----

@@ -208,7 +208,7 @@ import {
 	api_env,
 	api_db_list,
 	api_tree_list,
-} from '/@/api/v1/api_automation';
+} from '/@/api/v1/testing/apiAutomation';
 import ApiDetail from './api_detail.vue';
 
 const route = useRoute();

@@ -191,7 +191,7 @@ import {
 	getReviewReviewers, 
 	getReviewComments,
 	type Review 
-} from '/@/api/v1/reviews';
+} from '/@/api/v1/reviews/review';
 
 // Props
 interface Props {

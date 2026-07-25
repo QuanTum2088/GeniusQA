@@ -245,7 +245,7 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox, FormInstance } from 'element-plus';
-import { usePerformanceApi } from '/@/api/v1/performance';
+import { usePerformanceApi } from '/@/api/v1/testing/performance';
 import { useDictCache } from '/@/utils/dictCache';
 import { usePerfSchedulerWatcher } from '/@/stores/perfSchedulerWatcher';
 

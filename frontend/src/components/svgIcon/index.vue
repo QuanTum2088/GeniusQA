@@ -17,7 +17,7 @@ const props = defineProps({
   name: {
     type: String,
   },
-  // svg 大小
+ 
   size: {
     type: Number,
     default: () => 14,

@@ -136,7 +136,7 @@ import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { VideoPause, Refresh, Close, Download, Document } from '@element-plus/icons-vue'
-import { useUiAutomationApi } from '/@/api/v1/ui_automation'
+import { useUiAutomationApi } from '/@/api/v1/testing/uiAutomation'
 import dayjs from 'dayjs'
 import duration from 'dayjs/plugin/duration'
 

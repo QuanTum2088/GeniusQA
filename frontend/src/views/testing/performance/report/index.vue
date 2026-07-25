@@ -297,7 +297,7 @@
 import { ref, reactive, computed, onMounted, onActivated, onUnmounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRoute } from 'vue-router';
-import { usePerformanceApi } from '/@/api/v1/performance';
+import { usePerformanceApi } from '/@/api/v1/testing/performance';
 import { formatDateTime } from '/@/utils/formatTime';
 import CollectProgressDrawer from './CollectProgress.vue';
 

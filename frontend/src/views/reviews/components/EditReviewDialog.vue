@@ -71,7 +71,7 @@
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
-import { updateReview, type Review } from '/@/api/v1/reviews';
+import { updateReview, type Review } from '/@/api/v1/reviews/review';
 
 // Props
 interface Props {

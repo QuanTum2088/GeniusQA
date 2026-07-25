@@ -229,7 +229,7 @@ import {
   Monitor, Refresh, CircleCheck, CircleClose, TrendCharts, 
   Document, Check, SuccessFilled, WarningFilled, DocumentCopy 
 } from '@element-plus/icons-vue'
-import { useUiAutomationApi } from '/@/api/v1/ui_automation'
+import { useUiAutomationApi } from '/@/api/v1/testing/uiAutomation'
 
 const { uiBrowserApi } = useUiAutomationApi()
 

@@ -161,8 +161,8 @@
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Document, Plus, DataAnalysis, Setting, Search } from '@element-plus/icons-vue';
-import { getReviewList, deleteReview as deleteReviewApi, type Review } from '/@/api/v1/reviews';
-import { getProjectList } from '/@/api/v1/project';
+import { getReviewList, deleteReview as deleteReviewApi, type Review } from '/@/api/v1/reviews/review';
+import { getProjectList } from '/@/api/v1/projects/project';
 import CreateReviewDialog from './components/CreateReviewDialog.vue';
 import EditReviewDialog from './components/EditReviewDialog.vue';
 import ReviewDetailDialog from './components/ReviewDetailDialog.vue';

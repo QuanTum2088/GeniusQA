@@ -348,7 +348,7 @@
 import { ref, reactive, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import { Histogram, Refresh, Download, CopyDocument, Document, CircleCheck, CircleClose, TrendCharts, Picture, ArrowDown, Delete } from '@element-plus/icons-vue'
-import { useUiAutomationApi } from '/@/api/v1/ui_automation'
+import { useUiAutomationApi } from '/@/api/v1/testing/uiAutomation'
 import { formatDateTime } from '/@/utils/formatTime'
 import * as echarts from 'echarts'
 

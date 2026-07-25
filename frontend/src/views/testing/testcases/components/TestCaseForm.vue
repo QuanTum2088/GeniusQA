@@ -110,8 +110,8 @@
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import { createTestCase, updateTestCase, getTestCaseDetail } from '/@/api/v1/testcases';
-import { getModuleList } from '/@/api/v1/modules';
+import { createTestCase, updateTestCase, getTestCaseDetail } from '/@/api/v1/testing/testcases';
+import { getModuleList } from '/@/api/v1/testing/modules';
 import StepManager from './StepManager.vue';
 
 const props = defineProps({
