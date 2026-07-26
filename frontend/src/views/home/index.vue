@@ -185,15 +185,8 @@
                 <div class="project-rank" :class="i < 3 ? 'rank-gold' : ''">{{ i + 1 }}</div>
                 <div class="project-info">
                   <div class="project-name">{{ p.name }}</div>
-                  <el-progress
-                    :percentage="p.activity_score"
-                    :show-text="false"
-                    :stroke-width="4"
-                    :color="getActivityColor(p.activity_score)"
-                    style="margin-top: 5px"
-                  />
+                  <div class="project-meta">最近活动 {{ formatTime(p.last_activity) }}</div>
                 </div>
-                <span class="project-score" :style="{ color: getActivityColor(p.activity_score) }">{{ p.activity_score }}%</span>
               </div>
             </div>
           </div>
@@ -729,10 +722,6 @@ const loadProjectActivity = async () => {
     if (r.code === 200) activeProjects.value = r.data?.active_projects || [];
   } catch {} finally { projectLoading.value = false; }
 };
-
-const getActivityColor = (s: number) =>
-  s >= 80 ? '#10b981' : s >= 60 ? '#f59e0b' : s >= 40 ? '#ef4444' : '#9ca3af';
-
 
 const notifications = ref<any[]>([]);
 const unreadCount = ref(0);
@@ -1335,10 +1324,10 @@ onUnmounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.project-score {
+.project-meta {
+  margin-top: 4px;
   font-size: 12px;
-  font-weight: 600;
-  flex-shrink: 0;
+  color: var(--el-text-color-secondary);
 }
 
 

@@ -69,19 +69,41 @@ async def get_dashboard_overview(
         ai_monthly_result = await db.execute(ai_monthly_query, {"month_start": month_start})
         ai_monthly = ai_monthly_result.scalar() or 0
         
-        # AI成功率（模拟计算）
-        ai_success_rate = 92  # TODO: 根据实际执行结果计算
+        # AI 执行成功率（与 browser-use 统计页一致：completed/success）
+        ai_rate_query = text("""
+            SELECT
+                COUNT(*) AS total_count,
+                SUM(CASE WHEN status IN ('completed', 'success') THEN 1 ELSE 0 END) AS success_count
+            FROM ai_execution_records
+            WHERE enabled_flag = 1
+        """)
+        ai_rate_result = await db.execute(ai_rate_query)
+        ai_rate_row = ai_rate_result.fetchone()
+        ai_exec_total = int(ai_rate_row.total_count or 0) if ai_rate_row else 0
+        ai_exec_success = int(ai_rate_row.success_count or 0) if ai_rate_row else 0
+        ai_success_rate = round(ai_exec_success / ai_exec_total * 100, 1) if ai_exec_total > 0 else 0
         
         # 用户统计
         user_total_query = text("SELECT COUNT(*) FROM sys_user WHERE enabled_flag = 1")
         user_total_result = await db.execute(user_total_query)
         user_total = user_total_result.scalar() or 0
         
-        # 在线用户（模拟数据）
-        user_online = 12  # TODO: 实现在线用户统计
+        # 在线用户：与监控中心「在线用户」同一数据源（Redis）
+        try:
+            from app.api.v1.monitor.online.service import OnlineUserService
+            online_stats = await OnlineUserService.get_online_stats()
+            user_online = int(getattr(online_stats, "total_online", 0) or 0)
+        except Exception as online_err:
+            logger.warning(f"[首页看板] 获取在线用户失败: {online_err}")
+            user_online = 0
         
-        # 本月活跃用户（模拟数据）
-        user_monthly_active = int(user_total * 0.75)  # TODO: 根据实际活动记录计算
+        # 本月活跃用户（有登录/操作记录的近似：本月有更新的用户）
+        user_monthly_query = text("""
+            SELECT COUNT(*) FROM sys_user
+            WHERE enabled_flag = 1 AND updation_date >= :month_start
+        """)
+        user_monthly_result = await db.execute(user_monthly_query, {"month_start": month_start})
+        user_monthly_active = user_monthly_result.scalar() or 0
         
         overview_data = {
             "projects": {
@@ -445,19 +467,12 @@ async def get_project_activity(
     获取项目活跃度统计
     """
     try:
-        # 活跃项目排行（按最近活动时间）
+        # 活跃项目排行（按最近活动时间，不计算虚构活跃度百分比）
         active_projects_query = text("""
             SELECT 
                 p.id,
                 p.name,
-                p.updation_date as last_activity,
-                CASE 
-                    WHEN p.updation_date >= DATE_SUB(NOW(), INTERVAL 1 DAY) THEN 95
-                    WHEN p.updation_date >= DATE_SUB(NOW(), INTERVAL 3 DAY) THEN 85
-                    WHEN p.updation_date >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 70
-                    WHEN p.updation_date >= DATE_SUB(NOW(), INTERVAL 14 DAY) THEN 50
-                    ELSE 30
-                END as activity_score
+                p.updation_date as last_activity
             FROM projects p
             WHERE p.enabled_flag = 1
             AND p.status = 'active'
@@ -470,7 +485,6 @@ async def get_project_activity(
                 "id": row.id,
                 "name": row.name,
                 "last_activity": row.last_activity.isoformat() if row.last_activity else None,
-                "activity_score": row.activity_score
             }
             for row in active_projects_result.fetchall()
         ]

@@ -74,8 +74,7 @@ export interface ReviewStats {
 export interface ActiveProject {
   id: number;
   name: string;
-  last_activity: string;
-  activity_score: number;
+  last_activity: string | null;
 }
 
 export interface ProjectActivity {

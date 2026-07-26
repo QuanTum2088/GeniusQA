@@ -75,65 +75,20 @@
         </div>
         <div class="navbar-right">
           <div class="chat-options">
-            <el-select
-              v-model="selectedProjectId"
-              placeholder="项目"
-              size="small"
-              style="width: 140px"
-              @change="handleProjectChange"
-            >
-              <el-option v-for="p in projects" :key="p.id" :label="p.name" :value="p.id" />
-            </el-select>
-            <el-switch v-model="useKnowledgeBase" size="small" />
-            <el-select
-              v-model="selectedKnowledgeBaseId"
-              placeholder="知识库来源"
-              size="small"
-              style="width: 180px"
-              :disabled="!useKnowledgeBase"
-            >
-              <el-option v-for="kb in knowledgeBases" :key="kb.id" :label="kb.name" :value="Number(kb.id)" />
-            </el-select>
-            <el-switch v-model="useMcp" size="small" />
-            <el-select
-              v-model="selectedMcpConfigId"
-              placeholder="MCP配置"
-              size="small"
-              style="width: 160px"
-              :disabled="!useMcp"
-            >
-              <el-option v-for="m in mcpConfigs" :key="m.id" :label="m.name" :value="m.id" />
-            </el-select>
-            <el-switch v-model="useSkill" size="small" />
-            <el-select
-              v-model="selectedSkillId"
-              placeholder="Skill配置"
-              size="small"
-              style="width: 160px"
-              :disabled="!useSkill"
-            >
-              <el-option v-for="s in skillConfigs" :key="s.id" :label="s.name" :value="s.id" />
-            </el-select>
-            <el-select
-              v-if="toolMode === 'direct' && useSkill"
-              v-model="directSkillAction"
-              placeholder="Skill动作"
-              size="small"
-              style="width: 170px"
-            >
-              <el-option v-for="a in directSkillActions" :key="a.value" :label="a.label" :value="a.value" />
-            </el-select>
-            <el-input
-              v-if="toolMode === 'direct' && useSkill"
-              v-model="directSkillArgsText"
-              placeholder='动作参数JSON，如 {"url":"https://example.com"}'
-              size="small"
-              style="width: 260px"
-            />
-            <el-select v-model="toolMode" placeholder="调用模式" size="small" style="width: 110px">
-              <el-option label="智能" value="smart" />
-              <el-option label="直连" value="direct" />
-            </el-select>
+            <el-button size="small" :icon="Setting" @click="settingsDrawerVisible = true">
+              对话配置
+            </el-button>
+            <div v-if="enabledFeatureTags.length" class="active-feature-tags">
+              <el-tag
+                v-for="tag in enabledFeatureTags"
+                :key="tag"
+                size="small"
+                type="info"
+                effect="plain"
+              >
+                {{ tag }}
+              </el-tag>
+            </div>
           </div>
           <div class="connection-status">
             <el-icon :class="['status-icon', isWsConnected ? 'connected' : 'disconnected']">
@@ -151,6 +106,26 @@
           </el-tag>
         </div>
       </div>
+
+      <ChatSettingsDrawer
+        v-model:visible="settingsDrawerVisible"
+        v-model:selected-project-id="selectedProjectId"
+        v-model:use-knowledge-base="useKnowledgeBase"
+        v-model:selected-knowledge-base-id="selectedKnowledgeBaseId"
+        v-model:use-mcp="useMcp"
+        v-model:selected-mcp-config-id="selectedMcpConfigId"
+        v-model:use-skill="useSkill"
+        v-model:selected-skill-id="selectedSkillId"
+        v-model:tool-mode="toolMode"
+        v-model:direct-skill-action="directSkillAction"
+        v-model:direct-skill-args-text="directSkillArgsText"
+        :projects="projects"
+        :knowledge-bases="knowledgeBases"
+        :mcp-configs="mcpConfigs"
+        :skill-configs="skillConfigs"
+        :direct-skill-actions="directSkillActions"
+        @project-change="handleProjectChange"
+      />
       
       <!-- 欢迎界面 -->
       <div v-if="!currentConversationId" class="welcome-screen">
@@ -496,7 +471,8 @@ import {
   ArrowUp,
   Picture,
   Document,
-  Close
+  Close,
+  Setting
 } from '@element-plus/icons-vue'
 import { useConversationApi } from '/@/api/v1/ai/conversation'
 import type { ConversationData, MessageData } from '/@/api/v1/ai/conversation'
@@ -504,6 +480,7 @@ import { useFileApi } from '/@/api/v1/common/file'
 import { useProjectApi } from '/@/api/v1/projects/project'
 import { projectPlatformApi } from '/@/api/v1/projects/platform'
 import { skillsApi } from '/@/api/v1/ai/skills'
+import ChatSettingsDrawer from './components/ChatSettingsDrawer.vue'
 import { Session } from '/@/utils/storage'
 import { getApiBaseUrl } from '/@/utils/config'
 import { marked } from 'marked'
@@ -639,6 +616,7 @@ const skillConfigs = ref<any[]>([])
 const directSkillAction = ref<string>('agent_browser_open_snapshot')
 const directSkillArgsText = ref<string>('{}')
 const toolMode = ref<'smart' | 'direct'>('smart')
+const settingsDrawerVisible = ref(false)
 const mcpRecordDialogVisible = ref(false)
 const mcpRecordLoading = ref(false)
 const mcpRecords = ref<any[]>([])
@@ -685,6 +663,17 @@ const filteredConversations = computed(() => {
 const selectedSkill = computed(() => skillConfigs.value.find((s: any) => s.id === selectedSkillId.value))
 const isAgentBrowserSkill = computed(() => String(selectedSkill.value?.name || '').toLowerCase().includes('agent-browser'))
 const isPlaywrightSkill = computed(() => String(selectedSkill.value?.name || '').toLowerCase().includes('playwright'))
+
+const enabledFeatureTags = computed(() => {
+  const tags: string[] = []
+  const project = projects.value.find((p) => p.id === selectedProjectId.value)
+  if (project?.name) tags.push(project.name)
+  if (useKnowledgeBase.value) tags.push('知识库')
+  if (useMcp.value) tags.push('MCP')
+  if (useSkill.value) tags.push('Skill')
+  if (toolMode.value === 'direct') tags.push('直连')
+  return tags
+})
 
 const directSkillActions = computed(() => {
   const base = [{ label: '自定义命令', value: 'custom' }]
@@ -1835,6 +1824,15 @@ onUnmounted(() => {
           display: flex;
           gap: 8px;
           align-items: center;
+          max-width: min(520px, 48vw);
+
+          .active-feature-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            align-items: center;
+            overflow: hidden;
+          }
         }
 
         .connection-status {
