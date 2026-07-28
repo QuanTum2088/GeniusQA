@@ -1,8 +1,8 @@
 <template>
 	<el-footer class="layout-footer pb15">
 		<div class="layout-footer-warp">
-			<div>N-Tester平台 ❤️</div>
-			<div class="mt5">@2026 N-tester平台版权所有</div>
+			<div>GeniusQA ❤️</div>
+			<div class="mt5">@2026 GeniusQA 版权所有</div>
 		</div>
 	</el-footer>
 </template>

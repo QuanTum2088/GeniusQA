@@ -1,0 +1,104 @@
+--index-url https://mirrors.aliyun.com/pypi/simple
+
+# Windows 系统专用依赖文件（避免编译问题）
+# 核心框架
+fastapi==0.111.0
+uvicorn[standard]>=0.31.1
+gunicorn==22.0.0
+pydantic==2.12.5
+pydantic-settings==2.13.1
+python-multipart==0.0.20
+
+# 数据库
+SQLAlchemy==2.0.3
+aiomysql==0.3.2
+PyMySQL==1.0.2
+alembic==1.13.1
+
+# 缓存和任务队列
+redis==5.0.4
+celery==5.2.7
+
+# 认证和安全
+python-jose[cryptography]==3.3.0
+passlib==1.7.4
+bcrypt==4.2.0
+cryptography==40.0.2
+PyJWT==2.11.0
+Authlib==1.6.6
+pycryptodomex==3.23.0
+
+# HTTP客户端
+requests==2.32.5
+httpx==0.28.1
+
+# 文件处理
+aiofiles==25.1.0
+pandas==3.0.1
+openpyxl==3.1.5
+python-docx==1.2.0
+pypdf==6.6.2
+minio==7.2.20
+paramiko==4.0.0
+
+# 配置和日志
+python-dotenv==1.2.1
+loguru==0.6.0
+
+# 数据处理
+jsonpath-ng==1.6.1
+pyyaml==6.0.3
+xmltodict==1.0.4
+dictdiffer==0.9.0
+
+# 时间处理
+python-dateutil==2.9.0.post0
+croniter==6.0.0
+apscheduler
+
+# 图像和条码
+pillow==12.1.0
+python-barcode==0.16.1
+qrcode==8.2
+
+# 数据生成
+faker==40.5.1
+
+# UI自动化
+selenium==4.40.0
+webdriver-manager==4.0.2
+playwright==1.40.0
+opencv-python==4.10.0.84
+Appium-Python-Client==4.2.0
+
+# 测试框架
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+
+# API限流
+fastapi-limiter==0.1.6
+slowapi==0.1.9
+
+# 邮件
+email-validator==2.3.0
+
+# AI相关
+langchain==1.2.8
+langchain-openai==1.1.7
+langgraph==1.0.7
+langchain-mcp-adapters==0.2.2
+openai==2.16.0
+anthropic==0.76.0
+browser-use==0.12.0
+
+# 工具库
+user-agents==2.2.0
+psutil==7.2.2
+typer==0.12.3
+urllib3>=2.6.3,<3.0
+jmespath==1.0.1
+
+# WS长连接工具库
+websockets==15.0.1
+protobuf==6.33.6

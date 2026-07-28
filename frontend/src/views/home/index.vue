@@ -486,7 +486,7 @@ const statCards = computed(() => [
     path: '',
   },
   {
-    icon: MagicStick, label: 'AI执行',
+    icon: MagicStick, label: 'AI用例执行',
     value: coreStats.value.ai_executions?.total ?? 0,
     change: `成功率 ${coreStats.value.ai_executions?.success_rate ?? 0}%`,
     changeType: 'up',

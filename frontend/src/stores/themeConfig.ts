@@ -102,7 +102,7 @@ export const useThemeConfig = defineStore('themeConfig', {
 			// 是否开启水印
 			isWartermark: true,
 			// 水印文案
-			wartermarkText: 'N-Tester平台',
+			wartermarkText: 'GeniusQA',
 
 			/**
 			 * 其它设置
