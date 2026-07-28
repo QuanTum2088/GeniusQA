@@ -1,4 +1,4 @@
-# N-Tester AI 全栈测试平台
+# GeniusQA AI 全栈测试平台
 
 <div align="center">
 
@@ -20,7 +20,7 @@ http://106.54.166.76
 
 ## 🌈 项目介绍
 
-N-Tester AI 全栈测试平台是一个面向企业级应用的现代化智能测试管理系统，采用前后端完全分离的架构设计，集成了AI智能测试、API接口测试、UI自动化测试、数据工厂、评审管理等多个核心功能模块。
+GeniusQA AI 全栈测试平台是一个面向企业级应用的现代化智能测试管理系统，采用前后端完全分离的架构设计，集成了AI智能测试、API接口测试、UI自动化测试、数据工厂、评审管理等多个核心功能模块。
 
 **核心特性：**
 - 🤖 AI智能测试：集成大语言模型，智能生成测试用例和执行测试
@@ -142,7 +142,7 @@ N-Tester AI 全栈测试平台是一个面向企业级应用的现代化智能�
 ### 核心功能模块
 
 ```
-N-Tester AI 全栈测试平台
+GeniusQA AI 全栈测试平台
 ├── 🤖 AI智能测试模块
 │   ├── AI对话助手          # 智能测试咨询和建议
 │   ├── 智能用例生成        # 基于需求自动生成测试用例
@@ -489,8 +489,8 @@ frontend/src/
 #### 1. 克隆项目
 
 ```bash
-git clone https://github.com/rebort-hub/N-Tester.git
-cd N-Tester
+git clone https://github.com/rebort-hub/GeniusQA.git
+cd GeniusQA
 ```
 
 #### 2. 配置环境变量
@@ -683,11 +683,11 @@ VITE_OPEN=true
 VITE_PUBLIC_PATH=/
 
 # 网站主标题（菜单导航、浏览器当前网页标题)
-VITE_GLOBAL_TITLE=N-Tester
+VITE_GLOBAL_TITLE=GeniusQA
 #网站副标题（登录页顶部文字）
-VITE_GLOBAL_VICE_TITLE=N-Tester
+VITE_GLOBAL_VICE_TITLE=GeniusQA
 
-VITE_APP_NAMESPACE=N-Tester
+VITE_APP_NAMESPACE=GeniusQA
 
 # 安装依赖使用 yarn
 yarn install
@@ -1108,7 +1108,7 @@ A:
 
 ## 🔗 相关链接
 
-- **GitHub**: https://github.com/rebort-hub/N-Tester
+- **GitHub**: https://github.com/rebort-hub/GeniusQA
 - **FastAPI 文档**: https://fastapi.tiangolo.com/
 - **Vue 3 文档**: https://vuejs.org/
 - **Element Plus 文档**: https://element-plus.org/
@@ -1132,7 +1132,7 @@ A:
 
 ## 💌 支持作者
 
-如果这个项目对你有帮助，请在 [GitHub](https://github.com/rebort-hub/N-Tester) 上给个 ⭐ Star 支持一下！
+如果这个项目对你有帮助，请在 [GitHub](https://github.com/rebort-hub/GeniusQA) 上给个 ⭐ Star 支持一下！
 
 你的支持是我持续更新的动力 🚀
 
@@ -1142,6 +1142,6 @@ A:
 
 **Made with ❤️ by Rebort**
 
-**N-Tester AI 全栈测试平台 - 让测试更智能，让质量更可靠**
+**GeniusQA AI 全栈测试平台 - 让测试更智能，让质量更可靠**
 
 </div>
