@@ -5,7 +5,10 @@
 			v-else
 			:serviceId="currentService.id"
 			:serviceName="currentService.name"
+			:sourceType="currentService.source_type"
+			:sourceAddr="currentService.source_addr"
 			@back="onBack"
+			@update-source="onUpdateSource"
 		/>
 	</div>
 </template>
@@ -15,10 +18,31 @@ import { ref } from 'vue';
 import ApiList from './api_list.vue';
 import ApiServiceDetail from './api_service_detail.vue';
 
-const currentService = ref<{ id: number; name: string } | null>(null);
+type ServiceInfo = {
+	id: number;
+	name: string;
+	source_type?: string;
+	source_addr?: string;
+};
 
-function onSelectService(service: { id: number; name: string }) {
-	currentService.value = service;
+const currentService = ref<ServiceInfo | null>(null);
+
+function onSelectService(service: ServiceInfo) {
+	currentService.value = {
+		id: service.id,
+		name: service.name,
+		source_type: service.source_type || '',
+		source_addr: service.source_addr || '',
+	};
+}
+
+function onUpdateSource(payload: { source_type?: string; source_addr?: string }) {
+	if (!currentService.value) return;
+	currentService.value = {
+		...currentService.value,
+		...(payload.source_type !== undefined ? { source_type: payload.source_type } : {}),
+		...(payload.source_addr !== undefined ? { source_addr: payload.source_addr } : {}),
+	};
 }
 
 function onBack() {

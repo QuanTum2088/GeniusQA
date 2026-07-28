@@ -1,0 +1,34 @@
+# 填写正确的数据库连接信息
+
+server:
+  host: "0.0.0.0"
+  port: 8100
+
+database:
+  host: localhost
+  port: 3306
+  user: root
+  password: "change-me"
+  name: ntester
+
+redis:
+  uri: "redis://localhost:6379/4"
+
+celery:
+  broker_url: "redis://localhost:6379/5"
+  result_backend: "redis://localhost:6379/5"
+
+# Optional full URI form (overrides host/user/password/name when set):
+# database:
+#   async_url: "mysql+aiomysql://user:pass@localhost:3306/ntester?charset=utf8mb4"
+#   sync_url: "mysql+pymysql://user:pass@localhost:3306/ntester?charset=utf8mb4"
+
+frontend:
+  dist_path: "app/frontend"
+  public_base_url: "http://127.0.0.1"
+
+security:
+  secret_key: "change-me-in-production"
+
+optional:
+  grant_admin_oauth: false

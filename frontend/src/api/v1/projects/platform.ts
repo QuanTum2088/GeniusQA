@@ -25,6 +25,26 @@ export function useProjectPlatformApi() {
           method: 'post',
           data,
         }),
+      importFromFile: (projectId: number, data?: { path?: string; scope?: string }) =>
+        request({
+          url: `/v1/Ntesterc_project/${projectId}/mcp-configs/import`,
+          method: 'post',
+          data: data || {},
+        }),
+      syncFiles: (projectId: number) =>
+        request({
+          url: `/v1/Ntesterc_project/${projectId}/mcp-configs/sync-files`,
+          method: 'post',
+        }),
+      export: (
+        projectId: number,
+        data: { format: 'n-tester' | 'claude' | 'cursor'; scope?: string; write?: boolean },
+      ) =>
+        request({
+          url: `/v1/Ntesterc_project/${projectId}/mcp-configs/export`,
+          method: 'post',
+          data,
+        }),
     },
     skills: {
       list: (projectId: number, params?: Record<string, any>) =>

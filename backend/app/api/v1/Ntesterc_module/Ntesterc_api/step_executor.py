@@ -23,6 +23,7 @@ from .model import ApiDatabaseModel, ApiModel, ApiFunctionModel
 # ---------------------------------------------------------------------------
 
 _VAR_PATTERN = re.compile(r"\$\{([^}]+)\}")
+_MUSTACHE_PATTERN = re.compile(r"\{\{([^{}]+)\}\}")
 
 
 class VariableContext:
@@ -38,19 +39,43 @@ class VariableContext:
     def get(self, key: str, default: Any = None) -> Any:
         return self.session_vars.get(key, self.env_vars.get(key, default))
 
+    @staticmethod
+    def _normalize_key(key: str) -> str:
+        k = str(key or "").strip()
+        if k.startswith("{{") and k.endswith("}}"):
+            k = k[2:-2].strip()
+        if k.startswith("${") and k.endswith("}"):
+            k = k[2:-1].strip()
+        if k.startswith("env."):
+            k = k[4:].strip()
+        return k
+
+    def _lookup(self, key: str, fallback: str) -> str:
+        k = self._normalize_key(key)
+        if not k:
+            return fallback
+        if k.startswith("env."):
+            val = self.env_vars.get(k[4:])
+        else:
+            val = self.session_vars.get(k, self.env_vars.get(k))
+        if val is None:
+            return fallback
+        return str(val)
+
     def resolve(self, data: Any) -> Any:
-        """递归替换 ${var} 占位符。未定义变量保留原文。"""
+        """递归替换 ${var} / {{var}} 占位符。未定义变量保留原文。"""
         if isinstance(data, str):
-            def _replace(m: re.Match) -> str:
-                key = m.group(1).strip()
-                # 支持 ${env.KEY}
-                if key.startswith("env."):
-                    return str(self.env_vars.get(key[4:], m.group(0)))
-                val = self.session_vars.get(key, self.env_vars.get(key))
-                if val is None:
-                    return m.group(0)  # 保留原文
-                return str(val)
-            return _VAR_PATTERN.sub(_replace, data)
+            text = data
+
+            def _replace_dollar(m: re.Match) -> str:
+                return self._lookup(m.group(1), m.group(0))
+
+            def _replace_mustache(m: re.Match) -> str:
+                return self._lookup(m.group(1), m.group(0))
+
+            text = _VAR_PATTERN.sub(_replace_dollar, text)
+            text = _MUSTACHE_PATTERN.sub(_replace_mustache, text)
+            return text
         if isinstance(data, dict):
             return {k: self.resolve(v) for k, v in data.items()}
         if isinstance(data, list):
@@ -281,17 +306,42 @@ class StepExecutor:
 
         api_cfg = api_row.req or {}
 
-        # 变量替换
-        url = self.ctx.resolve(api_row.url)
-        headers = ApiAutomationService.params_header(api_cfg.get("header"))
-        headers = self.ctx.resolve(headers)
-        params = ApiAutomationService.params_header(api_cfg.get("params"))
-        params = self.ctx.resolve(params)
-        body = self.ctx.resolve(api_cfg.get("body") or {})
-        form_data = ApiAutomationService.params_header(api_cfg.get("form_data"))
-        form_urlencoded = ApiAutomationService.params_header(api_cfg.get("form_urlencoded"))
+        # 变量替换：先用步骤上下文（${var}/{{var}}），再走环境/全局变量 handle_var
+        url = await ApiAutomationService.handle_var(
+            self.db, self.env_id, self.ctx.resolve(api_row.url or "")
+        )
+        headers = await ApiAutomationService.handle_var(
+            self.db, self.env_id, self.ctx.resolve(ApiAutomationService.params_header(api_cfg.get("header")))
+        )
+        params = await ApiAutomationService.handle_var(
+            self.db, self.env_id, self.ctx.resolve(ApiAutomationService.params_header(api_cfg.get("params")))
+        )
+        body = await ApiAutomationService.handle_var(
+            self.db, self.env_id, self.ctx.resolve(api_cfg.get("body") or {})
+        )
+        form_data = await ApiAutomationService.handle_var(
+            self.db, self.env_id, self.ctx.resolve(ApiAutomationService.params_header(api_cfg.get("form_data")))
+        )
+        form_urlencoded = await ApiAutomationService.handle_var(
+            self.db, self.env_id, self.ctx.resolve(ApiAutomationService.params_header(api_cfg.get("form_urlencoded")))
+        )
         file_paths = api_cfg.get("file_path") or []
         config = api_cfg.get("config") or {"retry": 0, "req_timeout": 5, "res_timeout": 5}
+
+        if isinstance(url, str) and "{{" in url and "}}" in url:
+            result.success = False
+            result.error = f"URL 环境变量未替换：{url}（请确认已选择环境，且配置项名与占位符一致）"
+            result.request = {"method": api_cfg.get("method"), "url": url}
+            result.response = {"code": 500, "body": {"msg": "接口请求失败", "exception": result.error}}
+            result.logs.append(f"响应: {result.response['body']}")
+            return result
+        if isinstance(url, str) and url.strip() and not re.match(r"^https?://", url.strip(), re.I):
+            result.success = False
+            result.error = f"URL 缺少协议（http/https）：{url}"
+            result.request = {"method": api_cfg.get("method"), "url": url}
+            result.response = {"code": 500, "body": {"msg": "接口请求失败", "exception": result.error}}
+            result.logs.append(f"响应: {result.response['body']}")
+            return result
 
         # 前置操作
         before_ops = api_cfg.get("before") or []

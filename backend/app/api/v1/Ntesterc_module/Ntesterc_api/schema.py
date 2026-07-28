@@ -173,45 +173,45 @@ class DelApiDbRequest(BaseModel):
     id: int = Field(..., description="配置ID")
 
 
-# ---------- 场景脚本 ----------
+# ---------- 接口用例（历史接口路径仍为 api_script_*） ----------
 class ApiScriptListRequest(BaseModel):
-    """场景列表分页"""
+    """用例列表分页"""
     page: Optional[int] = Field(1, description="页码")
     pageSize: Optional[int] = Field(1000, description="每页条数")
 
 
 class ApiScriptRequest(BaseModel):
-    """场景列表请求 - 与 get_api_script_list 一致"""
+    """用例列表请求 - 与 get_api_script_list 一致"""
     page: Optional[int] = Field(1, description="页码")
     pageSize: Optional[int] = Field(1000, description="每页条数")
 
 
 class AddApiScriptRequest(BaseModel):
-    """新增场景脚本"""
-    name: str = Field(..., description="场景名称")
+    """新增用例"""
+    name: str = Field(..., description="用例名称")
     type: Optional[int] = Field(1, description="类型")
     script: Optional[List[Dict[str, Any]]] = Field(default_factory=list, description="步骤列表")
-    config: Optional[Dict[str, Any]] = Field(None, description="场景配置")
+    config: Optional[Dict[str, Any]] = Field(None, description="用例配置")
     description: Optional[str] = Field("", description="描述")
 
 
 class EditApiScriptRequest(BaseModel):
-    """编辑场景脚本"""
-    id: int = Field(..., description="场景ID")
-    name: Optional[str] = Field(None, description="场景名称")
+    """编辑用例"""
+    id: int = Field(..., description="用例ID")
+    name: Optional[str] = Field(None, description="用例名称")
     type: Optional[int] = Field(None, description="类型")
     script: Optional[List[Dict[str, Any]]] = Field(None, description="步骤列表")
-    config: Optional[Dict[str, Any]] = Field(None, description="场景配置")
+    config: Optional[Dict[str, Any]] = Field(None, description="用例配置")
     description: Optional[str] = Field(None, description="描述")
 
 
 class DelApiScriptRequest(BaseModel):
-    """删除场景脚本"""
-    id: int = Field(..., description="场景ID")
+    """删除用例"""
+    id: int = Field(..., description="用例ID")
 
 
 class RunApiScriptRequest(BaseModel):
-    """执行场景 - 与 service run_api_script 入参一致"""
+    """执行用例 - 与 service run_api_script 入参一致"""
     result_id: str = Field(..., description="本次执行批次ID（如 UUID）")
     name: str = Field(..., description="任务名称")
     config: Dict[str, Any] = Field(default_factory=dict, description="执行配置，含 env_id 等")
@@ -219,7 +219,7 @@ class RunApiScriptRequest(BaseModel):
 
 
 class ApiScriptResultRequest(BaseModel):
-    """获取场景执行结果"""
+    """获取用例执行结果"""
     result_id: int = Field(..., description="执行批次ID")
 
 
@@ -295,7 +295,7 @@ class ApiEnvironmentResponse(BaseModel):
 
 
 class ApiScriptResponse(BaseModel):
-    """API 场景"""
+    """API 用例"""
     id: int
     name: str
     type: int

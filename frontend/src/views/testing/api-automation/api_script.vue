@@ -7,11 +7,20 @@
 					<el-option v-for="s in serviceList" :key="s.id" :label="s.name" :value="s.id" />
 				</el-select>
 				<el-input v-model="caseKeyword" placeholder="搜索用例" clearable style="width:180px" @keyup.enter="filterCases" />
-				<el-button type="primary" icon="Search" @click="filterCases">搜索</el-button>
-				<el-button icon="Refresh" @click="resetSearch">重置</el-button>
+				<el-button type="primary" @click="filterCases">
+					<el-icon><ele-Search /></el-icon>
+					搜索
+				</el-button>
+				<el-button @click="resetSearch">
+					<el-icon><ele-Refresh /></el-icon>
+					重置
+				</el-button>
 			</div>
 			<div class="toolbar-right">
-				<el-button type="success" icon="Plus" :disabled="!selectedSuiteId" @click="openAddCaseDialog">新增用例</el-button>
+				<el-button type="success" :disabled="!selectedSuiteId" @click="openAddCaseDialog">
+					<el-icon><ele-Plus /></el-icon>
+					新增用例
+				</el-button>
 				<el-button type="primary" :disabled="selectedCaseIds.length === 0" @click="openRunDialog">
 					执行选中 ({{ selectedCaseIds.length }})
 				</el-button>
@@ -554,19 +563,20 @@ const get_script_result_data = async () => {
 	const res: any = await get_api_script_result({ result_id: result_id.value });
 	run_result_list.value = res.data || [];
 	const list = run_result_list.value;
-	run_count.value = list.length;
-	run_fail.value = 0;
-	if (list.length > 0) start_time.value = String(list[list.length - 1]?.create_time ?? '');
-	end_time.value = '';
-	for (const item of list) {
-		if (item?.status === 0) run_fail.value += 1;
-		if (item?.name === '执行结束') {
-			run_type.value = '执行结束';
-			run_count.value = Math.max(0, run_count.value - 1);
-			end_time.value = String(item?.create_time ?? '');
-			stopPolling();
-			break;
-		}
+	const steps = list.filter((item: any) => item?.name !== '执行结束');
+	run_count.value = steps.length;
+	run_fail.value = steps.filter((item: any) => Number(item?.status) === 0).length;
+	if (steps.length > 0) {
+		const times = steps.map((i: any) => String(i?.create_time ?? '')).filter(Boolean);
+		if (times.length) start_time.value = times[times.length - 1];
+	}
+	const endItem = list.find((item: any) => item?.name === '执行结束');
+	if (endItem) {
+		run_type.value = '执行结束';
+		end_time.value = String(endItem?.create_time ?? '');
+		stopPolling();
+	} else {
+		end_time.value = '';
 	}
 };
 
@@ -603,9 +613,13 @@ onMounted(() => { loadServices(); });
 
 <style scoped>
 .case-runner-page { height: calc(100vh - 120px); display: flex; flex-direction: column; padding: 10px; gap: 8px; overflow: hidden; }
-.case-runner-toolbar { display: flex; align-items: center; justify-content: space-between; background: var(--el-bg-color); border: 1px solid var(--el-border-color); border-radius: 8px; padding: 10px 14px; flex-shrink: 0; }
+.case-runner-toolbar { display: flex; align-items: center; justify-content: space-between; background: var(--el-bg-color); border: 1px solid var(--el-border-color); border-radius: 8px; padding: 10px 14px; flex-shrink: 0; gap: 12px; }
 .toolbar-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .toolbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.toolbar-left :deep(.el-button + .el-button),
+.toolbar-right :deep(.el-button + .el-button) {
+	margin-left: 0;
+}
 .case-runner-body { flex: 1; min-height: 0; display: flex; gap: 8px; overflow: hidden; }
 .suite-panel { width: 220px; flex-shrink: 0; background: var(--el-bg-color); border: 1px solid var(--el-border-color); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; }
 .suite-panel-header { padding: 10px 14px; border-bottom: 1px solid var(--el-border-color); flex-shrink: 0; }

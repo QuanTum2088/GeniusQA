@@ -40,6 +40,7 @@ try:
     from app.api.v1.Ntesterc_module.Ntesterc_ai.conversation.message_model import MessageModel
     from app.api.v1.Ntesterc_module.Ntesterc_ai.conversation.mcp_execution_record import MCPExecutionRecordModel
     from app.api.v1.Ntesterc_module.Ntesterc_ai.llm_config.model import LLMConfigModel
+    from app.api.v1.Ntesterc_module.Ntesterc_ai.usage.model import LLMUsageLogModel
     
     # 直接导入模型模块，避免触发 controller 和 service 的导入
     import sys

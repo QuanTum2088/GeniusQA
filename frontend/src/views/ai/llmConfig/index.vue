@@ -323,7 +323,12 @@
               </div>
             </template>
             <template v-else>
-              <p><strong>错误信息：</strong>{{ testResult.error }}</p>
+              <div class="test-result test-result--error">
+                <p><strong>错误信息：</strong></p>
+                <pre class="error-detail">{{ testResult.error || testResult.message || '未知错误' }}</pre>
+                <p v-if="testResult.endpoint"><strong>请求地址：</strong>{{ testResult.endpoint }}</p>
+                <p v-if="testResult.latency != null"><strong>耗时：</strong>{{ testResult.latency }}秒</p>
+              </div>
             </template>
           </el-alert>
         </el-form-item>
@@ -606,10 +611,14 @@ const handleRunTest = async () => {
     
     testResult.value = response.data
   } catch (error: any) {
+    
+    const payload = error.response?.data?.data || error.response?.data || {}
     testResult.value = {
       success: false,
-      message: '测试失败',
-      error: error.message || '未知错误'
+      message: payload.message || error.message || '测试失败',
+      error: payload.error || payload.message || error.message || '未知错误',
+      latency: payload.latency,
+      endpoint: payload.endpoint
     }
   } finally {
     testing.value = false
@@ -791,6 +800,21 @@ onMounted(() => {
       line-height: 1.6;
       white-space: pre-wrap;
       word-break: break-word;
+    }
+
+    &--error {
+      .error-detail {
+        margin: 8px 0;
+        padding: 12px;
+        background-color: #fef0f0;
+        border-radius: 4px;
+        color: #f56c6c;
+        font-family: Consolas, 'Courier New', monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
     }
   }
 }

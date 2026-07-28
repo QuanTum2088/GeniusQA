@@ -21,6 +21,7 @@ class ProjectModel(Base):
     description = Column(Text, comment="项目描述")
     status = Column(String(20), default="active", comment="状态: active/paused/completed/archived")
     owner_id = Column(BigInteger, ForeignKey("sys_user.id", use_alter=True, name="fk_project_owner"), nullable=False, comment="负责人ID")
+    workspace_path = Column(String(2000), nullable=True, comment="本机工作目录（写出 .n-tester/mcp.json 依赖）")
     
     # 关系定义
     members = relationship("ProjectMemberModel", back_populates="project", lazy="select")
@@ -68,21 +69,30 @@ class ProjectEnvironmentModel(Base):
 
 
 class ProjectMCPConfigModel(Base):
-    """用户级 MCP 远程配置（通过项目路由做权限校验，与 ntest 行为一致）"""
+    """MCP 配置（对齐 Claude Code：local/project/user + stdio/http/sse）"""
 
     __tablename__ = "project_mcp_config"
     __table_args__ = (
-        Index("uq_project_mcp_user_name", "user_id", "name", unique=True),
+        Index("ix_project_mcp_user_id", "user_id"),
+        Index("ix_project_mcp_project_id", "project_id"),
+        Index("ix_project_mcp_scope", "scope"),
         {"comment": "MCP 配置表", "mysql_charset": "utf8mb4"},
     )
 
-    user_id = Column(BigInteger, ForeignKey("sys_user.id", use_alter=True, name="fk_mcp_user"), nullable=False, comment="所属用户")
+    user_id = Column(BigInteger, ForeignKey("sys_user.id", use_alter=True, name="fk_mcp_user"), nullable=False, comment="创建者/所属用户")
+    project_id = Column(BigInteger, ForeignKey("projects.id", use_alter=True, name="fk_mcp_project"), nullable=True, comment="绑定项目（local/project）")
+    scope = Column(String(20), nullable=False, default="user", comment="作用域 local/project/user")
     name = Column(String(255), nullable=False, comment="配置名称")
-    url = Column(String(2048), nullable=False, comment="MCP 服务 URL")
-    transport = Column(String(50), default="streamable-http", comment="传输协议")
+    transport = Column(String(50), default="streamable-http", comment="stdio/streamable-http/sse")
+    url = Column(String(2048), nullable=True, comment="MCP 服务 URL（HTTP/SSE）")
     headers = Column(JSON, nullable=True, comment="请求头 JSON")
+    command = Column(String(500), nullable=True, comment="stdio 启动命令")
+    args = Column(JSON, nullable=True, comment="stdio 参数列表")
+    env = Column(JSON, nullable=True, comment="stdio 环境变量")
+    auth_type = Column(String(30), nullable=True, default="none", comment="none/bearer/api_key/custom")
+    auth_config = Column(JSON, nullable=True, comment="鉴权参数")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
-
+    description = Column(Text, nullable=True, comment="备注")
 
 class ProjectApiKeyModel(Base):
     """用户级第三方 API 密钥（项目路由鉴权）"""

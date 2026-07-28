@@ -4,11 +4,18 @@
 		<div class="manage-toolbar">
 			<div class="toolbar-row">
 				<div class="toolbar-doc">
-					<el-select v-model="doc_source_type" style="width:110px;flex-shrink:0">
+					<el-select v-model="doc_source_type" style="width:110px;flex-shrink:0" @change="persistSource">
 						<el-option label="Swagger" value="swagger" />
 						<el-option label="Apifox" value="apifox" />
 					</el-select>
-					<el-input v-model="doc_source_url" placeholder="输入文档 URL" clearable style="flex:1;min-width:180px" />
+					<el-input
+						v-model="doc_source_url"
+						placeholder="输入文档 URL"
+						clearable
+						style="flex:1;min-width:180px"
+						@change="persistSource"
+						@blur="persistSource"
+					/>
 					<el-input
 						v-if="doc_source_type === 'apifox'"
 						v-model="doc_source_cookies"
@@ -164,14 +171,32 @@ import ApiHistoryPanel from './components/ApiHistoryPanel.vue';
 import ApiMockPanel from './components/ApiMockPanel.vue';
 import {
 	api_tree, api_info, add_menu, del_menu, edit_menu, copy_menu,
-	pull_api_doc, params_select,
+	pull_api_doc, params_select, edit_api_service,
 } from '/@/api/v1/testing/apiAutomation';
 
 const props = defineProps<{
 	serviceId: number;
 	envId: number | null;
 	envList: any[];
+	sourceType?: string;
+	sourceAddr?: string;
 }>();
+
+const emit = defineEmits<{
+	(e: 'update-source', payload: { source_type?: string; source_addr?: string }): void;
+}>();
+
+function normalizeSourceType(raw?: string) {
+	const t = String(raw || '').trim().toLowerCase();
+	if (t === 'apifox') return 'apifox';
+	if (t === 'swagger' || t === 'openapi' || t === 'http') return 'swagger';
+	return t || 'swagger';
+}
+
+function applySourceFromProps() {
+	doc_source_type.value = normalizeSourceType(props.sourceType);
+	doc_source_url.value = (props.sourceAddr || '').trim();
+}
 
 // ---- 接口树 ----
 const treeRef = ref<any>(null);
@@ -235,6 +260,33 @@ const doc_source_type = ref('swagger');
 const doc_source_url = ref('');
 const doc_source_cookies = ref('');
 const pulling = ref(false);
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
+applySourceFromProps();
+
+watch(
+	() => [props.serviceId, props.sourceType, props.sourceAddr] as const,
+	() => applySourceFromProps(),
+);
+
+const saveSourceNow = async () => {
+	const source_type = normalizeSourceType(doc_source_type.value);
+	const source_addr = doc_source_url.value.trim();
+	doc_source_type.value = source_type;
+	await edit_api_service({
+		id: props.serviceId,
+		source_type,
+		source_addr: source_addr || undefined,
+	} as any);
+	emit('update-source', { source_type, source_addr });
+};
+
+const persistSource = () => {
+	if (persistTimer) clearTimeout(persistTimer);
+	persistTimer = setTimeout(() => {
+		saveSourceNow().catch(() => {});
+	}, 300);
+};
 
 const pullDoc = async () => {
 	if (!doc_source_url.value.trim()) { ElMessage.warning('请输入文档地址'); return; }
@@ -243,6 +295,7 @@ const pullDoc = async () => {
 	}
 	pulling.value = true;
 	try {
+		try { await saveSourceNow(); } catch { /* 保存失败不阻断拉取 */ }
 		await pull_api_doc({
 			api_service_id: props.serviceId,
 			source_type: doc_source_type.value,

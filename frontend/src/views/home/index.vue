@@ -117,6 +117,156 @@
           </div>
         </el-col>
       </el-row>
+      <div class="panel llm-usage-panel">
+        <div class="panel-hd">
+          <div class="llm-usage-hd-left">
+            <span class="panel-title">
+              <el-icon class="title-icon"><TrendCharts /></el-icon>
+              用量统计
+            </span>
+            <span class="llm-usage-hint">用量仅作参考，具体以供应商的统计为准</span>
+          </div>
+          <div class="llm-usage-hd-right">
+            <el-select v-model="llmUsageDays" size="small" style="width:96px" @change="loadLlmUsage">
+              <el-option label="近7天" :value="7" />
+              <el-option label="近14天" :value="14" />
+              <el-option label="近30天" :value="30" />
+            </el-select>
+            <el-button size="small" :icon="Refresh" circle @click="loadLlmUsage" />
+          </div>
+        </div>
+        <div class="llm-usage-tabs">
+          <span
+            v-for="t in llmUsageTabs"
+            :key="t.key"
+            class="llm-usage-tab"
+            :class="{ active: llmUsageTab === t.key }"
+            @click="switchLlmUsageTab(t.key)"
+          >{{ t.label }}</span>
+        </div>
+        <div class="llm-usage-body" v-loading="llmUsageLoading">
+          <template v-if="llmUsageTab === 'overview'">
+            <div class="llm-usage-overview">
+              <div class="llm-usage-donut-wrap">
+                <div class="llm-usage-donut" ref="llmUsageDonutEl"></div>
+              </div>
+              <div class="llm-usage-overview-right">
+                <div class="llm-usage-kicker">模型分布</div>
+                <div class="llm-usage-total">{{ formatTokenCount(llmUsage.overview.total_tokens) }}</div>
+                <div class="llm-usage-sub">
+                  缓存 {{ formatTokenCount(llmUsage.overview.cached_tokens) }}
+                  · 未缓存 {{ formatTokenCount(llmUsage.overview.uncached_tokens) }}
+                </div>
+                <div class="llm-usage-metrics">
+                  <div class="llm-metric">
+                    <div class="llm-metric-val">{{ llmUsage.overview.request_count }}</div>
+                    <div class="llm-metric-label">请求数</div>
+                  </div>
+                  <div class="llm-metric">
+                    <div class="llm-metric-val">{{ formatTokenCount(llmUsage.overview.cached_tokens) }}</div>
+                    <div class="llm-metric-label">缓存命中</div>
+                  </div>
+                  <div class="llm-metric">
+                    <div class="llm-metric-val">{{ llmUsage.overview.error_count }}</div>
+                    <div class="llm-metric-label">错误数</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="llm-usage-split">
+              <div class="llm-usage-col">
+                <div class="llm-col-title">模型分布</div>
+                <el-empty v-if="!llmUsage.by_model.length" description="暂无用量数据，聊天调用后开始累积" :image-size="48" />
+                <div v-else class="llm-usage-scroll" :class="{ 'is-scrollable': llmUsage.by_model.length >= 3 }">
+                  <div v-for="(m, i) in llmUsage.by_model" :key="i" class="llm-model-row">
+                    <div class="llm-model-left">
+                      <div class="llm-model-dot" :style="{ background: modelColor(i) }"></div>
+                      <div class="llm-model-text">
+                        <div class="llm-model-name">{{ m.provider ? `${m.provider} / ${m.model_name}` : m.model_name }}</div>
+                        <div class="llm-model-meta">{{ m.request_count }} 次 · {{ m.error_count }} 错误</div>
+                        <div class="llm-model-bar">
+                          <div class="llm-model-bar-fill" :style="{ width: tokenShare(m.total_tokens) + '%', background: modelColor(i) }"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="llm-model-tokens">{{ formatTokenCount(m.total_tokens) }}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="llm-usage-col">
+                <div class="llm-col-title">请求明细</div>
+                <el-empty v-if="!llmUsage.recent_requests.length" description="暂无请求记录" :image-size="48" />
+                <div v-else class="llm-usage-scroll" :class="{ 'is-scrollable': llmUsage.recent_requests.length >= 3 }">
+                  <div v-for="r in llmUsage.recent_requests" :key="r.id" class="llm-req-row">
+                    <div class="llm-req-top">
+                      <span class="llm-req-title">{{ r.source_label || r.source }} · {{ r.model_name }}</span>
+                      <el-tag :type="r.status === 'success' ? 'success' : 'danger'" size="small" effect="light">
+                        {{ r.status === 'success' ? '完成' : '错误' }}
+                      </el-tag>
+                    </div>
+                    <div class="llm-req-meta">
+                      {{ formatTime(r.created_at || '') }}
+                      · {{ r.provider ? `${r.provider} / ` : '' }}{{ r.model_name }}
+                      · {{ formatTokenCount(r.total_tokens) }} tok
+                      · 缓存 {{ formatTokenCount(r.cached_tokens) }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+          <template v-else-if="llmUsageTab === 'daily'">
+            <div class="llm-usage-chart" ref="llmUsageDailyEl"></div>
+            <el-empty v-if="!llmUsage.by_date.length" description="暂无按日数据" :image-size="48" />
+          </template>
+          <template v-else-if="llmUsageTab === 'category'">
+            <div class="llm-usage-tab-grid">
+              <div class="llm-usage-chart llm-usage-hbar" ref="llmUsageCategoryEl"></div>
+              <div class="llm-usage-tab-list">
+                <el-empty v-if="!llmUsage.by_category.length" description="暂无类别数据" :image-size="48" />
+                <div v-else class="llm-usage-scroll" :class="{ 'is-scrollable': llmUsage.by_category.length >= 3 }">
+                  <div v-for="(c, i) in llmUsage.by_category" :key="i" class="llm-model-row">
+                    <div class="llm-model-left">
+                      <div class="llm-model-dot" :style="{ background: modelColor(i) }"></div>
+                      <div class="llm-model-text">
+                        <div class="llm-model-name">{{ c.category }}</div>
+                        <div class="llm-model-meta">{{ c.request_count }} 次 · {{ c.error_count }} 错误</div>
+                        <div class="llm-model-bar">
+                          <div class="llm-model-bar-fill" :style="{ width: tokenShare(c.total_tokens) + '%', background: modelColor(i) }"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="llm-model-tokens">{{ formatTokenCount(c.total_tokens) }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+          <template v-else>
+            <div class="llm-usage-tab-grid">
+              <div class="llm-usage-chart llm-usage-hbar" ref="llmUsageModelEl"></div>
+              <div class="llm-usage-tab-list">
+                <el-empty v-if="!llmUsage.by_model.length" description="暂无模型数据" :image-size="48" />
+                <div v-else class="llm-usage-scroll" :class="{ 'is-scrollable': llmUsage.by_model.length >= 3 }">
+                  <div v-for="(m, i) in llmUsage.by_model" :key="i" class="llm-model-row">
+                    <div class="llm-model-left">
+                      <div class="llm-model-dot" :style="{ background: modelColor(i) }"></div>
+                      <div class="llm-model-text">
+                        <div class="llm-model-name">{{ m.provider ? `${m.provider} / ${m.model_name}` : m.model_name }}</div>
+                        <div class="llm-model-meta">{{ m.request_count }} 次 · {{ m.error_count }} 错误 · 缓存 {{ formatTokenCount(m.cached_tokens) }}</div>
+                        <div class="llm-model-bar">
+                          <div class="llm-model-bar-fill" :style="{ width: tokenShare(m.total_tokens) + '%', background: modelColor(i) }"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="llm-model-tokens">{{ formatTokenCount(m.total_tokens) }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
       <div class="panel review-stats-panel">
         <div class="panel-hd">
           <span class="panel-title">
@@ -267,8 +417,9 @@ import { getReviewStatistics } from '/@/api/v1/reviews/review';
 import {
   Bell, Top, Bottom, Folder, Document, MagicStick, UserFilled,
   Connection, DataAnalysis, Collection, Monitor,
-  List, TrendCharts, Files, VideoPlay, Phone, Calendar, Clock, User
+  List, TrendCharts, Files, VideoPlay, Phone, Calendar, Clock, User, Refresh
 } from '@element-plus/icons-vue';
+import type { LlmUsageStats } from '/@/api/v1/common/dashboard';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -345,7 +496,7 @@ const statCards = computed(() => [
   {
     icon: TrendCharts, label: '通过率',
     value: `${coreStats.value.test_cases?.pass_rate ?? 0}%`,
-    change: `测试用例`,
+    change: `API+Web`,
     changeType: coreStats.value.test_cases?.pass_rate >= 80 ? 'up' : 'down',
     bgColor: '#fef3c7', iconColor: '#d97706',
     path: '',
@@ -403,10 +554,55 @@ const initTrendChart = async () => {
 
     const apiData = countByDay(apiList, 'start_time');
     const webData = countByDay(webList, 'start_time');
-    const passData = apiData.map((v, i) => {
-      const total = v + webData[i];
-      return total > 0 ? Math.round((v / total) * 100) : 0;
-    });
+
+    const passRateByDay = () => {
+      const passMap: Record<string, number> = {};
+      const totalMap: Record<string, number> = {};
+      days.forEach((d) => {
+        passMap[d] = 0;
+        totalMap[d] = 0;
+      });
+
+      apiList.forEach((item: any) => {
+        const t = item.start_time || item.creation_date || '';
+        if (!t) return;
+        const d = new Date(t);
+        const key = `${d.getMonth() + 1}-${String(d.getDate()).padStart(2, '0')}`;
+        if (totalMap[key] === undefined) return;
+        const result = typeof item.result === 'string'
+          ? (() => { try { return JSON.parse(item.result); } catch { return null; } })()
+          : item.result;
+        const total = Number(result?.total || 0);
+        const passed = Number(result?.pass || 0);
+        if (total <= 0) return;
+        totalMap[key] += total;
+        passMap[key] += passed;
+      });
+
+      webList.forEach((item: any) => {
+        const t = item.start_time || item.creation_date || '';
+        if (!t) return;
+        const d = new Date(t);
+        const key = `${d.getMonth() + 1}-${String(d.getDate()).padStart(2, '0')}`;
+        if (totalMap[key] === undefined) return;
+        let result = item.result;
+        if (typeof result === 'string') {
+          try { result = JSON.parse(result); } catch { result = []; }
+        }
+        if (!Array.isArray(result)) return;
+        result.forEach((row: any) => {
+          const total = Number(row?.total || 0);
+          const fail = Number(row?.run_false || 0);
+          if (total <= 0) return;
+          totalMap[key] += total;
+          passMap[key] += Math.max(total - fail, 0);
+        });
+      });
+
+      return days.map((d) => (totalMap[d] > 0 ? Math.round((passMap[d] / totalMap[d]) * 100) : 0));
+    };
+
+    const passData = passRateByDay();
 
     await nextTick();
     if (!trendChartEl.value) return;
@@ -702,7 +898,7 @@ const loadReviewStats = async () => {
 
 const quickEntries = [
   { name: '需求管理', desc: '上传与管理需求', icon: Files, bgColor: '#ede9fe', iconColor: '#7c3aed', path: '/ai/intelligence/requirement-analysis' },
-  { name: 'AI测试设计', desc: 'AI生成测试用例', icon: MagicStick, bgColor: '#d1fae5', iconColor: '#059669', path: '/ai/intelligence/browser-use/cases' },
+  { name: 'AI执行测试用例', desc: '智能体执行用例', icon: MagicStick, bgColor: '#d1fae5', iconColor: '#059669', path: '/ai/intelligence/browser-use/cases' },
   { name: '测试用例', desc: '管理测试用例', icon: List, bgColor: '#dbeafe', iconColor: '#2563eb', path: '/testing/testcases' },
   { name: 'API测试', desc: '接口自动化测试', icon: Connection, bgColor: '#fce7f3', iconColor: '#db2777', path: '/api-automation/index' },
   { name: 'UI测试', desc: 'UI自动化测试', icon: Monitor, bgColor: '#fef3c7', iconColor: '#d97706', path: '/web/automation' },
@@ -832,6 +1028,298 @@ const formatTime = (t: string) => {
   return `${d.getMonth() + 1}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
+const llmUsageLoading = ref(false);
+const llmUsageDays = ref(7);
+const llmUsageTab = ref<'overview' | 'daily' | 'category' | 'model'>('overview');
+const llmUsageTabs = [
+  { key: 'overview' as const, label: '总览' },
+  { key: 'daily' as const, label: '按日期' },
+  { key: 'category' as const, label: '按类别' },
+  { key: 'model' as const, label: '按模型' },
+];
+const llmUsage = ref<LlmUsageStats>({
+  tab: 'overview',
+  days: 7,
+  overview: {
+    total_tokens: 0,
+    cached_tokens: 0,
+    uncached_tokens: 0,
+    prompt_tokens: 0,
+    completion_tokens: 0,
+    cache_hit_rate: 0,
+    request_count: 0,
+    error_count: 0,
+  },
+  by_model: [],
+  by_date: [],
+  by_category: [],
+  recent_requests: [],
+});
+const llmUsageDonutEl = ref<HTMLElement>();
+const llmUsageDailyEl = ref<HTMLElement>();
+const llmUsageCategoryEl = ref<HTMLElement>();
+const llmUsageModelEl = ref<HTMLElement>();
+let llmUsageDonutChart: echarts.ECharts | null = null;
+let llmUsageDailyChart: echarts.ECharts | null = null;
+let llmUsageCategoryChart: echarts.ECharts | null = null;
+let llmUsageModelChart: echarts.ECharts | null = null;
+
+const formatTokenCount = (n: number) => {
+  const v = Number(n) || 0;
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(v >= 10_000 ? 0 : 1)}K`;
+  return String(v);
+};
+
+const tokenShare = (n: number) => {
+  const total = Number(llmUsage.value.overview.total_tokens) || 0;
+  if (total <= 0) return 0;
+  return Math.min(100, Math.round((Number(n) || 0) / total * 100));
+};
+
+const modelColor = (i: number) => {
+  const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16'];
+  return colors[i % colors.length];
+};
+
+
+const ensureLlmChart = (
+  el: HTMLElement | undefined,
+  chart: echarts.ECharts | null,
+): echarts.ECharts | null => {
+  if (!el) return null;
+  const byDom = echarts.getInstanceByDom(el);
+  if (byDom) return byDom;
+  if (chart && !chart.isDisposed()) {
+    try {
+      chart.dispose();
+    } catch {
+      /* ignore */
+    }
+  }
+  return echarts.init(el);
+};
+
+const renderActiveLlmCharts = async () => {
+  await nextTick();
+  // loading 结束后再等一帧，避免容器宽高为 0
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  const tab = llmUsageTab.value;
+  if (tab === 'overview') renderLlmUsageDonut();
+  else if (tab === 'daily') renderLlmUsageDaily();
+  else if (tab === 'category') renderLlmUsageCategory();
+  else if (tab === 'model') renderLlmUsageModel();
+  llmUsageDonutChart?.resize();
+  llmUsageDailyChart?.resize();
+  llmUsageCategoryChart?.resize();
+  llmUsageModelChart?.resize();
+};
+
+const renderLlmUsageDonut = () => {
+  llmUsageDonutChart = ensureLlmChart(llmUsageDonutEl.value, llmUsageDonutChart);
+  if (!llmUsageDonutChart) return;
+  const cached = llmUsage.value.overview.cached_tokens || 0;
+  const uncached = llmUsage.value.overview.uncached_tokens || 0;
+  const rate = llmUsage.value.overview.cache_hit_rate || 0;
+  const hasData = cached + uncached > 0;
+  llmUsageDonutChart.setOption({
+    tooltip: {
+      trigger: 'item',
+      appendToBody: true,
+      appendTo: typeof document !== 'undefined' ? document.body : undefined,
+      confine: false,
+      extraCssText: 'z-index: 9999; max-width: 280px; white-space: normal;',
+      formatter: (params: any) => {
+        const name = params?.name ?? '';
+        const value = formatTokenCount(Number(params?.value) || 0);
+        const percent = params?.percent ?? 0;
+        return `${name}<br/>${value}（${percent}%）`;
+      },
+    },
+    legend: {
+      show: hasData,
+      bottom: 0,
+      left: 'center',
+      icon: 'roundRect',
+      itemWidth: 12,
+      itemHeight: 10,
+      itemGap: 18,
+      selectedMode: true,
+      textStyle: { color: '#6b7280', fontSize: 12 },
+      data: ['未缓存消耗', '缓存命中'],
+    },
+    series: [
+      {
+        type: 'pie',
+        radius: ['52%', '72%'],
+        center: ['50%', '44%'],
+        avoidLabelOverlap: true,
+        label: {
+          show: true,
+          position: 'center',
+          formatter: hasData ? `${rate}%\n命中率` : '暂无数据',
+          fontSize: 16,
+          fontWeight: 600,
+          color: '#111827',
+          lineHeight: 22,
+        },
+        data: hasData
+          ? [
+              { name: '未缓存消耗', value: uncached, itemStyle: { color: '#1e3a8a' } },
+              { name: '缓存命中', value: cached, itemStyle: { color: '#93c5fd' } },
+            ]
+          : [{ name: '暂无', value: 1, itemStyle: { color: '#e5e7eb' } }],
+      },
+    ],
+  }, true);
+};
+
+const renderLlmUsageDaily = () => {
+  llmUsageDailyChart = ensureLlmChart(llmUsageDailyEl.value, llmUsageDailyChart);
+  if (!llmUsageDailyChart) return;
+  const dates = llmUsage.value.by_date.map((d) => d.date);
+  const tokens = llmUsage.value.by_date.map((d) => d.total_tokens);
+  const reqs = llmUsage.value.by_date.map((d) => d.request_count);
+  llmUsageDailyChart.setOption({
+    tooltip: { trigger: 'axis', appendToBody: true, confine: false },
+    legend: { data: ['Token', '请求数'], bottom: 0 },
+    grid: { top: 48, left: 56, right: 56, bottom: 40 },
+    xAxis: { type: 'category', data: dates, axisLabel: { color: '#9ca3af' } },
+    yAxis: [
+      {
+        type: 'value',
+        name: 'Token',
+        nameLocation: 'end',
+        nameGap: 12,
+        nameTextStyle: { color: '#6b7280', padding: [0, 0, 0, 0] },
+        splitLine: { lineStyle: { color: '#f3f4f6' } },
+        axisLabel: { color: '#9ca3af' },
+      },
+      {
+        type: 'value',
+        name: '请求',
+        nameGap: 12,
+        nameTextStyle: { color: '#6b7280' },
+        minInterval: 1,
+        splitLine: { show: false },
+        axisLabel: { color: '#9ca3af' },
+      },
+    ],
+    series: [
+      { name: 'Token', type: 'bar', data: tokens, itemStyle: { color: '#6366f1', borderRadius: [4, 4, 0, 0] } },
+      { name: '请求数', type: 'line', yAxisIndex: 1, data: reqs, smooth: true, itemStyle: { color: '#10b981' } },
+    ],
+  }, true);
+};
+
+const renderLlmUsageCategory = () => {
+  llmUsageCategoryChart = ensureLlmChart(llmUsageCategoryEl.value, llmUsageCategoryChart);
+  if (!llmUsageCategoryChart) return;
+  const items = llmUsage.value.by_category.map((c) => ({
+    name: c.category,
+    value: c.total_tokens,
+  }));
+  const names = items.map((i) => i.name).reverse();
+  const values = items.map((i) => i.value).reverse();
+  llmUsageCategoryChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      appendToBody: true,
+      confine: false,
+      axisPointer: { type: 'shadow' },
+      formatter: (params: any) => {
+        const p = Array.isArray(params) ? params[0] : params;
+        return `${p?.name ?? ''}<br/>Token：${formatTokenCount(Number(p?.value) || 0)}`;
+      },
+    },
+    grid: { top: 16, left: 12, right: 48, bottom: 12, containLabel: true },
+    xAxis: { type: 'value', splitLine: { lineStyle: { color: '#f3f4f6' } }, axisLabel: { color: '#9ca3af' } },
+    yAxis: {
+      type: 'category',
+      data: names.length ? names : ['暂无'],
+      axisLabel: { color: '#6b7280', width: 100, overflow: 'truncate' },
+    },
+    series: [
+      {
+        type: 'bar',
+        data: (values.length ? values : [0]).map((v, idx) => ({
+          value: v,
+          itemStyle: { color: modelColor(Math.max(items.length - 1 - idx, 0)), borderRadius: [0, 4, 4, 0] },
+        })),
+        barMaxWidth: 22,
+      },
+    ],
+  }, true);
+};
+
+const renderLlmUsageModel = () => {
+  llmUsageModelChart = ensureLlmChart(llmUsageModelEl.value, llmUsageModelChart);
+  if (!llmUsageModelChart) return;
+  const items = llmUsage.value.by_model.map((m) => ({
+    name: m.provider ? `${m.provider}/${m.model_name}` : m.model_name,
+    value: m.total_tokens,
+  }));
+  const names = items.map((i) => i.name).reverse();
+  const values = items.map((i) => i.value).reverse();
+  llmUsageModelChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      appendToBody: true,
+      confine: false,
+      axisPointer: { type: 'shadow' },
+      formatter: (params: any) => {
+        const p = Array.isArray(params) ? params[0] : params;
+        return `${p?.name ?? ''}<br/>Token：${formatTokenCount(Number(p?.value) || 0)}`;
+      },
+    },
+    grid: { top: 16, left: 12, right: 48, bottom: 12, containLabel: true },
+    xAxis: { type: 'value', splitLine: { lineStyle: { color: '#f3f4f6' } }, axisLabel: { color: '#9ca3af' } },
+    yAxis: {
+      type: 'category',
+      data: names.length ? names : ['暂无'],
+      axisLabel: { color: '#6b7280', width: 120, overflow: 'truncate' },
+    },
+    series: [
+      {
+        type: 'bar',
+        data: (values.length ? values : [0]).map((v, idx) => ({
+          value: v,
+          itemStyle: { color: modelColor(Math.max(items.length - 1 - idx, 0)), borderRadius: [0, 4, 4, 0] },
+        })),
+        barMaxWidth: 22,
+      },
+    ],
+  }, true);
+};
+
+const loadLlmUsage = async () => {
+  llmUsageLoading.value = true;
+  try {
+    const r: any = await dashboardApi.getLlmUsage({ days: llmUsageDays.value, tab: llmUsageTab.value });
+    if (r?.code === 200 && r.data) {
+      llmUsage.value = {
+        ...llmUsage.value,
+        ...r.data,
+        overview: { ...llmUsage.value.overview, ...(r.data.overview || {}) },
+        by_model: r.data.by_model || [],
+        by_date: r.data.by_date || [],
+        by_category: r.data.by_category || [],
+        recent_requests: r.data.recent_requests || [],
+      };
+    }
+  } catch (e) {
+    console.error(e);
+  } finally {
+    llmUsageLoading.value = false;
+    await renderActiveLlmCharts();
+  }
+};
+
+const switchLlmUsageTab = async (key: 'overview' | 'daily' | 'category' | 'model') => {
+  llmUsageTab.value = key;
+  await renderActiveLlmCharts();
+};
+
 const goTo = (path: string) => {
   if (!path) return;
   if (path.includes('?')) {
@@ -854,6 +1342,10 @@ const handleResize = () => {
   reviewStatusChart?.resize();
   reviewPriorityChart?.resize();
   dfBarChart?.resize();
+  llmUsageDonutChart?.resize();
+  llmUsageDailyChart?.resize();
+  llmUsageCategoryChart?.resize();
+  llmUsageModelChart?.resize();
 };
 
 onMounted(async () => {
@@ -876,6 +1368,7 @@ onMounted(async () => {
     loadDfStats(),
     loadRecentExecutions(),
     loadReviewStats(),
+    loadLlmUsage(),
   ]);
 
   await nextTick();
@@ -906,6 +1399,10 @@ onUnmounted(() => {
   reviewStatusChart?.dispose();
   reviewPriorityChart?.dispose();
   dfBarChart?.dispose();
+  llmUsageDonutChart?.dispose();
+  llmUsageDailyChart?.dispose();
+  llmUsageCategoryChart?.dispose();
+  llmUsageModelChart?.dispose();
 });
 </script>
 
@@ -1469,6 +1966,225 @@ onUnmounted(() => {
   color: var(--el-text-color-secondary);
 }
 
+
+.llm-usage-panel {
+  overflow: visible;
+  .llm-usage-hd-left {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .llm-usage-hint {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+  .llm-usage-hd-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+}
+.llm-usage-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 16px 8px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.llm-usage-tab {
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  &.active {
+    color: #1d4ed8;
+    background: #eff6ff;
+    font-weight: 600;
+  }
+}
+.llm-usage-body {
+  padding: 16px;
+  min-height: 280px;
+}
+.llm-usage-overview {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.llm-usage-donut-wrap {
+  width: 240px;
+  flex-shrink: 0;
+  overflow: visible;
+}
+.llm-usage-donut {
+  width: 240px;
+  height: 220px;
+}
+.llm-usage-overview-right {
+  flex: 1;
+  min-width: 0;
+}
+.llm-usage-kicker {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 4px;
+}
+.llm-usage-total {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--el-text-color-primary);
+  line-height: 1.2;
+}
+.llm-usage-sub {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+.llm-usage-metrics {
+  display: flex;
+  gap: 28px;
+  margin-top: 18px;
+}
+.llm-metric-val {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.llm-metric-label {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.llm-usage-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  border-top: 1px solid var(--el-border-color-lighter);
+  padding-top: 16px;
+}
+.llm-usage-col {
+  min-width: 0;
+}
+.llm-col-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--el-text-color-primary);
+}
+.llm-usage-scroll {
+  padding-right: 4px;
+  &.is-scrollable {
+    max-height: 186px; /* 约 3 条，超出内部滚动 */
+    overflow-y: auto;
+  }
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+  }
+}
+.llm-model-row,
+.llm-req-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--el-border-color-extra-light);
+}
+.llm-model-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+.llm-model-text {
+  min-width: 0;
+  flex: 1;
+}
+.llm-model-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+.llm-model-name,
+.llm-req-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.llm-model-meta,
+.llm-req-meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.llm-model-bar {
+  margin-top: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  overflow: hidden;
+}
+.llm-model-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  min-width: 0;
+  transition: width 0.2s ease;
+}
+.llm-model-tokens {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  flex-shrink: 0;
+}
+.llm-req-row {
+  display: block;
+}
+.llm-req-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.llm-usage-chart {
+  width: 100%;
+  height: 300px;
+}
+.llm-usage-tab-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.1fr) minmax(280px, 1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+.llm-usage-hbar {
+  height: 280px;
+  min-height: 280px;
+}
+.llm-usage-tab-list {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 900px) {
+  .llm-usage-overview {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .llm-usage-split,
+  .llm-usage-tab-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 .review-stats-panel {
   .panel-hd {

@@ -281,11 +281,20 @@ class RoleService:
         """
         crud = RoleCRUD(db)
         
-        # 检查角色是否被用户使用
+        # 检查角色是否可删
         for role_id in role_ids:
+            role = await crud.get_by_id_crud(role_id)
+            if not role:
+                continue
+            role_key = (role.role_key or "").strip().lower()
+            role_name = (role.role_name or "").strip()
+            if role_key == "admin" or role_name == "超级管理员":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"角色【{role.role_name}】为系统内置超级管理员，不能删除"
+                )
             user_count = await crud.get_user_count_crud(role_id)
             if user_count > 0:
-                role = await crud.get_by_id_crud(role_id)
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"角色【{role.role_name}】已分配给用户，不能删除"

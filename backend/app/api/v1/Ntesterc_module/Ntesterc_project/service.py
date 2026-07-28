@@ -27,6 +27,9 @@ class ProjectService:
         db: AsyncSession
     ) -> ProjectOutSchema:
         """创建项目"""
+        from app.api.v1.Ntesterc_module.Ntesterc_project.mcp_schema_ensure import ensure_mcp_schema
+
+        await ensure_mcp_schema(db)
         crud = ProjectCRUD(db)
         
         # 检查项目名称是否已存在
@@ -70,6 +73,9 @@ class ProjectService:
         db: AsyncSession
     ) -> dict:
         """获取项目列表"""
+        from app.api.v1.Ntesterc_module.Ntesterc_project.mcp_schema_ensure import ensure_mcp_schema
+
+        await ensure_mcp_schema(db)
         crud = ProjectCRUD(db)
         
         # 构建查询条件
@@ -111,6 +117,9 @@ class ProjectService:
         db: AsyncSession
     ) -> ProjectOutSchema:
         """获取项目详情"""
+        from app.api.v1.Ntesterc_module.Ntesterc_project.mcp_schema_ensure import ensure_mcp_schema
+
+        await ensure_mcp_schema(db)
         # 检查权限
         await cls._check_project_member(project_id, current_user_id, db)
         
@@ -143,6 +152,9 @@ class ProjectService:
         db: AsyncSession
     ) -> ProjectOutSchema:
         """更新项目"""
+        from app.api.v1.Ntesterc_module.Ntesterc_project.mcp_schema_ensure import ensure_mcp_schema
+
+        await ensure_mcp_schema(db)
         # 检查权限（只有owner和admin可以更新）
         await cls._check_project_permission(project_id, current_user_id, ["owner", "admin"], db)
         

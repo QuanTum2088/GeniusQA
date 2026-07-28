@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import threading
 import shutil
 import time
@@ -88,35 +89,47 @@ class ApiAutomationService:
 
     
     @staticmethod
-    async def _complete_var(db: AsyncSession, env_id: int, key: str) -> Any:
-        env = await db.execute(
-            select(ApiEnvironmentModel).where(ApiEnvironmentModel.id == env_id, ApiEnvironmentModel.enabled_flag == 1)
-        )
-        env_row = env.scalar_one_or_none()
-        if env_row:
-            for i in (env_row.config or []):
-                if i.get("name") == key:
-                    return i.get("value")
-            for j in (env_row.variable or []):
-                if j.get("name") == key:
-                    return j.get("value")
+    def _normalize_var_name(name: Any) -> str:
+        """统一变量名：去掉首尾空白与 {{ }}，便于配置项写 base_url 或 {{base_url}} 都能命中。"""
+        n = str(name or "").strip()
+        if n.startswith("{{") and n.endswith("}}"):
+            n = n[2:-2].strip()
+        return n
 
-        g = await db.execute(
-            select(ApiVariableModel).where(ApiVariableModel.enabled_flag == 1, ApiVariableModel.name == key)
-        )
-        g_row = g.scalar_one_or_none()
-        if g_row:
-            return g_row.value
+    @staticmethod
+    async def _complete_var(db: AsyncSession, env_id: int, key: str) -> Any:
+        lookup = ApiAutomationService._normalize_var_name(key)
+        if not lookup:
+            return ""
+
+        if env_id:
+            env = await db.execute(
+                select(ApiEnvironmentModel).where(ApiEnvironmentModel.id == env_id, ApiEnvironmentModel.enabled_flag == 1)
+            )
+            env_row = env.scalar_one_or_none()
+            if env_row:
+                for i in (env_row.config or []):
+                    if isinstance(i, dict) and ApiAutomationService._normalize_var_name(i.get("name")) == lookup:
+                        return i.get("value")
+                for j in (env_row.variable or []):
+                    if isinstance(j, dict) and ApiAutomationService._normalize_var_name(j.get("name")) == lookup:
+                        return j.get("value")
+
+        g = await db.execute(select(ApiVariableModel).where(ApiVariableModel.enabled_flag == 1))
+        for row in g.scalars().all():
+            if ApiAutomationService._normalize_var_name(row.name) == lookup:
+                return row.value
         return ""
 
     @staticmethod
     async def _find_var(db: AsyncSession, env_id: int, s: str) -> str:
-        import re
-
-        keys = re.findall(r"\{{(.+?)}}", s) if ("{{" in s and "}}" in s) else []
+        keys = re.findall(r"\{\{(.+?)\}\}", s) if ("{{" in s and "}}" in s) else []
         for k in keys:
             var = "{{" + k + "}}"
-            val = await ApiAutomationService._complete_var(db, env_id, var)
+            val = await ApiAutomationService._complete_var(db, env_id, k)
+            # 未命中时不要替换成空串（否则 URL 会变成相对路径，掩盖真实原因）
+            if val is None or val == "":
+                continue
             s = s.replace(var, str(val))
         return s
 
@@ -141,8 +154,12 @@ class ApiAutomationService:
             return {}
         res: Dict[str, Any] = {}
         for i in params:
+            if not isinstance(i, dict):
+                continue
             if i.get("status"):
-                res[i.get("key")] = i.get("value")
+                key = i.get("key")
+                if key:
+                    res[key] = i.get("value")
         return res
 
     
@@ -240,7 +257,10 @@ class ApiAutomationService:
 
     @staticmethod
     async def _load_env_vars(db: AsyncSession, env_id: int) -> Dict[str, Any]:
-        """加载环境变量为字典，供 VariableContext 使用。"""
+        """加载环境配置/变量为字典，供 VariableContext 使用。
+
+        key 统一去掉 {{ }}，使 URL 中 {{base_url}} 与配置项 base_url / {{base_url}} 均可命中。
+        """
         if not env_id:
             return {}
         try:
@@ -255,12 +275,18 @@ class ApiAutomationService:
             if not env_row:
                 return {}
             result: Dict[str, Any] = {}
+
+            def _put(raw_name: Any, value: Any) -> None:
+                name = ApiAutomationService._normalize_var_name(raw_name)
+                if name:
+                    result[name] = value
+
             for item in (env_row.config or []):
-                if item.get("name"):
-                    result[item["name"]] = item.get("value")
+                if isinstance(item, dict):
+                    _put(item.get("name") or item.get("key"), item.get("value"))
             for item in (env_row.variable or []):
-                if item.get("key"):
-                    result[item["key"]] = item.get("value")
+                if isinstance(item, dict):
+                    _put(item.get("name") or item.get("key"), item.get("value"))
             return result
         except Exception:
             return {}
@@ -800,6 +826,40 @@ class ApiAutomationService:
             d.pop("_sa_instance_state", None)
             data.append(d)
         return data
+
+    @staticmethod
+    async def get_databases_paged(db: AsyncSession, body: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+        """直连数据库列表"""
+        body = body or {}
+        page, page_size = ApiAutomationService._extract_page(body)
+        has_paging = any(k in body for k in ("page", "currentPage", "pageSize", "page_size"))
+        search = body.get("search") or {}
+        name_like = ApiAutomationService._extract_contains(
+            search, "name__contains", "name__icontains", "name"
+        ) or ApiAutomationService._extract_contains(body, "name")
+        stmt = select(ApiDatabaseModel).where(
+            ApiDatabaseModel.enabled_flag == 1,
+            ApiDatabaseModel.created_by == user_id,
+        )
+        if name_like:
+            stmt = stmt.where(ApiDatabaseModel.name.like(f"%{name_like}%"))
+        stmt = stmt.order_by(ApiDatabaseModel.id.desc())
+        rows = (await db.execute(stmt)).scalars().all()
+        total = len(rows)
+        if has_paging:
+            start = (page - 1) * page_size
+            end = start + page_size
+            page_rows = rows[start:end]
+        else:
+            page_rows = rows
+            page = 1
+            page_size = total or page_size
+        content: List[Dict[str, Any]] = []
+        for r in page_rows:
+            d = r.__dict__.copy()
+            d.pop("_sa_instance_state", None)
+            content.append(d)
+        return {"content": content, "total": total, "page": page, "pageSize": page_size}
 
     @staticmethod
     async def add_database(db: AsyncSession, data: Dict[str, Any], user_id: int) -> None:
@@ -2921,7 +2981,7 @@ class ApiAutomationService:
                 "size": 0,
                 "res_time": 0,
                 "cookies": [],
-                "raw_request": None,
+                "raw_request": {"method": "", "url": url, "headers": {}, "body": ""},
             }
 
     @staticmethod
@@ -2934,6 +2994,17 @@ class ApiAutomationService:
        
         raw_url = body.get("url") or req.get("url") or ""
         url = await ApiAutomationService.handle_var(db, env_id, raw_url)
+        url = str(url or "").strip()
+        if "{{" in url and "}}" in url:
+            hint = "请先在右上角选择环境，并确认配置项名与 URL 中占位符一致（如配置 base_url 或 {{base_url}}，URL 写 {{base_url}}/...）"
+            if not env_id:
+                raise ValueError(f"URL 中的环境变量未替换（未选择环境）。{hint} 当前 URL：{url}")
+            raise ValueError(f"URL 中的环境变量未替换，请检查环境配置项。{hint} 当前 URL：{url}")
+        if url and not re.match(r"^https?://", url, re.I):
+            raise ValueError(
+                f"URL 缺少协议（http/https），当前为：{url}。"
+                "请确认环境配置中的接口前缀（如 https://uapis.cn）已正确替换到 URL。"
+            )
 
         # 参数依赖
         params_id = req.get("params_id")
@@ -2950,7 +3021,8 @@ class ApiAutomationService:
         form_data = await ApiAutomationService.handle_var(db, env_id, ApiAutomationService.params_header(req.get("form_data")))
         form_urlencoded = await ApiAutomationService.handle_var(db, env_id, ApiAutomationService.params_header(req.get("form_urlencoded")))
         file_paths = req.get("file_path") or []
-        config = req.get("config") or {"retry": 0, "req_timeout": 5, "res_timeout": 5}
+        config = req.get("config") if isinstance(req.get("config"), dict) else None
+        config = config or {"retry": 0, "req_timeout": 5, "res_timeout": 5}
 
      
         before_ops = req.get("before") or []
@@ -3012,9 +3084,10 @@ class ApiAutomationService:
         for item in before_list:
             level = "info" if item.get("status") == 1 else "error"
             console_logs.append({"level": level, "msg": f"[前置] {item.get('message', '')}"})
+        raw_req = res.get("raw_request") or {}
         console_logs.append({
             "level": "info" if int(res.get("code") or 0) < 400 else "error",
-            "msg": f"[请求] {res.get('raw_request', {}).get('method', '')} {res.get('raw_request', {}).get('url', '')} → {res.get('code')} ({res.get('res_time')} ms)",
+            "msg": f"[请求] {raw_req.get('method', '')} {raw_req.get('url', '')} → {res.get('code')} ({res.get('res_time')} ms)",
         })
         for item in after_list:
             level = "info" if item.get("status") == 1 else "error"
@@ -3054,7 +3127,7 @@ class ApiAutomationService:
         await db.commit()
         return res
 
-    # -------------------- 场景执行与结果 --------------------
+    # -------------------- 用例执行与结果 --------------------
     @staticmethod
     async def _new_uuid() -> str:
         return str(uuid.uuid4())
@@ -3118,7 +3191,7 @@ class ApiAutomationService:
                         execution_aborted = True
                         break
 
-                    total = total + len(case.get("script") or [])
+                    total += 1
                     step_uuid = await ApiAutomationService._new_uuid()
                     step["uuid"] = step_uuid
 
@@ -3154,8 +3227,8 @@ class ApiAutomationService:
 
                     step_result = await executor.execute(step)
                     success = step_result.success
-                    api_req = step_result.request
-                    api_res = step_result.response
+                    api_req = step_result.request or {}
+                    api_res = step_result.response or {}
                     # 写入日志
                     for log_line in step_result.logs:
                         await ApiAutomationService._write_log_line(case_uuid, result_id, log_line)
@@ -3167,6 +3240,30 @@ class ApiAutomationService:
                         case["status"] = 0
                         case["fail"] += 1
                         all_fail += 1
+
+                    # 写入步骤详情，供执行监控统计总数/失败数
+                    if not api_res and step_result.error:
+                        api_res = {
+                            "code": 500,
+                            "body": {"msg": "步骤执行失败", "exception": step_result.error},
+                            "header": {},
+                            "size": 0,
+                            "res_time": 0,
+                        }
+                    db.add(
+                        ApiScriptResultModel(
+                            name=step.get("name") or step_result.name or "",
+                            uuid=step_uuid,
+                            menu_id=case_uuid,
+                            result_id=int(result_id),
+                            status=1 if success else 0,
+                            req=api_req,
+                            res=api_res,
+                            created_by=user_id,
+                            updated_by=user_id,
+                        )
+                    )
+                    await db.flush()
 
                     await ApiAutomationService._write_log_line(
                         case_uuid, result_id, f"接口-{step.get('name')}执行完成"
@@ -4385,7 +4482,7 @@ class ApiAutomationService:
         )).scalar_one_or_none()
         api_service_id = suite.api_service_id if suite else None
 
-        # 构建 run_list（复用现有场景执行格式）
+        # 构建 run_list（复用现有用例执行格式）
         run_list = []
         case_id_map = {}  # name -> case_id 映射
         for case in cases:

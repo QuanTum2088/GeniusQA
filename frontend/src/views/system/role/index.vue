@@ -34,6 +34,15 @@ import {formatDateTime} from '/@/utils/formatTime';
 
 const SaveOrUpdateRoleRef = ref();
 const tableRef = ref();
+
+/** 超级管理员角色不可删除 */
+function isSuperAdminRole(row: any): boolean {
+  if (!row) return false;
+  const key = String(row.role_key || '').toLowerCase();
+  const name = String(row.role_name || '');
+  return key === 'admin' || name === '超级管理员';
+}
+
 const state = reactive({
   columns: [
     {
@@ -61,25 +70,29 @@ const state = reactive({
     },
     {
       label: '操作', fixed: 'right', width: '140', align: 'center',
-      render: (row: any) => h("div", null, [
-        h(ElButton, {
-          type: "primary",
-          size: "small",
-          onClick: () => {
-            onOpenSaveOrUpdate("update", row)
-          },
-          style: authFunction('system:role:edit') ? '' : 'display:none'
-        }, () => '编辑'),
+      render: (row: any) => {
+        const locked = isSuperAdminRole(row);
+        return h("div", null, [
+          h(ElButton, {
+            type: "primary",
+            size: "small",
+            onClick: () => {
+              onOpenSaveOrUpdate("update", row)
+            },
+            style: authFunction('system:role:edit') ? '' : 'display:none'
+          }, () => '编辑'),
 
-        h(ElButton, {
-          type: "danger",
-          size: "small",
-          onClick: () => {
-            deleted(row)
-          },
-          style: authFunction('system:role:delete') ? '' : 'display:none'
-        }, () => '删除')
-      ])
+          h(ElButton, {
+            type: "danger",
+            size: "small",
+            disabled: locked,
+            onClick: () => {
+              if (!locked) deleted(row)
+            },
+            style: authFunction('system:role:delete') ? '' : 'display:none'
+          }, () => '删除')
+        ]);
+      }
     },
   ],
   // list
@@ -121,6 +134,10 @@ const onOpenSaveOrUpdate = (editType: string, row: any) => {
 
 // 删除角色
 const deleted = (row: any) => {
+  if (isSuperAdminRole(row)) {
+    ElMessage.warning('不能删除超级管理员角色');
+    return;
+  }
   ElMessageBox.confirm('是否删除该条数据, 是否继续?', '提示', {
     confirmButtonText: '确认',
     cancelButtonText: '取消',

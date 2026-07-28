@@ -147,6 +147,12 @@
             placeholder="请输入项目描述"
           />
         </el-form-item>
+        <el-form-item label="本机工作目录" prop="workspace_path">
+          <el-input
+            v-model="formData.workspace_path"
+            placeholder="本机绝对路径，如 E:\code\my-app（写出 .mcp.json 依赖）"
+          />
+        </el-form-item>
         <el-form-item label="项目状态" prop="status">
           <el-select v-model="formData.status" placeholder="请选择状态">
             <el-option label="活跃" value="active" />
@@ -212,6 +218,7 @@ const formData = reactive({
   id: undefined,
   name: '',
   description: '',
+  workspace_path: '',
   status: 'active',
 });
 const submitLoading = ref(false);
@@ -276,6 +283,7 @@ const handleAdd = () => {
   formData.id = undefined;
   formData.name = '';
   formData.description = '';
+  formData.workspace_path = '';
   formData.status = 'active';
   dialogVisible.value = true;
 };
@@ -286,6 +294,7 @@ const handleEdit = (row: any) => {
   formData.id = row.id;
   formData.name = row.name;
   formData.description = row.description;
+  formData.workspace_path = row.workspace_path || '';
   formData.status = row.status;
   dialogVisible.value = true;
 };
@@ -315,6 +324,7 @@ const handleSubmit = async () => {
       const data = {
         name: formData.name,
         description: formData.description,
+        workspace_path: formData.workspace_path || null,
         status: formData.status,
       };
       

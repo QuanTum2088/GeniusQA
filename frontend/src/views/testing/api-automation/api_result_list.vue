@@ -1,7 +1,7 @@
 <template>
 	<div class="result-list-container">
 		<el-card shadow="hover" :body-style="{ paddingBottom: '0' }">
-			<el-form :inline="true" :model="searchParams.search">
+			<el-form :inline="true" :model="searchParams.search" class="search-form">
 				<el-form-item label="名称">
 					<el-input
 						v-model="searchParams.search.name"
@@ -12,8 +12,14 @@
 					/>
 				</el-form-item>
 				<el-form-item>
-					<el-button type="primary" icon="Search" @click="get_script_result_list">搜索</el-button>
-					<el-button icon="Refresh" @click="reset_search">重置</el-button>
+					<el-button type="primary" @click="get_script_result_list">
+						<el-icon><ele-Search /></el-icon>
+						搜索
+					</el-button>
+					<el-button @click="reset_search">
+						<el-icon><ele-Refresh /></el-icon>
+						重置
+					</el-button>
 				</el-form-item>
 			</el-form>
 		</el-card>
@@ -110,84 +116,89 @@
 		<el-drawer
 			v-model="detailDrawerVisible"
 			direction="rtl"
-			size="480px"
+			size="520px"
 			destroy-on-close
 			:show-close="false"
+			class="result-detail-drawer"
 		>
 			<template #header="{ close }">
 				<div class="drawer-header">
 					<div class="drawer-header-info">
-						<div class="drawer-title">{{ detailRow?.name }}</div>
-						<div class="drawer-subtitle">
-							<span>{{ detailRow?.start_time ? String(detailRow.start_time).replace('T',' ').slice(0,19) : '' }}</span>
-							<span v-if="detailRow?.end_time" style="margin-left:8px">→ {{ String(detailRow.end_time).replace('T',' ').slice(0,19) }}</span>
-						</div>
+						<div class="drawer-title" :title="detailRow?.name">{{ detailRow?.name }}</div>
 					</div>
 					<el-icon class="drawer-close" @click="close"><Close /></el-icon>
 				</div>
 			</template>
 
-			<!-- 汇总卡片 -->
-			<div class="detail-summary-cards">
-				<div class="summary-card">
-					<div class="sc-val">{{ detailRow?.result?.total ?? (detailRow?.script?.length ?? 0) }}</div>
-					<div class="sc-label">总用例</div>
+			<div class="drawer-body">
+				<div class="drawer-meta" v-if="detailRow?.start_time || detailRow?.end_time">
+					<span v-if="detailRow?.start_time">{{ String(detailRow.start_time).replace('T',' ').slice(0,19) }}</span>
+					<span v-if="detailRow?.end_time" class="meta-arrow">→</span>
+					<span v-if="detailRow?.end_time">{{ String(detailRow.end_time).replace('T',' ').slice(0,19) }}</span>
 				</div>
-				<div class="summary-card pass-card">
-					<div class="sc-val">{{ detailRow?.result?.pass ?? 0 }}</div>
-					<div class="sc-label">通过</div>
-				</div>
-				<div class="summary-card fail-card">
-					<div class="sc-val">{{ detailRow?.result?.fail ?? 0 }}</div>
-					<div class="sc-label">失败</div>
-				</div>
-				<div class="summary-card rate-card">
-					<div class="sc-val">{{ detailRow?.result?.percent ?? 0 }}%</div>
-					<div class="sc-label">通过率</div>
-				</div>
-			</div>
 
-			<!-- 进度条 -->
-			<div class="detail-progress">
-				<el-progress
-					:percentage="detailRow?.result?.percent ?? 0"
-					:color="[{color:'#f56c6c',percentage:99.99},{color:'#67c23a',percentage:100}]"
-					:stroke-width="8"
-					:show-text="false"
-				/>
-			</div>
-
-			<!-- 用例列表 -->
-			<div class="detail-section-title">用例明细</div>
-			<div class="detail-case-list">
-				<div
-					v-for="(step, i) in (detailRow?.script || [])"
-					:key="i"
-					class="detail-case-item"
-					:class="(step.fail ?? 0) > 0 ? 'item-fail' : 'item-pass'"
-				>
-					<div class="case-status-bar" :class="(step.fail ?? 0) > 0 ? 'bar-fail' : 'bar-pass'" />
-					<div class="case-item-body">
-						<div class="case-item-top">
-							<span class="case-index" :class="(step.fail ?? 0) > 0 ? 'idx-fail' : 'idx-pass'">{{ i + 1 }}</span>
-							<span class="case-name">{{ step.name }}</span>
-							<el-tag
-								:type="(step.fail ?? 0) === 0 ? 'success' : 'danger'"
-								size="small"
-								effect="dark"
-								round
-								style="margin-left:auto;flex-shrink:0"
-							>{{ (step.fail ?? 0) === 0 ? '✓ 通过' : '✗ 失败' }}</el-tag>
-						</div>
-						<div v-if="step.pass !== undefined || step.fail !== undefined" class="case-item-stats">
-							<span class="stat-pass">通过 {{ step.pass ?? 0 }} 步</span>
-							<span class="stat-sep">·</span>
-							<span class="stat-fail">失败 {{ step.fail ?? 0 }} 步</span>
-						</div>
+				<!-- 汇总卡片 -->
+				<div class="detail-summary-cards">
+					<div class="summary-card">
+						<div class="sc-val">{{ detailRow?.result?.total ?? (detailRow?.script?.length ?? 0) }}</div>
+						<div class="sc-label">总用例</div>
+					</div>
+					<div class="summary-card pass-card">
+						<div class="sc-val">{{ detailRow?.result?.pass ?? 0 }}</div>
+						<div class="sc-label">通过</div>
+					</div>
+					<div class="summary-card fail-card">
+						<div class="sc-val">{{ detailRow?.result?.fail ?? 0 }}</div>
+						<div class="sc-label">失败</div>
+					</div>
+					<div class="summary-card rate-card">
+						<div class="sc-val">{{ detailRow?.result?.percent ?? 0 }}%</div>
+						<div class="sc-label">通过率</div>
 					</div>
 				</div>
-				<div v-if="!detailRow?.script?.length" class="detail-empty">
-					暂无用例明细
+
+				<!-- 进度条 -->
+				<div class="detail-progress">
+					<el-progress
+						:percentage="detailRow?.result?.percent ?? 0"
+						:color="[{color:'#f56c6c',percentage:99.99},{color:'#67c23a',percentage:100}]"
+						:stroke-width="8"
+						:show-text="false"
+					/>
+				</div>
+
+				<!-- 用例列表 -->
+				<div class="detail-section-title">用例明细</div>
+				<div class="detail-case-list">
+					<div
+						v-for="(step, i) in (detailRow?.script || [])"
+						:key="i"
+						class="detail-case-item"
+						:class="(step.fail ?? 0) > 0 ? 'item-fail' : 'item-pass'"
+					>
+						<div class="case-status-bar" :class="(step.fail ?? 0) > 0 ? 'bar-fail' : 'bar-pass'" />
+						<div class="case-item-body">
+							<div class="case-item-top">
+								<span class="case-index" :class="(step.fail ?? 0) > 0 ? 'idx-fail' : 'idx-pass'">{{ i + 1 }}</span>
+								<span class="case-name" :title="step.name">{{ step.name }}</span>
+								<el-tag
+									:type="(step.fail ?? 0) === 0 ? 'success' : 'danger'"
+									size="small"
+									effect="dark"
+									round
+									class="case-status-tag"
+								>{{ (step.fail ?? 0) === 0 ? '✓ 通过' : '✗ 失败' }}</el-tag>
+							</div>
+							<div v-if="step.pass !== undefined || step.fail !== undefined" class="case-item-stats">
+								<span class="stat-pass">通过 {{ step.pass ?? 0 }} 步</span>
+								<span class="stat-sep">·</span>
+								<span class="stat-fail">失败 {{ step.fail ?? 0 }} 步</span>
+							</div>
+						</div>
+					</div>
+					<div v-if="!detailRow?.script?.length" class="detail-empty">
+						暂无用例明细
+					</div>
 				</div>
 			</div>
 		</el-drawer>
@@ -273,7 +284,7 @@ const rerun = async (row: any) => {
 	try {
 		const newId = Date.now();
 		if (!row?.config?.env_id) {
-			ElMessage.warning('无法重跑：缺少环境配置，请从场景页重新执行');
+			ElMessage.warning('无法重跑：缺少环境配置，请从用例页重新执行');
 			return;
 		}
 		await run_api_script({
@@ -324,22 +335,95 @@ onMounted(() => {
 
 <style scoped>
 .result-list-container { padding: 10px; }
+.search-form :deep(.el-form-item) {
+	margin-right: 12px;
+	margin-bottom: 12px;
+}
 .action-cell { white-space: nowrap; }
 
-/* 抽屉头部 */
-.drawer-header { display: flex; align-items: flex-start; justify-content: space-between; width: 100%; padding-bottom: 4px; }
-.drawer-header-info { flex: 1; min-width: 0; }
-.drawer-title { font-size: 17px; font-weight: 600; color: var(--el-text-color-primary); margin-bottom: 6px; word-break: break-all; }
-.drawer-subtitle { font-size: 12px; color: var(--el-text-color-placeholder); line-height: 1.6; }
-.drawer-close { font-size: 20px; color: var(--el-text-color-placeholder); cursor: pointer; flex-shrink: 0; margin-left: 12px; margin-top: 2px; }
+
+.drawer-body {
+	padding: 16px 20px 24px;
+	box-sizing: border-box;
+	width: 100%;
+	overflow-x: hidden;
+}
+.drawer-meta {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 6px 8px;
+	font-size: 12px;
+	color: var(--el-text-color-placeholder);
+	line-height: 1.5;
+	margin-bottom: 14px;
+}
+.meta-arrow { color: var(--el-text-color-disabled); }
+
+.drawer-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	width: 100%;
+	gap: 12px;
+	box-sizing: border-box;
+	min-width: 0;
+}
+.drawer-header-info { flex: 1; min-width: 0; overflow: hidden; }
+.drawer-title {
+	font-size: 16px;
+	font-weight: 600;
+	color: var(--el-text-color-primary);
+	line-height: 1.4;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.drawer-close {
+	font-size: 20px;
+	color: var(--el-text-color-placeholder);
+	cursor: pointer;
+	flex-shrink: 0;
+}
 .drawer-close:hover { color: var(--el-text-color-regular); }
 
-/* 汇总卡片 */
-.detail-summary-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 4px 0 20px; }
-.summary-card { background: linear-gradient(135deg, var(--el-fill-color-light), var(--el-bg-color)); border: 1px solid var(--el-border-color-lighter); border-radius: 12px; padding: 20px 12px; text-align: center; transition: all .2s; }
-.summary-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.08); }
-.sc-val { font-size: 28px; font-weight: 700; color: var(--el-text-color-primary); margin-bottom: 6px; line-height: 1; }
-.sc-label { font-size: 12px; color: var(--el-text-color-placeholder); letter-spacing: .5px; margin-top: 2px; }
+
+.detail-summary-cards {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 8px;
+	margin: 0 0 16px;
+	width: 100%;
+	box-sizing: border-box;
+}
+.summary-card {
+	background: linear-gradient(135deg, var(--el-fill-color-light), var(--el-bg-color));
+	border: 1px solid var(--el-border-color-lighter);
+	border-radius: 10px;
+	padding: 14px 6px;
+	text-align: center;
+	transition: all .2s;
+	min-width: 0;
+	box-sizing: border-box;
+}
+.summary-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+.sc-val {
+	font-size: 22px;
+	font-weight: 700;
+	color: var(--el-text-color-primary);
+	margin-bottom: 4px;
+	line-height: 1.2;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.sc-label {
+	font-size: 12px;
+	color: var(--el-text-color-placeholder);
+	letter-spacing: .5px;
+	margin-top: 2px;
+	white-space: nowrap;
+}
 .pass-card { background: linear-gradient(135deg, #f0f9ff, #e6f7ff); border-color: #b7eb8f; }
 .pass-card .sc-val { color: #52c41a; }
 .fail-card { background: linear-gradient(135deg, #fff1f0, #ffebe8); border-color: #ffccc7; }
@@ -348,29 +432,89 @@ onMounted(() => {
 .rate-card .sc-val { color: #722ed1; }
 
 /* 进度条 */
-.detail-progress { margin-bottom: 24px; }
+.detail-progress { margin-bottom: 20px; }
 
 /* 区块标题 */
-.detail-section-title { font-size: 13px; font-weight: 600; color: var(--el-text-color-primary); margin-bottom: 14px; padding-left: 10px; border-left: 3px solid #409eff; }
+.detail-section-title {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--el-text-color-primary);
+	margin-bottom: 12px;
+	padding-left: 10px;
+	border-left: 3px solid #409eff;
+}
 
 /* 用例列表 */
-.detail-case-list { display: flex; flex-direction: column; gap: 10px; }
-.detail-case-item { position: relative; background: var(--el-bg-color); border: 1px solid var(--el-border-color-lighter); border-radius: 8px; overflow: hidden; transition: all .2s; }
+.detail-case-list { display: flex; flex-direction: column; gap: 10px; width: 100%; box-sizing: border-box; }
+.detail-case-item {
+	position: relative;
+	background: var(--el-bg-color);
+	border: 1px solid var(--el-border-color-lighter);
+	border-radius: 8px;
+	overflow: hidden;
+	transition: all .2s;
+	width: 100%;
+	box-sizing: border-box;
+}
 .detail-case-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
 .item-pass { border-left-color: #52c41a; border-left-width: 3px; }
 .item-fail { border-left-color: #ff4d4f; border-left-width: 3px; }
 .case-status-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
 .bar-pass { background: linear-gradient(to bottom, #52c41a, #95de64); }
 .bar-fail { background: linear-gradient(to bottom, #ff4d4f, #ff7875); }
-.case-item-body { padding: 12px 14px 12px 18px; }
-.case-item-top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-.case-index { width: 24px; height: 24px; border-radius: 50%; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.case-item-body { padding: 12px 14px 12px 18px; min-width: 0; }
+.case-item-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; min-width: 0; }
+.case-index {
+	width: 24px;
+	height: 24px;
+	border-radius: 50%;
+	font-size: 12px;
+	font-weight: 600;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
 .idx-pass { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
 .idx-fail { background: #fff1f0; color: #ff4d4f; border: 1px solid #ffccc7; }
-.case-name { font-size: 13px; color: var(--el-text-color-primary); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.case-name {
+	font-size: 13px;
+	color: var(--el-text-color-primary);
+	font-weight: 500;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	flex: 1;
+	min-width: 0;
+}
+.case-status-tag { margin-left: auto; flex-shrink: 0; }
 .case-item-stats { display: flex; align-items: center; gap: 6px; font-size: 12px; padding-left: 34px; }
 .stat-pass { color: #52c41a; }
 .stat-fail { color: #ff4d4f; }
 .stat-sep { color: var(--el-text-color-placeholder); }
 .detail-empty { text-align: center; color: var(--el-text-color-placeholder); padding: 40px 0; font-size: 13px; }
+</style>
+
+
+<style>
+
+.result-detail-drawer.el-drawer .el-drawer__header {
+	height: auto !important;
+	min-height: 50px;
+	align-items: center !important;
+	margin-bottom: 0 !important;
+	padding: 14px 20px !important;
+	overflow: visible !important;
+	border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.result-detail-drawer.el-drawer .el-drawer__header > :first-child {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+}
+.result-detail-drawer.el-drawer .el-drawer__body {
+	padding: 0 !important;
+	overflow-x: hidden;
+	overflow-y: auto;
+}
 </style>

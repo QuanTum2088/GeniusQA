@@ -75,6 +75,22 @@
         </div>
         <div class="navbar-right">
           <div class="chat-options">
+            <el-select
+              v-model="selectedLlmConfigId"
+              size="small"
+              class="llm-model-select"
+              placeholder="选择模型"
+              filterable
+              :disabled="sending"
+              @change="handleLlmConfigChange"
+            >
+              <el-option
+                v-for="cfg in llmConfigs"
+                :key="cfg.id"
+                :label="formatLlmLabel(cfg)"
+                :value="cfg.id"
+              />
+            </el-select>
             <el-button size="small" :icon="Setting" @click="settingsDrawerVisible = true">
               对话配置
             </el-button>
@@ -205,6 +221,20 @@
               <div class="message-header">
                 <strong class="sender-name">{{ msg.role === 'user' ? '我' : 'AI 助手' }}</strong>
                 <span class="time">{{ formatTime(msg.creation_date) }}</span>
+                <el-tag
+                  v-if="msg.role === 'user' && msg.send_status === 'sending'"
+                  size="small"
+                  type="info"
+                  effect="plain"
+                  class="send-status-tag"
+                >发送中</el-tag>
+                <el-tag
+                  v-else-if="msg.role === 'user' && msg.send_status === 'failed'"
+                  size="small"
+                  type="danger"
+                  effect="light"
+                  class="send-status-tag"
+                >发送失败</el-tag>
               </div>
               
               <div class="message-body">
@@ -237,9 +267,30 @@
                 </div>
                 
                 <div
-                  :class="['message-text', { collapsed: msg.collapsed }]"
+                  :class="[
+                    'message-text',
+                    {
+                      collapsed: msg.collapsed,
+                      'is-failed': msg.send_status === 'failed',
+                    },
+                  ]"
                   v-html="renderMarkdown(msg.content)"
                 ></div>
+
+                <div
+                  v-if="msg.role === 'user' && msg.send_status === 'failed'"
+                  class="send-failed-banner"
+                >
+                  <span class="send-failed-text">{{ msg.send_error || '发送失败，请重试' }}</span>
+                  <el-button
+                    type="danger"
+                    link
+                    size="small"
+                    :icon="RefreshRight"
+                    :disabled="sending"
+                    @click="handleResendMessage(msg)"
+                  >重新发送</el-button>
+                </div>
 
                 <div
                   v-if="msg.role === 'assistant' && extractEvidenceLinks(msg.content).length > 0"
@@ -281,13 +332,31 @@
                 </div>
               </div>
               
-              <div v-if="!msg.loading" class="message-actions">
+              <div v-if="!msg.loading" class="message-actions" :class="{ 'is-failed-actions': msg.send_status === 'failed' }">
                 <el-button
                   text
                   size="small"
                   :icon="DocumentCopy"
                   @click="handleCopyMessage(msg.content)"
                   title="复制消息"
+                />
+                <el-button
+                  v-if="msg.role === 'user'"
+                  text
+                  size="small"
+                  :icon="RefreshRight"
+                  :disabled="sending"
+                  @click="handleResendMessage(msg)"
+                  :title="msg.send_status === 'failed' ? '重新发送' : '重新发送'"
+                />
+                <el-button
+                  v-else-if="msg.role === 'assistant'"
+                  text
+                  size="small"
+                  :icon="RefreshRight"
+                  :disabled="sending"
+                  @click="handleRegenerateMessage(msg)"
+                  title="重新生成"
                 />
                 <el-tag v-if="msg.tokens_used" size="small" type="info">Token: {{ msg.tokens_used }}</el-tag>
               </div>
@@ -463,6 +532,7 @@ import {
   Loading,
   Search,
   DocumentCopy,
+  RefreshRight,
   Download,
   ChatDotRound,
   Connection,
@@ -476,6 +546,8 @@ import {
 } from '@element-plus/icons-vue'
 import { useConversationApi } from '/@/api/v1/ai/conversation'
 import type { ConversationData, MessageData } from '/@/api/v1/ai/conversation'
+import { useLLMConfigApi } from '/@/api/v1/ai/llmConfig'
+import type { LLMConfigData } from '/@/api/v1/ai/llmConfig'
 import { useFileApi } from '/@/api/v1/common/file'
 import { useProjectApi } from '/@/api/v1/projects/project'
 import { projectPlatformApi } from '/@/api/v1/projects/platform'
@@ -493,6 +565,7 @@ defineOptions({
 })
 
 const conversationApi = useConversationApi()
+const llmConfigApi = useLLMConfigApi()
 const fileApi = useFileApi()
 const projectApi = useProjectApi()
 
@@ -600,8 +673,76 @@ const hasMoreMessages = ref(true)
 const currentPage = ref(1)
 const pageSize = 20
 const streamingMessage = ref<MessageData | null>(null)  // 正在流式接收的消息
+const pendingUserMessageId = ref<number | null>(null)  // 当前发送中的用户消息 ID
 const wsConnection = ref<{ ws: WebSocket; send: (payload: any) => void; close: () => void } | null>(null)  // WebSocket 连接
 const isWsConnected = ref(false)  // WebSocket 真实连接状态
+/** 首包超时：模型不可用时避免一直转圈等待 */
+const REPLY_FIRST_TOKEN_TIMEOUT_MS = 35000
+let replyWatchdogTimer: ReturnType<typeof setTimeout> | null = null
+
+const clearReplyWatchdog = () => {
+  if (replyWatchdogTimer) {
+    clearTimeout(replyWatchdogTimer)
+    replyWatchdogTimer = null
+  }
+}
+
+const markPendingUserSuccess = () => {
+  if (pendingUserMessageId.value == null) return
+  const userMsg = messages.value.find((m) => m.id === pendingUserMessageId.value)
+  if (userMsg) {
+    userMsg.send_status = 'success'
+    userMsg.send_error = undefined
+  }
+  pendingUserMessageId.value = null
+}
+
+const failCurrentSending = (message: string, options?: { silentToast?: boolean; toastType?: 'error' | 'info' }) => {
+  clearReplyWatchdog()
+  const errText = localizeLlmError(message) || '发送消息失败'
+  if (!options?.silentToast) {
+    if (options?.toastType === 'info') {
+      ElMessage.info(errText)
+    } else {
+      ElMessage.error(errText)
+    }
+  }
+
+  // 将对应的用户消息标记为发送失败，便于立即看见状态并重试
+  if (pendingUserMessageId.value != null) {
+    const userMsg = messages.value.find((m) => m.id === pendingUserMessageId.value)
+    if (userMsg) {
+      userMsg.send_status = 'failed'
+      userMsg.send_error = errText
+    }
+  } else {
+    const lastUser = [...messages.value].reverse().find((m) => m.role === 'user')
+    if (lastUser) {
+      lastUser.send_status = 'failed'
+      lastUser.send_error = errText
+    }
+  }
+  pendingUserMessageId.value = null
+
+  if (streamingMessage.value) {
+    const index = messages.value.findIndex((m) => m.id === streamingMessage.value!.id)
+    if (index > -1) {
+      messages.value.splice(index, 1)
+    }
+  }
+  streamingMessage.value = null
+  sending.value = false
+}
+
+const startReplyWatchdog = () => {
+  clearReplyWatchdog()
+  replyWatchdogTimer = setTimeout(() => {
+    if (!sending.value) return
+    failCurrentSending(
+      '模型响应超时，可能不可用或网络异常。请检查 LLM 配置中的 Base URL / API Key 后重试'
+    )
+  }, REPLY_FIRST_TOKEN_TIMEOUT_MS)
+}
 const projects = ref<Array<{ id: number; name: string }>>([])
 const selectedProjectId = ref<number | null>(null)
 const useKnowledgeBase = ref(false)
@@ -617,6 +758,8 @@ const directSkillAction = ref<string>('agent_browser_open_snapshot')
 const directSkillArgsText = ref<string>('{}')
 const toolMode = ref<'smart' | 'direct'>('smart')
 const settingsDrawerVisible = ref(false)
+const llmConfigs = ref<LLMConfigData[]>([])
+const selectedLlmConfigId = ref<number | null>(null)
 const mcpRecordDialogVisible = ref(false)
 const mcpRecordLoading = ref(false)
 const mcpRecords = ref<any[]>([])
@@ -735,6 +878,87 @@ const loadProjectOptions = async () => {
   }
 }
 
+const formatLlmLabel = (cfg: LLMConfigData) => {
+  const title = cfg.config_name || cfg.name || '未命名配置'
+  const model = cfg.model_name || cfg.name || ''
+  const defaultMark = cfg.is_default ? '（默认）' : ''
+  return model ? `${title} · ${model}${defaultMark}` : `${title}${defaultMark}`
+}
+
+const resolveDefaultLlmConfigId = () => {
+  const active = llmConfigs.value.filter((c) => c.is_active !== false)
+  const pool = active.length ? active : llmConfigs.value
+  return pool.find((c) => c.is_default)?.id ?? pool[0]?.id ?? null
+}
+
+
+const localizeLlmError = (message?: string) => {
+  const raw = (message || '').trim()
+  if (!raw) return ''
+  const lower = raw.toLowerCase()
+  if (
+    lower.includes('no llm configuration') ||
+    lower.includes('llm configuration not found')
+  ) {
+    return '未找到可用的 LLM 配置，请先在「AI 管理 → LLM 配置管理」中创建并启用模型，然后在顶部选择模型后再发送'
+  }
+  if (
+    lower.includes('all connection attempts failed') ||
+    lower.includes('connecterror') ||
+    lower.includes('connection refused')
+  ) {
+    return raw.includes('模型')
+      ? raw
+      : `模型服务不可用，连接失败。请检查 LLM 配置中的 Base URL、网络或代理后重试（${raw}）`
+  }
+  if (lower.includes('timed out') || lower.includes('timeout')) {
+    return raw.includes('超时')
+      ? raw
+      : `模型响应超时，请检查服务是否可达后重试（${raw}）`
+  }
+  return raw
+}
+
+const syncLlmConfigSelection = () => {
+  const boundId = currentConversation.value?.llm_config_id
+  if (boundId && llmConfigs.value.some((c) => c.id === boundId)) {
+    selectedLlmConfigId.value = boundId
+    return
+  }
+  selectedLlmConfigId.value = resolveDefaultLlmConfigId()
+}
+
+const loadLlmConfigs = async () => {
+  try {
+    const response: any = await llmConfigApi.getList({ is_active: true })
+    if (response.code === 200) {
+      llmConfigs.value = Array.isArray(response.data) ? response.data : []
+      syncLlmConfigSelection()
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '加载模型配置失败')
+  }
+}
+
+const handleLlmConfigChange = async (configId: number) => {
+  if (!currentConversationId.value || !configId) return
+  try {
+    const response: any = await conversationApi.updateConversation(currentConversationId.value, {
+      llm_config_id: configId
+    })
+    if (response.code === 200) {
+      const conv = conversations.value.find((c) => c.id === currentConversationId.value)
+      if (conv) {
+        conv.llm_config_id = configId
+      }
+      ElMessage.success('已切换对话模型')
+    }
+  } catch (e: any) {
+    syncLlmConfigSelection()
+    ElMessage.error(e?.message || '切换模型失败')
+  }
+}
+
 const handleProjectChange = async () => {
   if (!selectedProjectId.value) return
   localStorage.setItem('defaultProjectId', String(selectedProjectId.value))
@@ -745,23 +969,73 @@ const handleProjectChange = async () => {
       skillsApi.list(selectedProjectId.value, { page: 1, page_size: 200, is_active: true })
     ])
     knowledgeBases.value = kbRes?.data?.items || []
-    if (!knowledgeBases.value.some((kb: any) => Number(kb.id) === selectedKnowledgeBaseId.value)) {
-      selectedKnowledgeBaseId.value = knowledgeBases.value.length ? Number(knowledgeBases.value[0].id) : null
-    }
     mcpConfigs.value = mcpRes?.data?.items || []
-    if (!mcpConfigs.value.some((m: any) => m.id === selectedMcpConfigId.value)) {
-      selectedMcpConfigId.value = mcpConfigs.value.length ? mcpConfigs.value[0].id : null
-    }
     skillConfigs.value = skillRes?.data?.items || []
-    if (!skillConfigs.value.some((s: any) => s.id === selectedSkillId.value)) {
-      selectedSkillId.value = skillConfigs.value.length ? skillConfigs.value[0].id : null
+
+    // 未开启时不预选；开启后仅在校验失效时清空，不自动选第一项
+    if (!useKnowledgeBase.value) {
+      selectedKnowledgeBaseId.value = null
+    } else if (
+      selectedKnowledgeBaseId.value != null &&
+      !knowledgeBases.value.some((kb: any) => Number(kb.id) === selectedKnowledgeBaseId.value)
+    ) {
+      selectedKnowledgeBaseId.value = null
     }
+
+    if (!useMcp.value) {
+      selectedMcpConfigId.value = null
+    } else if (
+      selectedMcpConfigId.value != null &&
+      !mcpConfigs.value.some((m: any) => m.id === selectedMcpConfigId.value)
+    ) {
+      selectedMcpConfigId.value = null
+    }
+
+    if (!useSkill.value) {
+      selectedSkillId.value = null
+    } else if (
+      selectedSkillId.value != null &&
+      !skillConfigs.value.some((s: any) => s.id === selectedSkillId.value)
+    ) {
+      selectedSkillId.value = null
+    }
+
     if (toolMode.value === 'direct' && useSkill.value) {
       directSkillAction.value = 'agent_browser_open_snapshot'
       directSkillArgsText.value = '{}'
     }
   } catch (e: any) {
     ElMessage.error(e?.message || '加载知识库/MCP/Skill配置失败')
+  }
+}
+
+const deriveConversationTitle = (content: string) => {
+  let text = (content || '').trim()
+  if (!text) return '新对话'
+  if (text.includes('\n\n[附件]:')) {
+    text = text.split('\n\n[附件]:')[0].trim()
+  }
+  const firstLine = text.split('\n')[0].trim()
+  if (!firstLine) return '新对话'
+  return firstLine.length > 30 ? `${firstLine.slice(0, 30)}...` : firstLine
+}
+
+const updateConversationTitle = (conversationId: number, title: string) => {
+  if (!title) return
+  const conv = conversations.value.find(c => c.id === conversationId)
+  if (conv) {
+    conv.title = title
+  }
+}
+
+
+const persistConversationTitle = async (conversationId: number, title: string) => {
+  if (!conversationId || !title || title === '新对话') return
+  updateConversationTitle(conversationId, title)
+  try {
+    await conversationApi.updateConversation(conversationId, { title })
+  } catch (e) {
+    console.warn('持久化对话标题失败:', e)
   }
 }
 
@@ -803,6 +1077,83 @@ const handleCopyMessage = async (content: string) => {
   }
 }
 
+
+const extractResendPayload = (msg: MessageData) => {
+  let content = msg.content || ''
+  if (content.includes('\n\n[附件]:')) {
+    content = content.split('\n\n[附件]:')[0]
+  }
+  content = content.trim()
+  if (content === '[发送了附件]') {
+    content = ''
+  }
+  const rawAtts = (msg.meta_data?.attachments || []) as Array<{
+    name: string
+    size: number
+    type: string
+    url?: string
+  }>
+  const restoredAttachments = rawAtts
+    .filter((a) => a && a.url)
+    .map((a, index) => ({
+      id: `resend-${Date.now()}-${index}`,
+      name: a.name,
+      size: a.size,
+      type: a.type,
+      url: a.url as string,
+      uploading: false,
+      uploadProgress: 100,
+    }))
+  return { content, attachments: restoredAttachments }
+}
+
+/**
+ * 重新发送用户消息
+ */
+const handleResendMessage = async (msg: MessageData) => {
+  if (sending.value) {
+    ElMessage.warning('正在回复中，请稍后再重新发送')
+    return
+  }
+  const { content, attachments: restored } = extractResendPayload(msg)
+  if (!content && restored.length === 0) {
+    ElMessage.warning('无法重新发送空消息')
+    return
+  }
+  // 失败消息原地重试：移除旧失败气泡，避免重复一条相同内容
+  if (msg.send_status === 'failed') {
+    const idx = messages.value.findIndex((m) => m.id === msg.id)
+    if (idx > -1) messages.value.splice(idx, 1)
+  }
+  inputMessage.value = content
+  attachments.value = restored
+  await handleSendMessage()
+}
+
+/**
+ * 重新生成
+ */
+const handleRegenerateMessage = async (msg: MessageData) => {
+  if (sending.value) {
+    ElMessage.warning('正在回复中，请稍后再试')
+    return
+  }
+  const idx = messages.value.findIndex((m) => m.id === msg.id)
+  if (idx < 0) return
+  let userMsg: MessageData | undefined
+  for (let i = idx - 1; i >= 0; i -= 1) {
+    if (messages.value[i].role === 'user') {
+      userMsg = messages.value[i]
+      break
+    }
+  }
+  if (!userMsg) {
+    ElMessage.warning('未找到对应的用户消息，无法重新生成')
+    return
+  }
+  await handleResendMessage(userMsg)
+}
+
 /**
  * 清空输入框
  */
@@ -816,21 +1167,9 @@ const handleClearInput = () => {
  */
 const handleCancelSending = () => {
   if (sending.value && wsConnection.value) {
+    failCurrentSending('已取消发送', { toastType: 'info' })
     // 关闭 WebSocket 连接会中断流式响应
     wsConnection.value.close()
-    
-    // 移除流式消息
-    if (streamingMessage.value) {
-      const index = messages.value.findIndex(m => m.id === streamingMessage.value!.id)
-      if (index > -1) {
-        messages.value.splice(index, 1)
-      }
-    }
-    
-    streamingMessage.value = null
-    sending.value = false
-    ElMessage.info('已取消发送')
-    
     // 重新连接 WebSocket
     if (currentConversationId.value) {
       connectToWebSocket(currentConversationId.value)
@@ -846,7 +1185,19 @@ const loadConversations = async () => {
     // 加载更多对话（最多100个）
     const response = await conversationApi.getConversationList({ limit: 100 })
     if (response.code === 200) {
-      conversations.value = response.data.conversations
+      const prevMap = new Map(conversations.value.map((c) => [c.id, c]))
+      conversations.value = (response.data.conversations || []).map((c: ConversationData) => {
+        const prev = prevMap.get(c.id)
+        // 服务端仍是默认标题、本地已有更好标题时，保留本地，避免被刷回「新对话」
+        if (
+          prev?.title &&
+          prev.title !== '新对话' &&
+          (!c.title || c.title === '新对话')
+        ) {
+          return { ...c, title: prev.title }
+        }
+        return c
+      })
     }
   } catch (error: any) {
     ElMessage.error(error.message || '加载对话列表失败')
@@ -938,7 +1289,8 @@ const handleScroll = () => {
 const handleCreateConversation = async () => {
   try {
     const response = await conversationApi.createConversation({
-      title: '新对话'
+      title: '新对话',
+      llm_config_id: selectedLlmConfigId.value ?? resolveDefaultLlmConfigId() ?? undefined
     })
     
     if (response.code === 200) {
@@ -962,6 +1314,7 @@ const handleSelectConversation = async (conversationId: number) => {
   }
   
   currentConversationId.value = conversationId
+  syncLlmConfigSelection()
   await loadMessages(conversationId)
   
   // 建立新的 WebSocket 连接
@@ -1013,14 +1366,28 @@ const handleWebSocketMessage = (event: any) => {
   } else if (event.type === 'start') {
     console.log('开始接收流式响应')
   } else if (event.type === 'user_message') {
-    // 更新用户消息的真实 ID
+    // 更新用户消息的真实 ID，并保持 pending 追踪
     if (event.data && messages.value.length > 0) {
-      const lastUserMsg = [...messages.value].reverse().find(m => m.role === 'user')
-      if (lastUserMsg && lastUserMsg.id > Date.now() - 10000) {
+      const targetId = pendingUserMessageId.value
+      const lastUserMsg =
+        (targetId != null ? messages.value.find((m) => m.id === targetId) : null) ||
+        [...messages.value].reverse().find((m) => m.role === 'user')
+      if (lastUserMsg && (targetId != null || lastUserMsg.id > Date.now() - 10000)) {
         lastUserMsg.id = event.data.id
+        pendingUserMessageId.value = event.data.id
+        if (!lastUserMsg.send_status || lastUserMsg.send_status === 'sending') {
+          lastUserMsg.send_status = 'sending'
+        }
       }
     }
+    // 后端在用户消息落库后返回最新标题
+    if (event.data?.conversation_title && currentConversationId.value) {
+      updateConversationTitle(currentConversationId.value, event.data.conversation_title)
+    }
   } else if (event.type === 'content') {
+    // 已收到首包：取消超时，并视为发送成功（进入正常回复）
+    clearReplyWatchdog()
+    markPendingUserSuccess()
     // 追加内容到流式消息
     if (streamingMessage.value && event.data) {
       streamingMessage.value.content += event.data.content
@@ -1036,25 +1403,21 @@ const handleWebSocketMessage = (event: any) => {
     }
   } else if (event.type === 'done') {
     console.log('流式响应完成')
+    clearReplyWatchdog()
+    markPendingUserSuccess()
     if (streamingMessage.value) {
       streamingMessage.value.loading = false
       streamingMessage.value.collapsed = streamingMessage.value.content.length > 500
     }
     streamingMessage.value = null
     sending.value = false
+    if (event.data?.title && currentConversationId.value) {
+      updateConversationTitle(currentConversationId.value, event.data.title)
+    }
     // 刷新对话列表
     loadConversations()
   } else if (event.type === 'error') {
-    ElMessage.error(event.message || '发送消息失败')
-    // 移除临时消息
-    if (streamingMessage.value) {
-      const index = messages.value.findIndex(m => m.id === streamingMessage.value!.id)
-      if (index > -1) {
-        messages.value.splice(index, 1)
-      }
-    }
-    streamingMessage.value = null
-    sending.value = false
+    failCurrentSending(event.message || '发送消息失败')
   } else if (event.type === 'pong') {
     // 心跳响应
     console.log('收到心跳响应')
@@ -1086,6 +1449,15 @@ const handleSendMessage = async () => {
   // 检查连接状态
   if (!isWsConnected.value) {
     ElMessage.warning('正在连接中，请稍候...')
+    return
+  }
+
+  if (!llmConfigs.value.length) {
+    ElMessage.warning('尚未配置 LLM 模型，请先在「AI 管理 → LLM 配置管理」中创建并启用模型')
+    return
+  }
+  if (!selectedLlmConfigId.value) {
+    ElMessage.warning('请先在顶部选择对话模型后再发送')
     return
   }
 
@@ -1162,9 +1534,17 @@ const handleSendMessage = async () => {
       message_type: 'text',
       creation_date: new Date().toISOString(),
       collapsed: fullContent.length > 500,
-      meta_data: attachmentData.length > 0 ? { attachments: attachmentData } : undefined
+      meta_data: attachmentData.length > 0 ? { attachments: attachmentData } : undefined,
+      send_status: 'sending',
     }
     messages.value.push(tempUserMessage)
+    pendingUserMessageId.value = tempUserMessage.id
+
+    if (currentConversationId.value) {
+      const nextTitle = deriveConversationTitle(fullContent)
+      updateConversationTitle(currentConversationId.value, nextTitle)
+      void persistConversationTitle(currentConversationId.value, nextTitle)
+    }
     
     // 创建临时的 AI 消息（用于流式显示）
     streamingMessage.value = {
@@ -1294,17 +1674,9 @@ const handleSendMessage = async () => {
             }
           : undefined,
     })
+    startReplyWatchdog()
   } catch (error: any) {
-    ElMessage.error(error.message || '发送消息失败')
-    // 移除临时消息
-    if (streamingMessage.value) {
-      const index = messages.value.findIndex(m => m.id === streamingMessage.value!.id)
-      if (index > -1) {
-        messages.value.splice(index, 1)
-      }
-    }
-    streamingMessage.value = null
-    sending.value = false
+    failCurrentSending(error.message || '发送消息失败')
     // 恢复输入内容
     inputMessage.value = content
   }
@@ -1495,7 +1867,8 @@ const toggleMessageFold = (message: MessageData) => {
 const handleCreateWithPrompt = async (prompt: string) => {
   try {
     const response = await conversationApi.createConversation({
-      title: '新对话'
+      title: '新对话',
+      llm_config_id: selectedLlmConfigId.value ?? resolveDefaultLlmConfigId() ?? undefined
     })
     
     if (response.code === 200) {
@@ -1679,10 +2052,12 @@ const formatTime = (dateStr: string) => {
 onMounted(() => {
   loadConversations()
   loadProjectOptions()
+  loadLlmConfigs()
 })
 
 // 组件卸载时关闭 WebSocket
 onUnmounted(() => {
+  clearReplyWatchdog()
   if (wsConnection.value) {
     wsConnection.value.close()
     wsConnection.value = null
@@ -1824,7 +2199,11 @@ onUnmounted(() => {
           display: flex;
           gap: 8px;
           align-items: center;
-          max-width: min(520px, 48vw);
+          max-width: min(720px, 58vw);
+
+          .llm-model-select {
+            width: 220px;
+          }
 
           .active-feature-tags {
             display: flex;
@@ -2022,6 +2401,10 @@ onUnmounted(() => {
               font-size: 12px;
               color: var(--el-text-color-secondary);
             }
+
+            .send-status-tag {
+              margin-left: 0;
+            }
           }
           
           .message-body {
@@ -2033,6 +2416,27 @@ onUnmounted(() => {
 
               &:hover {
                 color: var(--el-color-primary);
+              }
+            }
+
+            .send-failed-banner {
+              display: flex;
+              align-items: flex-start;
+              justify-content: space-between;
+              gap: 12px;
+              margin-top: 8px;
+              padding: 8px 12px;
+              background: var(--el-color-danger-light-9);
+              border: 1px solid var(--el-color-danger-light-5);
+              border-radius: 8px;
+
+              .send-failed-text {
+                flex: 1;
+                font-size: 12px;
+                line-height: 1.5;
+                color: var(--el-color-danger);
+                word-break: break-word;
+                white-space: pre-wrap;
               }
             }
             
@@ -2242,6 +2646,10 @@ onUnmounted(() => {
             opacity: 0;
             transition: opacity 0.2s ease;
 
+            &.is-failed-actions {
+              opacity: 1;
+            }
+
             .el-button {
               min-height: auto;
               padding: 4px 8px;
@@ -2265,6 +2673,11 @@ onUnmounted(() => {
           
           &.collapsed::after {
             background: linear-gradient(to bottom, transparent, var(--el-color-primary));
+          }
+
+          &.is-failed {
+            opacity: 0.72;
+            box-shadow: inset 0 0 0 1px rgba(245, 108, 108, 0.65);
           }
         }
       }
@@ -2354,7 +2767,7 @@ onUnmounted(() => {
         .input-container {
           position: relative;
           display: flex;
-          align-items: flex-end;
+          align-items: center;
           gap: 8px;
           background: var(--el-bg-color-page);
           border: 1px solid var(--el-border-color);
@@ -2369,8 +2782,10 @@ onUnmounted(() => {
           
           .upload-buttons {
             display: flex;
+            align-items: center;
+            align-self: center;
             gap: 4px;
-            padding: 12px 0 12px 12px;
+            padding: 0 0 0 12px;
             
             .el-button {
               font-size: 20px;
@@ -2405,7 +2820,8 @@ onUnmounted(() => {
           .send-button {
             position: absolute;
             right: 10px;
-            bottom: 10px;
+            top: 50%;
+            transform: translateY(-50%);
             width: 40px;
             height: 40px;
             min-height: 40px;
@@ -2416,7 +2832,7 @@ onUnmounted(() => {
 
             &:hover:not(:disabled) {
               box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
-              transform: translateY(-2px);
+              transform: translateY(calc(-50% - 2px));
             }
           }
         }

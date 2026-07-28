@@ -50,8 +50,61 @@ async def get_dashboard_overview(
         testcase_weekly_result = await db.execute(testcase_weekly_query, {"week_start": week_start})
         testcase_weekly = testcase_weekly_result.scalar() or 0
         
-        # 用例通过率（模拟计算）
-        testcase_pass_rate = 87  # TODO: 根据实际执行结果计算
+        # 用例通过率
+        api_pass = api_total = 0
+        web_pass = web_total = 0
+        try:
+            api_rate_query = text("""
+                SELECT
+                    COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(result, '$.pass')) AS SIGNED)), 0) AS pass_count,
+                    COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(result, '$.total')) AS SIGNED)), 0) AS total_count
+                FROM api_automation_script_result_lists
+                WHERE enabled_flag = 1
+                  AND end_time IS NOT NULL
+                  AND result IS NOT NULL
+            """)
+            api_rate_result = await db.execute(api_rate_query)
+            api_rate_row = api_rate_result.fetchone()
+            if api_rate_row:
+                api_pass = int(api_rate_row.pass_count or 0)
+                api_total = int(api_rate_row.total_count or 0)
+        except Exception as api_rate_err:
+            logger.warning(f"[首页看板] 汇总 API 通过率失败: {api_rate_err}")
+
+        try:
+            import json as _json
+            web_rate_query = text("""
+                SELECT result
+                FROM web_management_result_lists
+                WHERE enabled_flag = 1
+                  AND end_time IS NOT NULL
+                  AND result IS NOT NULL
+            """)
+            web_rate_result = await db.execute(web_rate_query)
+            for row in web_rate_result.fetchall():
+                items = row.result
+                if isinstance(items, str):
+                    try:
+                        items = _json.loads(items)
+                    except Exception:
+                        continue
+                if not isinstance(items, list):
+                    continue
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    total_num = int(item.get("total") or 0)
+                    fail_num = int(item.get("run_false") or 0)
+                    if total_num <= 0:
+                        continue
+                    web_total += total_num
+                    web_pass += max(total_num - fail_num, 0)
+        except Exception as web_rate_err:
+            logger.warning(f"[首页看板] 汇总 Web 通过率失败: {web_rate_err}")
+
+        exec_pass = api_pass + web_pass
+        exec_total = api_total + web_total
+        testcase_pass_rate = round(exec_pass / exec_total * 100, 1) if exec_total > 0 else 0
         
         # AI执行统计
         ai_total_query = text("""
@@ -88,7 +141,7 @@ async def get_dashboard_overview(
         user_total_result = await db.execute(user_total_query)
         user_total = user_total_result.scalar() or 0
         
-        # 在线用户：与监控中心「在线用户」同一数据源（Redis）
+        # 在线用户：
         try:
             from app.api.v1.monitor.online.service import OnlineUserService
             online_stats = await OnlineUserService.get_online_stats()
@@ -97,7 +150,7 @@ async def get_dashboard_overview(
             logger.warning(f"[首页看板] 获取在线用户失败: {online_err}")
             user_online = 0
         
-        # 本月活跃用户（有登录/操作记录的近似：本月有更新的用户）
+        # 本月活跃用户
         user_monthly_query = text("""
             SELECT COUNT(*) FROM sys_user
             WHERE enabled_flag = 1 AND updation_date >= :month_start
@@ -509,7 +562,7 @@ async def get_project_activity(
         api_result = await db.execute(api_query)
         module_usage["api_testing"] = api_result.scalar() or 0
         
-        # UI自动化模块 - 使用正确的表名
+        # UI自动化模块 
         ui_query = text("SELECT COUNT(*) FROM ui_executions")
         ui_result = await db.execute(ui_query)
         module_usage["automation_ui"] = ui_result.scalar() or 0
@@ -643,3 +696,181 @@ async def get_api_interface_stats(
     except Exception as e:
         logger.error(f"[首页看板] 获取API接口统计失败: {str(e)}")
         return error_response(message=f"获取API接口统计失败: {str(e)}")
+
+@router.get("/llm-usage", summary="获取 LLM 用量统计")
+async def get_llm_usage_stats(
+    days: int = Query(7, ge=1, le=90, description="统计天数"),
+    tab: str = Query("overview", description="overview|daily|category|model"),
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """LLM token / 缓存命中 / 请求统计（数据来自 llm_usage_logs，改造上线后开始累积）"""
+    try:
+        from app.api.v1.Ntesterc_module.Ntesterc_ai.usage.service import UsageLogService
+        await UsageLogService.ensure_table()
+
+        start_date = datetime.now() - timedelta(days=days - 1)
+        start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        overview_q = text("""
+            SELECT
+                COALESCE(SUM(total_tokens), 0) AS total_tokens,
+                COALESCE(SUM(cached_tokens), 0) AS cached_tokens,
+                COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+                COALESCE(SUM(completion_tokens), 0) AS completion_tokens,
+                COUNT(*) AS request_count,
+                SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS error_count
+            FROM llm_usage_logs
+            WHERE enabled_flag = 1
+              AND creation_date >= :start_date
+        """)
+        overview_row = (await db.execute(overview_q, {"start_date": start_date})).fetchone()
+        total_tokens = int(overview_row.total_tokens or 0) if overview_row else 0
+        cached_tokens = int(overview_row.cached_tokens or 0) if overview_row else 0
+        prompt_tokens = int(overview_row.prompt_tokens or 0) if overview_row else 0
+        completion_tokens = int(overview_row.completion_tokens or 0) if overview_row else 0
+        request_count = int(overview_row.request_count or 0) if overview_row else 0
+        error_count = int(overview_row.error_count or 0) if overview_row else 0
+
+        base_for_hit = prompt_tokens if prompt_tokens > 0 else total_tokens
+        uncached_tokens = max(base_for_hit - cached_tokens, 0)
+        cache_hit_rate = round(cached_tokens / base_for_hit * 100, 1) if base_for_hit > 0 else 0.0
+
+        by_model_q = text("""
+            SELECT
+                COALESCE(NULLIF(model_name, ''), 'unknown') AS model_name,
+                COALESCE(provider, '') AS provider,
+                COALESCE(SUM(total_tokens), 0) AS total_tokens,
+                COALESCE(SUM(cached_tokens), 0) AS cached_tokens,
+                COUNT(*) AS request_count,
+                SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS error_count
+            FROM llm_usage_logs
+            WHERE enabled_flag = 1
+              AND creation_date >= :start_date
+            GROUP BY COALESCE(NULLIF(model_name, ''), 'unknown'), COALESCE(provider, '')
+            ORDER BY total_tokens DESC
+            LIMIT 20
+        """)
+        by_model = [
+            {
+                "model_name": row.model_name,
+                "provider": row.provider,
+                "total_tokens": int(row.total_tokens or 0),
+                "cached_tokens": int(row.cached_tokens or 0),
+                "request_count": int(row.request_count or 0),
+                "error_count": int(row.error_count or 0),
+            }
+            for row in (await db.execute(by_model_q, {"start_date": start_date})).fetchall()
+        ]
+
+        by_date_q = text("""
+            SELECT
+                DATE(creation_date) AS day,
+                COALESCE(SUM(total_tokens), 0) AS total_tokens,
+                COALESCE(SUM(cached_tokens), 0) AS cached_tokens,
+                COUNT(*) AS request_count,
+                SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS error_count
+            FROM llm_usage_logs
+            WHERE enabled_flag = 1
+              AND creation_date >= :start_date
+            GROUP BY DATE(creation_date)
+            ORDER BY day ASC
+        """)
+        by_date = [
+            {
+                "date": row.day.strftime("%m-%d") if hasattr(row.day, "strftime") else str(row.day)[5:10],
+                "total_tokens": int(row.total_tokens or 0),
+                "cached_tokens": int(row.cached_tokens or 0),
+                "request_count": int(row.request_count or 0),
+                "error_count": int(row.error_count or 0),
+            }
+            for row in (await db.execute(by_date_q, {"start_date": start_date})).fetchall()
+        ]
+
+        by_category_q = text("""
+            SELECT
+                COALESCE(NULLIF(source, ''), 'unknown') AS category,
+                COALESCE(SUM(total_tokens), 0) AS total_tokens,
+                COUNT(*) AS request_count,
+                SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS error_count
+            FROM llm_usage_logs
+            WHERE enabled_flag = 1
+              AND creation_date >= :start_date
+            GROUP BY COALESCE(NULLIF(source, ''), 'unknown')
+            ORDER BY total_tokens DESC
+        """)
+        category_label = {
+            "chat": "AI 聊天",
+            "browser_use": "Browser-Use",
+            "unknown": "其他",
+        }
+        by_category = [
+            {
+                "category": category_label.get(row.category, row.category),
+                "source": row.category,
+                "total_tokens": int(row.total_tokens or 0),
+                "request_count": int(row.request_count or 0),
+                "error_count": int(row.error_count or 0),
+            }
+            for row in (await db.execute(by_category_q, {"start_date": start_date})).fetchall()
+        ]
+
+        recent_q = text("""
+            SELECT
+                id,
+                creation_date,
+                model_name,
+                provider,
+                source,
+                total_tokens,
+                cached_tokens,
+                status,
+                error_message,
+                latency_ms
+            FROM llm_usage_logs
+            WHERE enabled_flag = 1
+              AND creation_date >= :start_date
+            ORDER BY creation_date DESC
+            LIMIT 30
+        """)
+        recent_requests = [
+            {
+                "id": row.id,
+                "created_at": row.creation_date.isoformat() if row.creation_date else None,
+                "model_name": row.model_name or "unknown",
+                "provider": row.provider or "",
+                "source": row.source or "chat",
+                "source_label": category_label.get(row.source or "chat", row.source or "chat"),
+                "total_tokens": int(row.total_tokens or 0),
+                "cached_tokens": int(row.cached_tokens or 0),
+                "status": row.status or "success",
+                "error_message": row.error_message,
+                "latency_ms": row.latency_ms,
+            }
+            for row in (await db.execute(recent_q, {"start_date": start_date})).fetchall()
+        ]
+
+        data = {
+            "tab": tab,
+            "days": days,
+            "overview": {
+                "total_tokens": total_tokens,
+                "cached_tokens": cached_tokens,
+                "uncached_tokens": uncached_tokens,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "cache_hit_rate": cache_hit_rate,
+                "request_count": request_count,
+                "error_count": error_count,
+            },
+            "by_model": by_model,
+            "by_date": by_date,
+            "by_category": by_category,
+            "recent_requests": recent_requests,
+        }
+        return success_response(data=data, message="获取 LLM 用量统计成功")
+
+    except Exception as e:
+        logger.error(f"[首页看板] 获取 LLM 用量统计失败: {str(e)}")
+        return error_response(message=f"获取 LLM 用量统计失败: {str(e)}")
+

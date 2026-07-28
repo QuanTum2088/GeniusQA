@@ -69,6 +69,20 @@ interface StateRow {
 const SaveOrUpdateUserRef = ref()
 const tableRef = ref()
 
+/** 超级管理员用户不可禁用/删除 */
+function isSuperAdminUser(row: any): boolean {
+  if (!row) return false;
+  if (Number(row.user_type) === 10) return true;
+  const names = row.role_names || row.roles || [];
+  if (Array.isArray(names)) {
+    return names.some((n: any) => {
+      if (typeof n === 'string') return n === '超级管理员' || n.includes('超级管理员');
+      return false;
+    });
+  }
+  return false;
+}
+
 const state = reactive<StateRow>({
   columns: [
     {
@@ -84,7 +98,7 @@ const state = reactive<StateRow>({
     {key: 'nickname', label: '用户昵称', width: '', align: 'center', show: true},
     {
       key: 'roles', label: '关联角色', width: '', align: 'center', show: true,
-      render: (row: any) => handleRoles(row.roles)
+      render: (row: any) => handleRoles(row.role_names || row.roles)
     },
     {key: 'dept_name', label: '所属部门', width: '150', align: 'center', show: true},
     {key: 'email', label: '邮箱', width: '', align: 'center', show: true},
@@ -105,40 +119,45 @@ const state = reactive<StateRow>({
       fixed: 'right', 
       align: 'center', 
       width: '280',
-      render: (row: any) => h("div", null, [
-        h(ElButton, {
-          type: "primary",
-          size: "small",
-          onClick: () => {
-            onOpenSaveOrUpdate('update', row)
-          },
-          style: authFunction('system:user:edit') ? '' : 'display:none'
-        }, () => '编辑'),
-        h(ElButton, {
-          type: row.status ? "warning" : "success",
-          size: "small",
-          onClick: () => {
-            toggleStatus(row)
-          },
-          style: authFunction('system:user:status') ? '' : 'display:none'
-        }, () => row.status ? '禁用' : '启用'),
-        h(ElButton, {
-          type: "info",
-          size: "small",
-          onClick: () => {
-            resetPassword(row)
-          },
-          style: authFunction('system:user:reset-password') ? '' : 'display:none'
-        }, () => '重置密码'),
-        h(ElButton, {
-          type: "danger",
-          size: "small",
-          onClick: () => {
-            deleted(row)
-          },
-          style: authFunction('system:user:delete') ? '' : 'display:none'
-        }, () => '删除')
-      ])
+      render: (row: any) => {
+        const locked = isSuperAdminUser(row);
+        return h("div", null, [
+          h(ElButton, {
+            type: "primary",
+            size: "small",
+            onClick: () => {
+              onOpenSaveOrUpdate('update', row)
+            },
+            style: authFunction('system:user:edit') ? '' : 'display:none'
+          }, () => '编辑'),
+          h(ElButton, {
+            type: row.status ? "warning" : "success",
+            size: "small",
+            disabled: locked,
+            onClick: () => {
+              if (!locked) toggleStatus(row)
+            },
+            style: authFunction('system:user:status') ? '' : 'display:none'
+          }, () => row.status ? '禁用' : '启用'),
+          h(ElButton, {
+            type: "info",
+            size: "small",
+            onClick: () => {
+              resetPassword(row)
+            },
+            style: authFunction('system:user:reset-password') ? '' : 'display:none'
+          }, () => '重置密码'),
+          h(ElButton, {
+            type: "danger",
+            size: "small",
+            disabled: locked,
+            onClick: () => {
+              if (!locked) deleted(row)
+            },
+            style: authFunction('system:user:delete') ? '' : 'display:none'
+          }, () => '删除')
+        ]);
+      }
     },
   ],
   // list
@@ -195,6 +214,10 @@ const onOpenSaveOrUpdate = (editType: string, row?: TableDataRow) => {
 
 // 删除用户
 const deleted = (row: TableDataRow) => {
+  if (isSuperAdminUser(row)) {
+    ElMessage.warning('不能删除超级管理员');
+    return;
+  }
   ElMessageBox.confirm('是否删除该条数据, 是否继续?', '提示', {
     confirmButtonText: '确认',
     cancelButtonText: '取消',
@@ -216,6 +239,10 @@ const deleted = (row: TableDataRow) => {
 
 // 启用/禁用用户
 const toggleStatus = (row: TableDataRow) => {
+  if (isSuperAdminUser(row)) {
+    ElMessage.warning('不能禁用超级管理员');
+    return;
+  }
   const action = row.status ? '禁用' : '启用';
   ElMessageBox.confirm(`确定要${action}该用户吗？`, '提示', {
     confirmButtonText: '确认',

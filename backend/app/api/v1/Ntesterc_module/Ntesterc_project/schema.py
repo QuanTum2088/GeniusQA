@@ -14,6 +14,7 @@ class ProjectBaseSchema(BaseSchema):
     name: str = Field(..., min_length=1, max_length=200, description="项目名称")
     description: Optional[str] = Field(None, description="项目描述")
     status: Optional[str] = Field("active", description="状态")
+    workspace_path: Optional[str] = Field(None, max_length=2000, description="本机工作目录")
 
 
 class ProjectCreateSchema(ProjectBaseSchema):
@@ -26,6 +27,7 @@ class ProjectUpdateSchema(BaseSchema):
     name: Optional[str] = Field(None, min_length=1, max_length=200)
     description: Optional[str] = None
     status: Optional[str] = None
+    workspace_path: Optional[str] = Field(None, max_length=2000, description="本机工作目录")
 
 
 class ProjectOutSchema(ProjectBaseSchema, TimestampSchema):
@@ -33,11 +35,11 @@ class ProjectOutSchema(ProjectBaseSchema, TimestampSchema):
     id: int
     owner_id: int
     owner_name: Optional[str] = None  # 项目负责人姓名
+    workspace_path: Optional[str] = None
     creation_date: datetime
     updation_date: datetime
     member_count: Optional[int] = 0
     environment_count: Optional[int] = 0
-
 
 class ProjectQuerySchema(PageQuerySchema):
     """项目查询Schema"""

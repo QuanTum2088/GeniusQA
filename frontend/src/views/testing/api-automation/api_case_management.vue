@@ -3,9 +3,21 @@
     <!-- 左侧用例集树 -->
     <div class="suite-panel">
       <div class="suite-panel-header">
-        <el-input v-model="suiteKeyword" placeholder="搜索用例集" clearable size="small"
-          prefix-icon="Search" style="flex:1;margin-right:6px" />
-        <el-button type="primary" size="small" icon="Plus" @click="openAddSuiteDialog(null)">新增</el-button>
+        <el-input
+          v-model="suiteKeyword"
+          placeholder="搜索用例集"
+          clearable
+          size="small"
+          style="width: 160px"
+        >
+          <template #prefix>
+            <el-icon><ele-Search /></el-icon>
+          </template>
+        </el-input>
+        <el-button type="primary" size="small" @click="openAddSuiteDialog(null)">
+          <el-icon><ele-Plus /></el-icon>
+          新增
+        </el-button>
       </div>
       <el-tree ref="suiteTreeRef" :data="suiteTree" :props="{ label: 'name', children: 'children' }"
         :filter-node-method="filterSuiteNode" node-key="id" highlight-current draggable
@@ -32,15 +44,18 @@
     <!-- 右侧用例列表 -->
     <div class="case-panel">
       <div class="case-panel-header">
-        <span class="selected-suite-name">{{ selectedSuite ? selectedSuite.name : '请选择用例集' }}</span>
-        <div class="case-panel-actions">
-          <el-button type="success" size="small" icon="VideoPlay"
-            :disabled="selectedCaseIds.length === 0" @click="openRunDialog">
-            执行 {{ selectedCaseIds.length > 0 ? `(${selectedCaseIds.length})` : '' }}
-          </el-button>
-          <el-button type="primary" size="small" icon="Plus" :disabled="!selectedSuite" @click="openAddCaseDialog">
-            新增用例
-          </el-button>
+        <div class="case-panel-title-row">
+          <span class="selected-suite-name">{{ selectedSuite ? selectedSuite.name : '请选择用例集' }}</span>
+          <div class="case-panel-actions">
+            <el-button type="primary" size="small" :disabled="!selectedSuite" @click="openAddCaseDialog">
+              <el-icon><ele-Plus /></el-icon>
+              新增用例
+            </el-button>
+            <el-button type="success" size="small" :disabled="selectedCaseIds.length === 0" @click="openRunDialog">
+              <el-icon><ele-VideoPlay /></el-icon>
+              执行 {{ selectedCaseIds.length > 0 ? `(${selectedCaseIds.length})` : '' }}
+            </el-button>
+          </div>
         </div>
       </div>
 
@@ -423,7 +438,17 @@ onMounted(() => { loadSuiteTree(); });
 <style scoped>
 .case-mgmt-container { display: flex; height: 100%; min-height: 0; }
 .suite-panel { width: 280px; min-width: 220px; max-width: 320px; border-right: 1px solid var(--el-border-color); display: flex; flex-direction: column; overflow: hidden; }
-.suite-panel-header { display: flex; align-items: center; padding: 8px; border-bottom: 1px solid var(--el-border-color); flex-shrink: 0; }
+.suite-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid var(--el-border-color);
+  flex-shrink: 0;
+}
+.suite-panel-header :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
 .suite-tree { flex: 1; overflow-y: auto; padding: 4px 0; }
 .suite-tree-node { display: flex; align-items: center; width: 100%; overflow: hidden; }
 .node-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
@@ -433,9 +458,22 @@ onMounted(() => { loadSuiteTree(); });
 .node-action-icon:hover { color: #409eff; background: var(--el-color-primary-light-9); }
 .node-action-icon.danger:hover { color: #f56c6c; background: var(--el-color-danger-light-9); }
 .case-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 8px; min-width: 0; }
-.case-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-shrink: 0; }
+.case-panel-header { margin-bottom: 8px; flex-shrink: 0; }
+.case-panel-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .selected-suite-name { font-size: 14px; font-weight: 600; color: var(--el-text-color-primary); }
-.case-panel-actions { display: flex; gap: 8px; }
+.case-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.case-panel-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
 .run-result-bar { margin-bottom: 8px; flex-shrink: 0; }
 .case-type-tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-shrink: 0; flex-wrap: wrap; }
 .case-type-tab { padding: 4px 14px; border-radius: 20px; font-size: 12px; cursor: pointer; border: 1px solid var(--el-border-color); color: var(--el-text-color-regular); background: var(--el-bg-color); transition: all .15s; user-select: none; white-space: nowrap; }

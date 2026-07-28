@@ -462,9 +462,10 @@ async def api_db_list(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """数据库下拉列表"""
+    """数据库列表（支持分页与名称搜索）"""
     try:
-        data = await ApiAutomationService.get_all_databases(db, current_user_id)
+        body = await body_to_json(request)
+        data = await ApiAutomationService.get_databases_paged(db, body or {}, current_user_id)
         return success_response(data, message="请求成功")
     except Exception as e:
         return error_response(f"接口请求异常，原因是：{str(e)}")
@@ -808,7 +809,7 @@ async def get_api_script_list(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id)
 ):
-    """获取场景列表"""
+    """获取用例列表"""
     try:
         body = await body_to_json(request)
         page = int(body.get("page") or 1)
@@ -825,7 +826,7 @@ async def add_api_script(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """新增场景脚本"""
+    """新增用例"""
     try:
         body = await body_to_json(request)
         await ApiAutomationService.add_api_script(db, body, current_user_id)
@@ -840,7 +841,7 @@ async def edit_api_script(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """编辑场景脚本"""
+    """编辑用例"""
     try:
         body = await body_to_json(request)
         await ApiAutomationService.edit_api_script(db, body, current_user_id)
@@ -855,7 +856,7 @@ async def del_api_script(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """删除场景脚本"""
+    """删除用例"""
     try:
         body = await body_to_json(request)
         await ApiAutomationService.delete_api_script(db, int(body["id"]), current_user_id)
@@ -870,7 +871,7 @@ async def get_api_script_list_simple(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """获取全部场景脚本(id/name)"""
+    """获取全部用例(id/name)"""
     try:
         rows = await ApiAutomationService.get_api_script_simple_list(db, current_user_id)
         return success_response(rows, message="请求成功")
@@ -884,7 +885,7 @@ async def run_api_script(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id)
 ):
-    """执行场景"""
+    """执行用例"""
     try:
         body = await body_to_json(request)
         await ApiAutomationService.run_api_script(db, body, current_user_id)

@@ -88,23 +88,23 @@ class ApiResultModel(Base):
 
 
 class ApiScriptModel(Base):
-    """API场景模型"""
+    """API用例模型（历史表名 api_automation_scripts，对应前端用例）"""
     __tablename__ = 'api_automation_scripts'
     
-    name = Column(String(255), nullable=False, comment='场景名称')
-    type = Column(Integer, default=1, comment='场景类型')
-    script = Column(JSON, nullable=False, comment='场景步骤')
-    config = Column(JSON, comment='场景配置')
-    description = Column(String(255), default='', comment='场景描述')
+    name = Column(String(255), nullable=False, comment='用例名称')
+    type = Column(Integer, default=1, comment='用例类型')
+    script = Column(JSON, nullable=False, comment='用例步骤')
+    config = Column(JSON, comment='用例配置')
+    description = Column(String(255), default='', comment='用例描述')
 
 
 class ApiScriptResultListModel(Base):
-    """API场景执行汇总模型"""
+    """API用例执行汇总模型"""
     __tablename__ = 'api_automation_script_result_lists'
     
     result_id = Column(BigInteger, nullable=False, comment='执行ID')
-    name = Column(String(255), nullable=False, comment='场景名称')
-    script = Column(JSON, comment='场景配置')
+    name = Column(String(255), nullable=False, comment='用例/任务名称')
+    script = Column(JSON, comment='用例配置')
     config = Column(JSON, comment='执行配置')
     result = Column(JSON, comment='执行结果')
     start_time = Column(DateTime, server_default=func.now(), comment='开始时间')
@@ -113,7 +113,7 @@ class ApiScriptResultListModel(Base):
 
 
 class ApiScriptResultModel(Base):
-    """API场景执行详情模型"""
+    """API用例执行详情模型"""
     __tablename__ = 'api_automation_script_results'
     
     name = Column(String(255), nullable=False, comment='步骤名称')

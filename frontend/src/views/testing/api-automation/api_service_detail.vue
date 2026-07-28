@@ -2,16 +2,19 @@
 	<div class="service-detail-container">
 		<!-- 顶部操作栏 -->
 		<div class="service-detail-header">
-			<el-button type="primary" plain size="small" icon="ArrowLeft" @click="emit('back')">
-				返回接口列表
-			</el-button>
-			<span class="service-name">{{ serviceName }}</span>
+			<div class="header-left">
+				<el-button type="primary" plain size="small" @click="emit('back')">
+					<el-icon><ele-ArrowLeft /></el-icon>
+					返回接口列表
+				</el-button>
+				<span class="service-name">{{ serviceName }}</span>
+			</div>
 			<div class="header-right">
 				<el-select
 					v-model="selectedEnvId"
 					placeholder="请选择环境"
 					clearable
-					style="width: 180px; margin-right: 8px"
+					style="width: 180px"
 				>
 					<el-option
 						v-for="env in envList"
@@ -27,7 +30,14 @@
 		<!-- Tab 区域 -->
 		<el-tabs v-model="activeTab" type="border-card" class="service-detail-tabs">
 			<el-tab-pane label="接口管理" name="manage">
-				<ApiManagePanel :serviceId="currentServiceId" :envId="selectedEnvId" :envList="envList" />
+				<ApiManagePanel
+					:serviceId="currentServiceId"
+					:envId="selectedEnvId"
+					:envList="envList"
+					:sourceType="sourceType"
+					:sourceAddr="sourceAddr"
+					@update-source="(p) => emit('update-source', p)"
+				/>
 			</el-tab-pane>
 			<el-tab-pane label="用例管理" name="case">
 				<ApiCaseManagement :serviceId="currentServiceId" :envId="selectedEnvId" />
@@ -52,8 +62,11 @@
 		<!-- 环境管理对话框 -->
 		<el-dialog v-model="envDialogVisible" title="环境管理" width="560px" @close="closeEnvDialog">
 			<div style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px">
-				<el-input v-model="envSearchName" placeholder="输入环境名称" clearable style="width: 260px" />
-				<el-button type="primary" @click="openEnvFormDialog(null)">新增</el-button>
+				<el-input v-model="envSearchName" placeholder="输入环境名称" clearable style="width: 220px" />
+				<el-button type="primary" @click="openEnvFormDialog(null)">
+					<el-icon><ele-Plus /></el-icon>
+					新增
+				</el-button>
 			</div>
 			<el-table v-loading="envLoading" :data="filteredEnvList" border stripe empty-text="暂无环境">
 				<el-table-column prop="name" label="环境名称" min-width="160" show-overflow-tooltip />
@@ -84,8 +97,8 @@
 							:key="idx"
 							style="display: flex; gap: 8px; margin-bottom: 6px"
 						>
-							<el-input v-model="item.name" placeholder="配置项名（如 {{base_url}}）" style="flex: 1" />
-							<el-input v-model="item.value" placeholder="配置项值" style="flex: 1" />
+							<el-input v-model="item.name" placeholder="配置项名（如 base_url）" style="flex: 1" />
+							<el-input v-model="item.value" placeholder="配置项值（如 https://uapis.cn）" style="flex: 1" />
 							<el-button type="danger" size="small" @click="envForm.config.splice(idx, 1)">删除</el-button>
 						</div>
 						<el-button size="small" @click="envForm.config.push({ name: '', value: '' })">添加配置项</el-button>
@@ -98,7 +111,7 @@
 							:key="idx"
 							style="display: flex; gap: 8px; margin-bottom: 6px"
 						>
-							<el-input v-model="item.name" placeholder="变量名（如 {{token}}）" style="flex: 1" />
+							<el-input v-model="item.name" placeholder="变量名（如 token）" style="flex: 1" />
 							<el-input v-model="item.value" placeholder="变量值" style="flex: 1" />
 							<el-button type="danger" size="small" @click="envForm.variable.splice(idx, 1)">删除</el-button>
 						</div>
@@ -145,10 +158,13 @@ const PrecisionTestTab = defineAsyncComponent({
 const props = defineProps<{
 	serviceId: number;
 	serviceName: string;
+	sourceType?: string;
+	sourceAddr?: string;
 }>();
 
 const emit = defineEmits<{
 	(e: 'back'): void;
+	(e: 'update-source', payload: { source_type?: string; source_addr?: string }): void;
 }>();
 
 const activeTab = ref<'manage' | 'case' | 'script' | 'querydb' | 'precision' | 'result' | 'codegen'>('manage');
@@ -281,21 +297,37 @@ onMounted(() => {
 .service-detail-header {
 	display: flex;
 	align-items: center;
+	justify-content: space-between;
 	margin-bottom: 8px;
 	gap: 12px;
+}
+
+.header-left {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	flex: 1;
 }
 
 .service-name {
 	font-size: 16px;
 	font-weight: 600;
 	color: #303133;
-	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .header-right {
 	display: flex;
 	align-items: center;
-	margin-left: auto;
+	gap: 8px;
+	flex-shrink: 0;
+}
+
+.header-right :deep(.el-button + .el-button) {
+	margin-left: 0;
 }
 
 .service-detail-tabs {

@@ -137,7 +137,9 @@ async function loadDbList() {
   try {
     const res: any = await api_db_list({})
     const raw = res?.data
-    dbList.value = Array.isArray(raw) ? raw : (Array.isArray(raw?.rows) ? raw.rows : [])
+    dbList.value = Array.isArray(raw?.content)
+      ? raw.content
+      : (Array.isArray(raw) ? raw : (Array.isArray(raw?.rows) ? raw.rows : []))
   } catch {
     dbList.value = []
   }

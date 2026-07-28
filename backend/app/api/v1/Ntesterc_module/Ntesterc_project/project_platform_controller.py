@@ -17,17 +17,36 @@ router = APIRouter()
 # ---------- MCP ----------
 
 
+class MCPCallBody(BaseModel):
+    name: str = Field(..., description="工具名称")
+    arguments: Optional[Dict[str, Any]] = Field(default_factory=dict)
+
+
+class MCPImportBody(BaseModel):
+    path: Optional[str] = Field(None, description="可选绝对路径；默认按 .n-tester/mcp.json → .mcp.json → .cursor/mcp.json 探测")
+    scope: Optional[str] = Field("project", description="导入作用域 local/project/user")
+
+
+class MCPExportBody(BaseModel):
+    format: str = Field("claude", description="导出格式：n-tester / claude / cursor")
+    scope: Optional[str] = Field(None, description="可选：仅导出指定作用域")
+    write: bool = Field(True, description="是否写入目标文件；false 仅返回预览")
+
+
 @router.get("/{project_id}/mcp-configs", summary="MCP 配置列表")
 async def list_mcp(
     project_id: int,
     search: str = Query("", description="名称搜索"),
     is_enabled: Optional[bool] = Query(None),
+    scope: Optional[str] = Query(None, description="作用域 local/project/user"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    return await S.list_mcp_configs(project_id, current_user_id, db, search, is_enabled, page, page_size)
+    return await S.list_mcp_configs(
+        project_id, current_user_id, db, search, is_enabled, scope, page, page_size
+    )
 
 
 @router.post("/{project_id}/mcp-configs", summary="创建 MCP 配置")
@@ -38,6 +57,39 @@ async def create_mcp(
     current_user_id: int = Depends(get_current_user_id),
 ):
     return await S.create_mcp_config(project_id, current_user_id, db, data)
+
+
+@router.post("/{project_id}/mcp-configs/import", summary="从平台/兼容文件导入")
+async def mcp_import(
+    project_id: int,
+    body: MCPImportBody = Body(default=MCPImportBody()),
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    return await S.import_mcp_from_file(
+        project_id, current_user_id, db, body.model_dump(exclude_none=True)
+    )
+
+
+@router.post("/{project_id}/mcp-configs/sync-files", summary="同步到 N-Tester 平台文件")
+async def mcp_sync_files(
+    project_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    return await S.sync_mcp_files(project_id, current_user_id, db)
+
+
+@router.post("/{project_id}/mcp-configs/export", summary="按需导出为 Claude/Cursor/平台格式")
+async def mcp_export(
+    project_id: int,
+    body: MCPExportBody = Body(default=MCPExportBody()),
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    return await S.export_mcp_configs(
+        project_id, current_user_id, db, body.model_dump(exclude_none=True)
+    )
 
 
 @router.put("/{project_id}/mcp-configs/{config_id}", summary="更新 MCP 配置")
@@ -69,6 +121,29 @@ async def test_mcp(
     current_user_id: int = Depends(get_current_user_id),
 ):
     return await S.test_mcp_config(project_id, current_user_id, config_id, db)
+
+
+@router.get("/{project_id}/mcp-configs/{config_id}/tools", summary="列出 MCP 工具")
+async def mcp_tools(
+    project_id: int,
+    config_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    return await S.mcp_list_tools(project_id, current_user_id, config_id, db)
+
+
+@router.post("/{project_id}/mcp-configs/{config_id}/call", summary="调用 MCP 工具")
+async def mcp_call(
+    project_id: int,
+    config_id: int,
+    body: MCPCallBody = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    return await S.mcp_call_tool(
+        project_id, current_user_id, config_id, db, body.name, body.arguments or {}
+    )
 
 
 # ---------- Skill ----------

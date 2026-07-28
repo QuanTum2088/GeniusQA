@@ -58,146 +58,328 @@ async def _get_project(project_id: int, db: AsyncSession) -> ProjectModel:
 # ---------- MCP 配置 ----------
 
 
+def _mcp_to_dict(c: ProjectMCPConfigModel) -> dict:
+    auth_config = c.auth_config or {}
+    # 脱敏
+    masked = dict(auth_config) if isinstance(auth_config, dict) else {}
+    for key in ("token", "api_key"):
+        val = masked.get(key)
+        if isinstance(val, str) and len(val) > 8 and not val.startswith("${"):
+            masked[key] = val[:4] + "****" + val[-2:]
+    return {
+        "id": c.id,
+        "name": c.name,
+        "scope": getattr(c, "scope", None) or "user",
+        "project_id": getattr(c, "project_id", None),
+        "url": c.url or "",
+        "transport": c.transport or "streamable-http",
+        "headers": c.headers or {},
+        "command": getattr(c, "command", None) or "",
+        "args": getattr(c, "args", None) or [],
+        "env": getattr(c, "env", None) or {},
+        "auth_type": getattr(c, "auth_type", None) or "none",
+        "auth_config": masked,
+        "description": getattr(c, "description", None) or "",
+        "is_enabled": c.is_enabled,
+        "created_at": _iso(c.creation_date),
+        "updated_at": _iso(c.updation_date),
+    }
+
+
+def _normalize_transport(raw: Optional[str]) -> str:
+    t = (raw or "streamable-http").strip().lower()
+    if t in ("http", "streamable_http"):
+        return "streamable-http"
+    if t in ("stdio", "sse", "streamable-http"):
+        return t
+    return "streamable-http"
+
+
+def _visibility_clause(project_id: int, user_id: int):
+    """当前项目可见：local(me+project) | project(project) | user(me)。"""
+    return or_(
+        (
+            (ProjectMCPConfigModel.scope == "local")
+            & (ProjectMCPConfigModel.user_id == user_id)
+            & (ProjectMCPConfigModel.project_id == project_id)
+        ),
+        (
+            (ProjectMCPConfigModel.scope == "project")
+            & (ProjectMCPConfigModel.project_id == project_id)
+        ),
+        (
+            (ProjectMCPConfigModel.scope == "user")
+            & (ProjectMCPConfigModel.user_id == user_id)
+        ),
+        # 兼容旧数据：无 scope 字段时视作用户级
+        (
+            or_(ProjectMCPConfigModel.scope.is_(None), ProjectMCPConfigModel.scope == "")
+            & (ProjectMCPConfigModel.user_id == user_id)
+        ),
+    )
+
+
+async def _require_workspace(project: ProjectModel, scope: str) -> Optional[str]:
+    ws = (getattr(project, "workspace_path", None) or "").strip()
+    if scope in ("local", "project") and not ws:
+        raise HTTPException(
+            status_code=400,
+            detail="请先在项目设置中配置「本机工作目录」(workspace_path)，再使用项目私有/项目共享作用域",
+        )
+    if ws:
+        p = Path(ws).expanduser()
+        if not p.exists() or not p.is_dir():
+            raise HTTPException(status_code=400, detail=f"本机工作目录不存在或不是目录: {ws}")
+        return str(p.resolve())
+    return None
+
+
+async def _workspace_or_none(project: ProjectModel) -> Optional[str]:
+    ws = (getattr(project, "workspace_path", None) or "").strip()
+    if not ws:
+        return None
+    p = Path(ws).expanduser()
+    if p.exists() and p.is_dir():
+        return str(p.resolve())
+    return None
+
+
 async def list_mcp_configs(
     project_id: int,
     user_id: int,
     db: AsyncSession,
     search: str = "",
     is_enabled: Optional[bool] = None,
+    scope: Optional[str] = None,
     page: int = 1,
     page_size: int = 20,
 ) -> dict:
+    from app.api.v1.Ntesterc_module.Ntesterc_project.mcp_schema_ensure import ensure_mcp_schema
+
+    await ensure_mcp_schema(db)
     await _check_member(project_id, user_id, db)
     q = select(ProjectMCPConfigModel).where(
-        ProjectMCPConfigModel.user_id == user_id,
         ProjectMCPConfigModel.enabled_flag == 1,
+        _visibility_clause(project_id, user_id),
     )
     if search:
         q = q.where(ProjectMCPConfigModel.name.contains(search))
     if is_enabled is not None:
         q = q.where(ProjectMCPConfigModel.is_enabled == is_enabled)
+    if scope:
+        q = q.where(ProjectMCPConfigModel.scope == scope)
 
     count_stmt = select(func.count()).select_from(q.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
 
     q = q.order_by(ProjectMCPConfigModel.id.desc()).offset((page - 1) * page_size).limit(page_size)
     rows = (await db.execute(q)).scalars().all()
-    items = []
-    for c in rows:
-        items.append(
-            {
-                "id": c.id,
-                "name": c.name,
-                "url": c.url,
-                "transport": c.transport,
-                "headers": c.headers or {},
-                "is_enabled": c.is_enabled,
-                "created_at": _iso(c.creation_date),
-            }
-        )
+    items = [_mcp_to_dict(c) for c in rows]
     return page_response(items, total, page, page_size, "查询成功")
 
 
 async def create_mcp_config(project_id: int, user_id: int, db: AsyncSession, data: dict) -> dict:
-    await _check_role(project_id, user_id, ["owner", "admin"], db)
-    name = data.get("name", "").strip()
+    from app.api.v1.Ntesterc_module.Ntesterc_project.mcp_schema_ensure import ensure_mcp_schema
+    from app.api.v1.Ntesterc_module.Ntesterc_project import mcp_file_sync as sync
+
+    await ensure_mcp_schema(db)
+    scope = (data.get("scope") or "local").strip().lower()
+    if scope not in ("local", "project", "user"):
+        raise HTTPException(status_code=400, detail="scope 必须是 local/project/user")
+
+    if scope == "project":
+        await _check_role(project_id, user_id, ["owner", "admin"], db)
+    else:
+        await _check_member(project_id, user_id, db)
+
+    project = await _get_project(project_id, db)
+    workspace = await _require_workspace(project, scope)
+
+    name = (data.get("name") or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="配置名称不能为空")
-    exists = await db.execute(
-        select(ProjectMCPConfigModel.id).where(
-            ProjectMCPConfigModel.user_id == user_id,
-            ProjectMCPConfigModel.name == name,
-            ProjectMCPConfigModel.enabled_flag == 1,
-        )
+
+    transport = _normalize_transport(data.get("transport"))
+    url = (data.get("url") or "").strip()
+    command = (data.get("command") or "").strip()
+    args = data.get("args") if isinstance(data.get("args"), list) else []
+    env = data.get("env") if isinstance(data.get("env"), dict) else {}
+    headers = data.get("headers") if isinstance(data.get("headers"), dict) else {}
+    auth_type = (data.get("auth_type") or "none").strip().lower()
+    auth_config = data.get("auth_config") if isinstance(data.get("auth_config"), dict) else {}
+
+    if transport == "stdio":
+        if not command:
+            raise HTTPException(status_code=400, detail="stdio 模式请填写启动命令")
+        url = url or ""
+    else:
+        if not url:
+            raise HTTPException(status_code=400, detail="HTTP/SSE 模式请填写 URL")
+
+    bind_project_id = None if scope == "user" else project_id
+
+    # 重名校验（同作用域可见范围内）
+    exists_q = select(ProjectMCPConfigModel.id).where(
+        ProjectMCPConfigModel.enabled_flag == 1,
+        ProjectMCPConfigModel.name == name,
+        ProjectMCPConfigModel.scope == scope,
     )
-    if exists.scalar():
-        raise HTTPException(status_code=400, detail="MCP 配置名称已存在")
+    if scope == "user":
+        exists_q = exists_q.where(ProjectMCPConfigModel.user_id == user_id)
+    elif scope == "local":
+        exists_q = exists_q.where(
+            ProjectMCPConfigModel.user_id == user_id,
+            ProjectMCPConfigModel.project_id == project_id,
+        )
+    else:
+        exists_q = exists_q.where(ProjectMCPConfigModel.project_id == project_id)
+    if (await db.execute(exists_q)).scalar():
+        raise HTTPException(status_code=400, detail="同作用域下 MCP 配置名称已存在")
 
     m = ProjectMCPConfigModel(
         user_id=user_id,
+        project_id=bind_project_id,
+        scope=scope,
         name=name,
-        url=data.get("url", "").strip(),
-        transport=data.get("transport") or "streamable-http",
-        headers=data.get("headers") or {},
-        is_enabled=data.get("is_enabled", True),
+        url=url,
+        transport=transport,
+        headers=headers,
+        command=command or None,
+        args=args,
+        env=env,
+        auth_type=auth_type,
+        auth_config=auth_config,
+        description=(data.get("description") or "") or None,
+        is_enabled=bool(data.get("is_enabled", True)),
         created_by=user_id,
         updated_by=user_id,
     )
     db.add(m)
     await db.commit()
     await db.refresh(m)
-    return success_response(
-        data={
-            "id": m.id,
-            "name": m.name,
-            "url": m.url,
-            "transport": m.transport,
-            "headers": m.headers or {},
-            "is_enabled": m.is_enabled,
-            "created_at": _iso(m.creation_date),
-        },
-        message="创建成功",
-    )
+
+    file_info = {}
+    try:
+        file_info = sync.sync_config_to_files(m, workspace_path=workspace)
+    except Exception as e:
+        logger = __import__("logging").getLogger(__name__)
+        logger.warning(f"同步 MCP 文件失败（配置已入库）: {e}")
+        file_info = {"warning": str(e)}
+
+    out = _mcp_to_dict(m)
+    out["file_sync"] = file_info
+    return success_response(data=out, message="创建成功")
 
 
 async def update_mcp_config(project_id: int, user_id: int, config_id: int, db: AsyncSession, data: dict) -> dict:
-    await _check_role(project_id, user_id, ["owner", "admin"], db)
-    stmt = select(ProjectMCPConfigModel).where(
-        ProjectMCPConfigModel.id == config_id,
-        ProjectMCPConfigModel.user_id == user_id,
-        ProjectMCPConfigModel.enabled_flag == 1,
-    )
-    c = (await db.execute(stmt)).scalar_one_or_none()
-    if not c:
-        raise HTTPException(status_code=404, detail="MCP 配置不存在")
+    from app.api.v1.Ntesterc_module.Ntesterc_project.mcp_schema_ensure import ensure_mcp_schema
+    from app.api.v1.Ntesterc_module.Ntesterc_project import mcp_file_sync as sync
+
+    await ensure_mcp_schema(db)
+    c = await _get_mcp_config_visible(project_id, user_id, config_id, db)
+    old_name = c.name
+    old_scope = getattr(c, "scope", None) or "user"
+
+    scope = (data.get("scope") or old_scope).strip().lower()
+    if scope == "project" or old_scope == "project":
+        await _check_role(project_id, user_id, ["owner", "admin"], db)
+    elif getattr(c, "user_id", None) != user_id and old_scope != "project":
+        raise HTTPException(status_code=403, detail="无权修改他人的私有/全局 MCP 配置")
+
+    project = await _get_project(project_id, db)
+    # 切换作用域到 local/project 时强制校验工作目录；纯字段更新尽量不阻断
+    if "scope" in data and scope in ("local", "project"):
+        workspace = await _require_workspace(project, scope)
+    else:
+        workspace = await _workspace_or_none(project)
+        if scope in ("local", "project") and not workspace:
+            # 仍尝试同步，失败仅警告
+            pass
 
     if data.get("name"):
-        dup = await db.execute(
-            select(ProjectMCPConfigModel.id).where(
-                ProjectMCPConfigModel.user_id == user_id,
-                ProjectMCPConfigModel.name == data["name"],
-                ProjectMCPConfigModel.id != config_id,
-                ProjectMCPConfigModel.enabled_flag == 1,
-            )
-        )
-        if dup.scalar():
-            raise HTTPException(status_code=400, detail="MCP 配置名称已存在")
-        c.name = data["name"]
-    if data.get("url") is not None:
-        c.url = data["url"]
+        c.name = str(data["name"]).strip()
+    if "scope" in data:
+        c.scope = scope
+        c.project_id = None if scope == "user" else project_id
     if data.get("transport") is not None:
-        c.transport = data["transport"]
+        c.transport = _normalize_transport(data.get("transport"))
+    if data.get("url") is not None:
+        c.url = data.get("url") or ""
     if data.get("headers") is not None:
-        c.headers = data["headers"]
+        c.headers = data["headers"] or {}
+    if data.get("command") is not None:
+        c.command = data.get("command") or None
+    if data.get("args") is not None:
+        c.args = data["args"] if isinstance(data["args"], list) else []
+    if data.get("env") is not None:
+        c.env = data["env"] if isinstance(data["env"], dict) else {}
+    if data.get("auth_type") is not None:
+        c.auth_type = data.get("auth_type") or "none"
+    if data.get("auth_config") is not None:
+        # 若回传脱敏值则保留原值
+        incoming = data["auth_config"] if isinstance(data["auth_config"], dict) else {}
+        merged = dict(c.auth_config or {})
+        for k, v in incoming.items():
+            if isinstance(v, str) and "****" in v:
+                continue
+            merged[k] = v
+        c.auth_config = merged
+    if data.get("description") is not None:
+        c.description = data.get("description")
     if data.get("is_enabled") is not None:
         c.is_enabled = data["is_enabled"]
     c.updated_by = user_id
     await db.commit()
     await db.refresh(c)
-    return success_response(
-        data={
-            "id": c.id,
-            "name": c.name,
-            "url": c.url,
-            "transport": c.transport,
-            "headers": c.headers or {},
-            "is_enabled": c.is_enabled,
-            "created_at": _iso(c.creation_date),
-        },
-        message="更新成功",
-    )
+
+    # 若作用域变更，先从旧位置删除
+    if old_scope != scope or old_name != c.name:
+        try:
+            # 构造临时对象删除旧文件项
+            class _Old:
+                pass
+            o = _Old()
+            o.scope = old_scope
+            o.name = old_name
+            sync.remove_config_from_files(o, workspace_path=workspace)
+        except Exception:
+            pass
+
+    file_info = {}
+    try:
+        if scope == "user" or workspace:
+            file_info = sync.sync_config_to_files(
+                c, workspace_path=workspace, old_name=old_name if old_name != c.name else None
+            )
+        elif scope in ("local", "project"):
+            file_info = {"warning": "未配置本机工作目录，已跳过文件同步"}
+    except Exception as e:
+        file_info = {"warning": str(e)}
+
+    out = _mcp_to_dict(c)
+    out["file_sync"] = file_info
+    return success_response(data=out, message="更新成功")
 
 
 async def delete_mcp_config(project_id: int, user_id: int, config_id: int, db: AsyncSession) -> dict:
-    await _check_role(project_id, user_id, ["owner", "admin"], db)
-    stmt = select(ProjectMCPConfigModel).where(
-        ProjectMCPConfigModel.id == config_id,
-        ProjectMCPConfigModel.user_id == user_id,
-        ProjectMCPConfigModel.enabled_flag == 1,
-    )
-    c = (await db.execute(stmt)).scalar_one_or_none()
-    if not c:
-        raise HTTPException(status_code=404, detail="MCP 配置不存在")
+    from app.api.v1.Ntesterc_module.Ntesterc_project.mcp_schema_ensure import ensure_mcp_schema
+    from app.api.v1.Ntesterc_module.Ntesterc_project import mcp_file_sync as sync
+
+    await ensure_mcp_schema(db)
+    c = await _get_mcp_config_visible(project_id, user_id, config_id, db)
+    scope = getattr(c, "scope", None) or "user"
+    if scope == "project":
+        await _check_role(project_id, user_id, ["owner", "admin"], db)
+    elif c.user_id != user_id:
+        raise HTTPException(status_code=403, detail="无权删除他人的 MCP 配置")
+
+    project = await _get_project(project_id, db)
+    workspace = (getattr(project, "workspace_path", None) or "").strip() or None
+    try:
+        sync.remove_config_from_files(c, workspace_path=workspace)
+    except Exception:
+        pass
+
     c.enabled_flag = 0
     c.updated_by = user_id
     await db.commit()
@@ -206,53 +388,86 @@ async def delete_mcp_config(project_id: int, user_id: int, config_id: int, db: A
 
 async def test_mcp_config(project_id: int, user_id: int, config_id: int, db: AsyncSession) -> dict:
     await _check_member(project_id, user_id, db)
-    stmt = select(ProjectMCPConfigModel).where(
-        ProjectMCPConfigModel.id == config_id,
-        ProjectMCPConfigModel.user_id == user_id,
-        ProjectMCPConfigModel.enabled_flag == 1,
-    )
-    c = (await db.execute(stmt)).scalar_one_or_none()
-    if not c:
-        raise HTTPException(status_code=404, detail="MCP 配置不存在")
     try:
         tools = await mcp_list_tools(project_id, user_id, config_id, db)
         if tools.get("code") == 200:
             return success_response(
-                data={"ok": True, "tools_count": len((tools.get("data") or {}).get("tools") or [])},
+                data={"ok": True, "tools": (tools.get("data") or {}).get("tools") or []},
                 message="连接成功",
             )
-        return tools
+        return success_response(
+            data={"ok": False},
+            message=tools.get("message") or "连接失败",
+        )
     except Exception as e:
-        return error_response(message=f"连接失败: {e}")
+        return success_response(data={"ok": False}, message=f"连接失败: {e}")
 
 
-async def _get_mcp_config(project_id: int, user_id: int, config_id: int, db: AsyncSession) -> ProjectMCPConfigModel:
+async def _get_mcp_config_visible(
+    project_id: int, user_id: int, config_id: int, db: AsyncSession
+) -> ProjectMCPConfigModel:
+    from app.api.v1.Ntesterc_module.Ntesterc_project.mcp_schema_ensure import ensure_mcp_schema
+
+    await ensure_mcp_schema(db)
     await _check_member(project_id, user_id, db)
     stmt = select(ProjectMCPConfigModel).where(
         ProjectMCPConfigModel.id == config_id,
-        ProjectMCPConfigModel.user_id == user_id,
         ProjectMCPConfigModel.enabled_flag == 1,
+        _visibility_clause(project_id, user_id),
     )
     c = (await db.execute(stmt)).scalar_one_or_none()
     if not c:
-        raise HTTPException(status_code=404, detail="MCP 配置不存在")
+        raise HTTPException(status_code=404, detail="MCP 配置不存在或无权访问")
     return c
 
 
-def _build_server_config(c: ProjectMCPConfigModel) -> dict:
+async def _get_mcp_config(project_id: int, user_id: int, config_id: int, db: AsyncSession) -> ProjectMCPConfigModel:
+    return await _get_mcp_config_visible(project_id, user_id, config_id, db)
+
+
+def _build_server_config(c: ProjectMCPConfigModel, *, workspace_path: Optional[str] = None) -> tuple:
+    from app.api.v1.Ntesterc_module.Ntesterc_project.mcp_file_sync import merge_auth_headers
+
     name = c.name or f"mcp-{c.id}"
-    transport = (c.transport or "streamable-http").strip()
-    
-    if transport.lower() == "streamable-http":
-        transport = "streamable_http"
+    transport = (c.transport or "streamable-http").strip().lower()
+    if transport in ("http", "streamable-http", "streamable_http"):
+        transport_key = "streamable_http"
+    elif transport == "sse":
+        transport_key = "sse"
+    elif transport == "stdio":
+        transport_key = "stdio"
+    else:
+        transport_key = "streamable_http"
+
+    if transport_key == "stdio":
+        env = dict(c.env or {}) if isinstance(c.env, dict) else {}
+        if workspace_path:
+            env.setdefault("CLAUDE_PROJECT_DIR", workspace_path)
+        cfg = {
+            name: {
+                "transport": "stdio",
+                "command": (c.command or "npx").strip(),
+                "args": list(c.args or []),
+                "env": env,
+            }
+        }
+        return cfg, name
+
+    headers = merge_auth_headers(
+        c.headers if isinstance(c.headers, dict) else {},
+        getattr(c, "auth_type", None),
+        getattr(c, "auth_config", None) if isinstance(getattr(c, "auth_config", None), dict) else {},
+        for_file=False,
+        scope=getattr(c, "scope", None) or "user",
+    )
     cfg = {
         name: {
-            "transport": transport,
-            "url": c.url,
+            "transport": transport_key,
+            "url": (c.url or "").strip(),
         }
     }
-    if c.headers and isinstance(c.headers, dict):
-        cfg[name]["headers"] = c.headers
+    if headers:
+        cfg[name]["headers"] = headers
     return cfg, name
 
 
@@ -263,7 +478,9 @@ async def mcp_list_tools(project_id: int, user_id: int, config_id: int, db: Asyn
     except Exception as e:
         return error_response(message=f"缺少依赖 langchain-mcp-adapters: {e}")
 
-    server_config, server_name = _build_server_config(c)
+    project = await _get_project(project_id, db)
+    workspace = (getattr(project, "workspace_path", None) or "").strip() or None
+    server_config, server_name = _build_server_config(c, workspace_path=workspace)
     try:
         client = MultiServerMCPClient(server_config)
         async with client.session(server_name) as session:
@@ -278,12 +495,14 @@ async def mcp_list_tools(project_id: int, user_id: int, config_id: int, db: Asyn
                     "input_schema": getattr(t, "inputSchema", {}) or {},
                 }
             )
-        return success_response(data={"tools": items}, message="查询成功")
+        return success_response(data={"tools": items}, message="ok")
     except Exception as e:
-        return error_response(message=f"获取工具列表失败: {e}")
+        return error_response(message=f"列出工具失败: {e}")
 
 
-async def mcp_call_tool(project_id: int, user_id: int, config_id: int, db: AsyncSession, tool_name: str, arguments: dict) -> dict:
+async def mcp_call_tool(
+    project_id: int, user_id: int, config_id: int, db: AsyncSession, tool_name: str, arguments: dict
+) -> dict:
     c = await _get_mcp_config(project_id, user_id, config_id, db)
     try:
         from langchain_mcp_adapters.client import MultiServerMCPClient
@@ -291,26 +510,147 @@ async def mcp_call_tool(project_id: int, user_id: int, config_id: int, db: Async
     except Exception as e:
         return error_response(message=f"缺少依赖 langchain-mcp-adapters: {e}")
 
-    server_config, server_name = _build_server_config(c)
+    project = await _get_project(project_id, db)
+    workspace = (getattr(project, "workspace_path", None) or "").strip() or None
+    server_config, server_name = _build_server_config(c, workspace_path=workspace)
     try:
         client = MultiServerMCPClient(server_config)
         async with client.session(server_name) as session:
             tools = await load_mcp_tools(session)
-            target = None
-            for tool in tools:
-                if getattr(tool, "name", None) == tool_name:
-                    target = tool
-                    break
+            target = next((t for t in tools if getattr(t, "name", "") == tool_name), None)
             if not target:
-                return error_response(message=f"工具不存在: {tool_name}")
-            # langchain tools: invoke/ainvoke
-            if hasattr(target, "ainvoke"):
-                result = await target.ainvoke(arguments or {})
-            else:
-                result = target.invoke(arguments or {})
-        return success_response(data={"result": result}, message="调用成功")
+                return error_response(message=f"未找到工具: {tool_name}")
+            result = await target.ainvoke(arguments or {})
+        return success_response(data={"result": result}, message="ok")
     except Exception as e:
-        return error_response(message=f"调用失败: {e}")
+        return error_response(message=f"调用工具失败: {e}")
+
+
+async def import_mcp_from_file(project_id: int, user_id: int, db: AsyncSession, data: dict) -> dict:
+    """从平台/兼容文件导入（默认 .n-tester/mcp.json，兼容 .mcp.json / .cursor/mcp.json）。"""
+    from app.api.v1.Ntesterc_module.Ntesterc_project.mcp_schema_ensure import ensure_mcp_schema
+    from app.api.v1.Ntesterc_module.Ntesterc_project import mcp_file_sync as sync
+
+    await ensure_mcp_schema(db)
+    await _check_role(project_id, user_id, ["owner", "admin"], db)
+    project = await _get_project(project_id, db)
+    workspace = await _require_workspace(project, "project")
+    path_str = (data.get("path") or "").strip()
+    if path_str:
+        path = Path(path_str).expanduser()
+    else:
+        path = None
+        for cand in sync.default_import_candidates(workspace):
+            if cand.exists():
+                path = cand
+                break
+        if path is None:
+            tried = ", ".join(str(p) for p in sync.default_import_candidates(workspace))
+            raise HTTPException(status_code=404, detail=f"未找到可导入文件，已尝试: {tried}")
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"文件不存在: {path}")
+    items = sync.parse_mcp_json_file(path)
+    created = []
+    for item in items:
+        item["scope"] = data.get("scope") or "project"
+        try:
+            res = await create_mcp_config(project_id, user_id, db, item)
+            if res.get("code") == 200:
+                created.append(item["name"])
+        except HTTPException:
+            # 已存在则更新
+            q = await db.execute(
+                select(ProjectMCPConfigModel).where(
+                    ProjectMCPConfigModel.enabled_flag == 1,
+                    ProjectMCPConfigModel.name == item["name"],
+                    ProjectMCPConfigModel.scope == item["scope"],
+                    ProjectMCPConfigModel.project_id == project_id,
+                )
+            )
+            existing = q.scalar_one_or_none()
+            if existing:
+                await update_mcp_config(project_id, user_id, existing.id, db, item)
+                created.append(item["name"])
+    return success_response(data={"imported": created, "path": str(path)}, message=f"已导入 {len(created)} 项")
+
+
+async def sync_mcp_files(project_id: int, user_id: int, db: AsyncSession) -> dict:
+    """将当前项目可见配置重写到 N-Tester 平台文件（.n-tester/mcp.json 等）。"""
+    from app.api.v1.Ntesterc_module.Ntesterc_project.mcp_schema_ensure import ensure_mcp_schema
+    from app.api.v1.Ntesterc_module.Ntesterc_project import mcp_file_sync as sync
+
+    await ensure_mcp_schema(db)
+    await _check_member(project_id, user_id, db)
+    project = await _get_project(project_id, db)
+    workspace = await _workspace_or_none(project)
+    rows = (
+        await db.execute(
+            select(ProjectMCPConfigModel).where(
+                ProjectMCPConfigModel.enabled_flag == 1,
+                _visibility_clause(project_id, user_id),
+                ProjectMCPConfigModel.is_enabled == True,  # noqa: E712
+            )
+        )
+    ).scalars().all()
+    synced = []
+    skipped = []
+    for c in rows:
+        scope = getattr(c, "scope", None) or "user"
+        if scope in ("local", "project") and not workspace:
+            skipped.append({"name": c.name, "reason": "缺少 workspace_path"})
+            continue
+        try:
+            info = sync.sync_config_to_files(c, workspace_path=workspace)
+            synced.append(info)
+        except Exception as e:
+            skipped.append({"name": c.name, "reason": str(e)})
+    return success_response(
+        data={"synced": synced, "skipped": skipped, "workspace_path": workspace, "format": "n-tester"},
+        message="平台文件同步完成",
+    )
+
+
+async def export_mcp_configs(project_id: int, user_id: int, db: AsyncSession, data: dict) -> dict:
+    """按需导出为 n-tester / claude / cursor 格式。"""
+    from app.api.v1.Ntesterc_module.Ntesterc_project.mcp_schema_ensure import ensure_mcp_schema
+    from app.api.v1.Ntesterc_module.Ntesterc_project import mcp_file_sync as sync
+
+    await ensure_mcp_schema(db)
+    await _check_member(project_id, user_id, db)
+    fmt = (data.get("format") or "claude").strip().lower()
+    write = bool(data.get("write", True))
+    scope_filter = (data.get("scope") or "").strip().lower() or None
+
+    project = await _get_project(project_id, db)
+    workspace = await _workspace_or_none(project)
+    if fmt in ("claude", "cursor", "n-tester") and not workspace:
+        # project 作用域导出需要 workspace；仅 user 也可导出
+        pass
+
+    q = select(ProjectMCPConfigModel).where(
+        ProjectMCPConfigModel.enabled_flag == 1,
+        _visibility_clause(project_id, user_id),
+        ProjectMCPConfigModel.is_enabled == True,  # noqa: E712
+    )
+    if scope_filter:
+        q = q.where(ProjectMCPConfigModel.scope == scope_filter)
+    rows = (await db.execute(q)).scalars().all()
+    if not rows:
+        return success_response(data={"format": fmt, "written": [], "preview": {}}, message="没有可导出的配置")
+
+    needs_ws = any((getattr(c, "scope", None) or "user") in ("local", "project") for c in rows)
+    if needs_ws and not workspace and fmt != "n-tester":
+        # claude/cursor local+project 需要路径
+        if any((getattr(c, "scope", None) or "") == "project" for c in rows):
+            raise HTTPException(status_code=400, detail="导出项目共享配置前请先配置本机工作目录")
+        if fmt == "claude" and any((getattr(c, "scope", None) or "") == "local" for c in rows):
+            raise HTTPException(status_code=400, detail="导出项目私有配置前请先配置本机工作目录")
+
+    try:
+        result = sync.export_configs(list(rows), format=fmt, workspace_path=workspace, write=write)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return success_response(data=result, message=f"已导出为 {fmt}")
 
 
 # ---------- Skill 管理（兼容转发到独立模块） ----------

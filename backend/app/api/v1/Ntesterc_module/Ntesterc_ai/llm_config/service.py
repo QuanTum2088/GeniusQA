@@ -143,51 +143,63 @@ class LLMConfigService:
     
     @classmethod
     async def delete(cls, db: AsyncSession, config_id: int) -> bool:
-        """删除配置（硬删除）"""
+        """删除配置（硬删除）。先解除关联引用，避免外键冲突。"""
         config = await cls.get_by_id(db, config_id)
         if not config:
             raise HTTPException(status_code=404, detail="配置不存在")
-        
-        # 检查是否有AI模型配置在使用此LLM配置
+
+        # 1. 解除对话对 LLM 配置的外键引用（ON DELETE RESTRICT）
         try:
-            from sqlalchemy import select
-            # 尝试导入AI模型配置模型
-            try:
-                from app.api.v1.Ntesterc_module.Ntesterc_intel.model import AIModelConfigModel
-                
-                # 检查是否有AI模型配置关联此LLM配置
-                check_stmt = select(AIModelConfigModel).where(
-                    AIModelConfigModel.llm_config_id == config_id,
-                    AIModelConfigModel.enabled_flag == 1
+            from app.api.v1.Ntesterc_module.Ntesterc_ai.conversation.model import ConversationModel
+
+            clear_conv = await db.execute(
+                update(ConversationModel)
+                .where(ConversationModel.llm_config_id == config_id)
+                .values(llm_config_id=None)
+            )
+            if clear_conv.rowcount:
+                logger.info(
+                    f"删除LLM配置前已清空 {clear_conv.rowcount} 条对话的 llm_config_id: config_id={config_id}"
                 )
-                check_result = await db.execute(check_stmt)
-                related_configs = check_result.scalars().all()
-                
-                if related_configs:
-                    config_names = [c.name for c in related_configs]
-                    raise HTTPException(
-                        status_code=400, 
-                        detail=f"无法删除，以下AI模型配置正在使用此LLM配置: {', '.join(config_names)}"
-                    )
-            except ImportError:
-                # 如果AI模型配置模型不存在，跳过检查
-                pass
-        except HTTPException:
-            # 重新抛出HTTP异常
-            raise
         except Exception as e:
-            # 其他异常记录日志但不阻止删除
-            logger.warning(f"检查AI模型配置关联时出错: {e}")
-        
-        # 硬删除
-        stmt = (
-            delete(LLMConfigModel)
-            .where(LLMConfigModel.id == config_id)
-        )
-        
+            logger.warning(f"清空对话 llm_config_id 失败: {e}")
+            raise HTTPException(status_code=400, detail=f"无法删除：对话关联清理失败（{e}）")
+
+        # 2. 解除 AI 模型配置关联（无外键，置空即可）
+        try:
+            from app.api.v1.Ntesterc_module.Ntesterc_intel.model import AIModelConfigModel
+
+            clear_ai = await db.execute(
+                update(AIModelConfigModel)
+                .where(AIModelConfigModel.llm_config_id == config_id)
+                .values(llm_config_id=None)
+            )
+            if clear_ai.rowcount:
+                logger.info(
+                    f"删除LLM配置前已清空 {clear_ai.rowcount} 条AI模型配置的 llm_config_id: config_id={config_id}"
+                )
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.warning(f"清空AI模型配置 llm_config_id 时出错: {e}")
+
+        # 3. 解除用量日志关联（无外键，置空保留历史）
+        try:
+            from app.api.v1.Ntesterc_module.Ntesterc_ai.usage.model import LLMUsageLogModel
+
+            await db.execute(
+                update(LLMUsageLogModel)
+                .where(LLMUsageLogModel.llm_config_id == config_id)
+                .values(llm_config_id=None)
+            )
+        except Exception as e:
+            logger.warning(f"清空用量日志 llm_config_id 时出错: {e}")
+
+        # 4. 硬删除配置本身
+        stmt = delete(LLMConfigModel).where(LLMConfigModel.id == config_id)
         await db.execute(stmt)
         await db.commit()
-        
+
         logger.info(f"硬删除LLM配置成功: ID={config_id}, Name={config.config_name}")
         return True
     
@@ -254,96 +266,184 @@ class LLMConfigService:
         db: AsyncSession,
         data: LLMConfigTestSchema
     ) -> Dict[str, Any]:
-        """测试配置"""
+        """测试配置，失败时返回可读的具体错误信息。"""
         import httpx
-        
-        # 如果提供了 config_id，从数据库加载配置
+        import re as _re
+
         if data.config_id:
             config = await cls.get_by_id(db, data.config_id)
             if not config:
                 return {
                     "success": False,
-                    "message": "配置不存在",
-                    "error": "配置ID无效"
+                    "message": "测试失败",
+                    "error": "配置不存在或已删除（配置ID无效）",
                 }
-            
             provider = config.provider
             api_key = config.api_key
             base_url = config.base_url
-            model_name = config.name
+            model_name = config.name or config.model_name
         else:
-            # 使用提供的临时配置
             provider = data.provider
             api_key = data.api_key
             base_url = data.base_url
             model_name = data.name
-        
-        # 测试连接
-        start_time = time.time()
-        
-        try:
-            # 构建请求
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            payload = {
-                "model": model_name,
-                "messages": [
-                    {"role": "user", "content": data.test_message}
-                ],
-                "max_tokens": 100
-            }
-            
-            # 规范化 base_url，与 llm_service_langchain 保持一致
-            import re as _re
-            clean_url = (base_url or "").rstrip('/')
-            # 去掉用户可能粘贴的完整端点路径
-            for ep in ['/chat/completions', '/completions']:
-                if clean_url.endswith(ep):
-                    clean_url = clean_url[:-len(ep)].rstrip('/')
-                    break
-            # 没有版本号时补 /v1
-            if clean_url and not _re.search(r'/v\d+(/|$)', clean_url) \
-                    and not clean_url.endswith('/compatible-mode/v1'):
-                clean_url = clean_url + '/v1'
-            
-            endpoint = f"{clean_url}/chat/completions" if clean_url else "https://api.openai.com/v1/chat/completions"
-            
-            # 发送请求
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(endpoint, json=payload, headers=headers)
-                
-                latency = time.time() - start_time
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-                    
-                    return {
-                        "success": True,
-                        "message": "测试成功",
-                        "response": content,
-                        "latency": round(latency, 2)
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "message": "测试失败",
-                        "error": f"HTTP {response.status_code}: {response.text}",
-                        "latency": round(latency, 2)
-                    }
-        
-        except Exception as e:
-            latency = time.time() - start_time
+
+        if not api_key:
             return {
                 "success": False,
                 "message": "测试失败",
-                "error": str(e),
-                "latency": round(latency, 2)
+                "error": "API Key 为空，请先填写有效的密钥",
             }
-    
+        if not model_name:
+            return {
+                "success": False,
+                "message": "测试失败",
+                "error": "模型名称为空，请先填写模型名称",
+            }
+
+        clean_url = (base_url or "").rstrip("/")
+        for ep in ["/chat/completions", "/completions"]:
+            if clean_url.endswith(ep):
+                clean_url = clean_url[: -len(ep)].rstrip("/")
+                break
+        if (
+            clean_url
+            and not _re.search(r"/v\d+(/|$)", clean_url)
+            and not clean_url.endswith("/compatible-mode/v1")
+        ):
+            clean_url = clean_url + "/v1"
+
+        endpoint = (
+            f"{clean_url}/chat/completions"
+            if clean_url
+            else "https://api.openai.com/v1/chat/completions"
+        )
+
+        start_time = time.time()
+        try:
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "model": model_name,
+                "messages": [{"role": "user", "content": data.test_message}],
+                "max_tokens": 100,
+            }
+
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(endpoint, json=payload, headers=headers)
+
+            latency = round(time.time() - start_time, 2)
+
+            if response.status_code == 200:
+                result = response.json()
+                content = (
+                    result.get("choices", [{}])[0]
+                    .get("message", {})
+                    .get("content", "")
+                )
+                return {
+                    "success": True,
+                    "message": "测试成功",
+                    "response": content,
+                    "latency": latency,
+                    "endpoint": endpoint,
+                    "provider": provider,
+                    "model": model_name,
+                }
+
+            detail = cls._extract_api_error_detail(response)
+            return {
+                "success": False,
+                "message": "测试失败",
+                "error": (
+                    f"HTTP {response.status_code}，请求地址：{endpoint}\n"
+                    f"模型：{model_name}\n"
+                    f"详情：{detail}"
+                ),
+                "latency": latency,
+                "endpoint": endpoint,
+            }
+
+        except httpx.ConnectError as e:
+            latency = round(time.time() - start_time, 2)
+            return {
+                "success": False,
+                "message": "测试失败",
+                "error": (
+                    f"无法连接到 LLM 服务：{endpoint}\n"
+                    f"原因：{cls._friendly_exception(e)}\n"
+                    "请检查 Base URL 是否正确，以及网络/代理是否可达。"
+                ),
+                "latency": latency,
+                "endpoint": endpoint,
+            }
+        except httpx.TimeoutException as e:
+            latency = round(time.time() - start_time, 2)
+            return {
+                "success": False,
+                "message": "测试失败",
+                "error": (
+                    f"连接超时（30秒）：{endpoint}\n"
+                    f"原因：{cls._friendly_exception(e)}\n"
+                    "请检查网络延迟，或确认服务地址是否可访问。"
+                ),
+                "latency": latency,
+                "endpoint": endpoint,
+            }
+        except Exception as e:
+            latency = round(time.time() - start_time, 2)
+            return {
+                "success": False,
+                "message": "测试失败",
+                "error": (
+                    f"请求地址：{endpoint}\n"
+                    f"原因：{cls._friendly_exception(e)}"
+                ),
+                "latency": latency,
+                "endpoint": endpoint,
+            }
+
+    @staticmethod
+    def _extract_api_error_detail(response) -> str:
+        """从 LLM API 响应中提取可读错误。"""
+        text = (response.text or "").strip()
+        if not text:
+            return response.reason_phrase or "无响应内容"
+        try:
+            body = response.json()
+            if isinstance(body, dict):
+                err = body.get("error")
+                if isinstance(err, dict):
+                    msg = err.get("message") or err.get("msg") or str(err)
+                    code = err.get("code") or err.get("type")
+                    return f"{msg}" + (f"（code={code}）" if code else "")
+                if isinstance(err, str):
+                    return err
+                for key in ("message", "msg", "detail"):
+                    if body.get(key):
+                        return str(body[key])
+                return str(body)[:800]
+        except Exception:
+            pass
+        return text[:800]
+
+    @staticmethod
+    def _friendly_exception(exc: Exception) -> str:
+        """将常见网络异常转为更易读的说明。"""
+        raw = str(exc).strip() or exc.__class__.__name__
+        lower = raw.lower()
+        if "all connection attempts failed" in lower:
+            return f"所有连接尝试均失败（{raw}）"
+        if "name or service not known" in lower or "getaddrinfo failed" in lower:
+            return f"域名解析失败（{raw}）"
+        if "certificate" in lower or "ssl" in lower:
+            return f"证书/SSL 校验失败（{raw}）"
+        if "connection refused" in lower:
+            return f"连接被拒绝（{raw}）"
+        return raw
+
     @classmethod
     async def _unset_all_defaults(cls, db: AsyncSession):
         """取消所有默认配置"""

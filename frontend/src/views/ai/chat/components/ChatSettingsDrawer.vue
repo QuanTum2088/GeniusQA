@@ -34,6 +34,7 @@
 				<el-select
 					v-model="selectedKnowledgeBaseId"
 					placeholder="知识库来源"
+					clearable
 					style="width: 100%"
 					:disabled="!useKnowledgeBase"
 				>
@@ -57,6 +58,7 @@
 				<el-select
 					v-model="selectedMcpConfigId"
 					placeholder="MCP 配置"
+					clearable
 					style="width: 100%"
 					:disabled="!useMcp"
 				>
@@ -75,6 +77,7 @@
 				<el-select
 					v-model="selectedSkillId"
 					placeholder="Skill 配置"
+					clearable
 					style="width: 100%"
 					:disabled="!useSkill"
 				>
@@ -126,6 +129,8 @@
 </template>
 
 <script setup lang="ts">
+import { watch } from 'vue'
+
 defineOptions({ name: 'ChatSettingsDrawer' })
 
 export interface ChatSettingsOption {
@@ -161,6 +166,18 @@ const selectedSkillId = defineModel<number | null>('selectedSkillId', { default:
 const toolMode = defineModel<'smart' | 'direct'>('toolMode', { default: 'smart' })
 const directSkillAction = defineModel<string>('directSkillAction', { default: 'agent_browser_open_snapshot' })
 const directSkillArgsText = defineModel<string>('directSkillArgsText', { default: '{}' })
+
+watch(useKnowledgeBase, (enabled) => {
+	if (!enabled) selectedKnowledgeBaseId.value = null
+})
+
+watch(useMcp, (enabled) => {
+	if (!enabled) selectedMcpConfigId.value = null
+})
+
+watch(useSkill, (enabled) => {
+	if (!enabled) selectedSkillId.value = null
+})
 </script>
 
 <style scoped lang="scss">
@@ -232,5 +249,13 @@ const directSkillArgsText = defineModel<string>('directSkillArgsText', { default
 .drawer-footer {
 	display: flex;
 	justify-content: flex-end;
+}
+</style>
+
+
+<style lang="scss">
+.el-drawer.chat-settings-drawer .el-drawer__footer {
+	padding: 16px 20px 24px;
+	border-top: 1px solid var(--el-border-color-lighter);
 }
 </style>

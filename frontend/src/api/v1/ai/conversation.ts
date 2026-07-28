@@ -35,7 +35,11 @@ export interface MessageData {
   creation_date: string
   loading?: boolean  
   collapsed?: boolean  
-  total_tokens?: number  
+  total_tokens?: number
+  /** 前端发送状态：发送中 / 成功 / 失败 */
+  send_status?: 'sending' | 'success' | 'failed'
+  /** 发送失败时的错误说明 */
+  send_error?: string
 }
 
 /**

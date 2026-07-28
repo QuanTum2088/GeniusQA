@@ -16,6 +16,7 @@ from app.api.v1.Ntesterc_module.Ntesterc_ai.conversation.model import Conversati
 from app.api.v1.Ntesterc_module.Ntesterc_ai.conversation.message_model import MessageModel
 from app.api.v1.Ntesterc_module.Ntesterc_ai.conversation.mcp_execution_record import MCPExecutionRecordModel
 from app.api.v1.Ntesterc_module.Ntesterc_ai.conversation.llm_service import get_llm_service, get_llm_service_by_id, LLMMessage
+from app.api.v1.Ntesterc_module.Ntesterc_ai.usage.service import UsageLogService
 from app.api.v1.system.file.service import FileService
 from app.api.v1.Ntesterc_module.Ntesterc_project.project_platform_service import (
     query_knowledge_base,
@@ -906,6 +907,144 @@ class MessageService:
         await db.refresh(message)
         
         return message
+
+    @staticmethod
+    def _derive_conversation_title(content: str) -> str:
+        """从用户消息内容生成对话标题（取首行，最多 30 字符）。"""
+        text = (content or "").strip()
+        if not text:
+            return "新对话"
+        if "\n\n[附件]:" in text:
+            text = text.split("\n\n[附件]:", 1)[0].strip()
+        first_line = text.split("\n")[0].strip()
+        if not first_line:
+            return "新对话"
+        if len(first_line) > 30:
+            return first_line[:30] + "..."
+        return first_line
+
+    @staticmethod
+    async def _sync_conversation_title(
+        db: AsyncSession,
+        conversation,
+        content: str,
+        user_id: int,
+    ) -> None:
+        """每次用户发消息后，用最新消息内容更新对话标题（显式 UPDATE，确保落库）。"""
+        from sqlalchemy import update as sql_update
+
+        title = MessageService._derive_conversation_title(content)
+        if not title:
+            return
+        # 显式 UPDATE，避免长连接会话中 ORM 脏检查未触发导致标题不落库
+        await db.execute(
+            sql_update(ConversationModel)
+            .where(ConversationModel.id == conversation.id)
+            .values(title=title, updated_by=user_id)
+        )
+        await db.commit()
+        # 同步内存对象；expire_on_commit=False 时 identity map 不会自动刷新
+        try:
+            conversation.title = title
+            conversation.updated_by = user_id
+            await db.refresh(conversation)
+        except Exception:
+            conversation.title = title
+            conversation.updated_by = user_id
+
+    @staticmethod
+    def _is_fatal_llm_error(exc: Exception) -> bool:
+        """连接/鉴权等致命错误：不应再降级重试，应立即失败。"""
+        text = f"{type(exc).__name__}: {exc}".lower()
+        keywords = (
+            "connection",
+            "connecterror",
+            "connect",
+            "timeout",
+            "timed out",
+            "all connection attempts failed",
+            "name or service not known",
+            "getaddrinfo failed",
+            "connection refused",
+            "temporary failure in name resolution",
+            "unauthorized",
+            "invalid api key",
+            "incorrect api key",
+            "authentication",
+            "permission denied",
+            "ssl",
+            "certificate",
+            "401",
+            "403",
+            "404",
+            "429",
+            "502",
+            "503",
+            "504",
+        )
+        return any(k in text for k in keywords)
+
+    @staticmethod
+    def _friendly_llm_error(exc: Exception) -> str:
+        """将 LLM 调用异常转为可读中文提示。"""
+        raw = str(exc).strip() or type(exc).__name__
+        lower = raw.lower()
+        if "all connection attempts failed" in lower or "connecterror" in lower:
+            return (
+                f"模型服务不可用，无法建立连接：{raw}。"
+                "请检查 LLM 配置中的 Base URL、网络/代理，或在配置页先做连接测试。"
+            )
+        if "timeout" in lower or "timed out" in lower:
+            return (
+                f"模型响应超时：{raw}。"
+                "请检查模型服务是否可达，或稍后重试。"
+            )
+        if "401" in lower or "unauthorized" in lower or "api key" in lower:
+            return f"模型鉴权失败：{raw}。请检查 API Key 是否正确。"
+        if "403" in lower or "permission" in lower:
+            return f"模型访问被拒绝：{raw}。请检查账号权限或配额。"
+        if "404" in lower or "not found" in lower:
+            return f"模型或接口不存在：{raw}。请检查模型名称与 Base URL。"
+        if "429" in lower:
+            return f"模型请求过于频繁或额度不足：{raw}。"
+        return f"模型调用失败：{raw}"
+
+    @staticmethod
+    async def _record_chat_usage(
+        *,
+        db: AsyncSession,
+        user_id: int,
+        conversation_id: int,
+        message_id: Optional[int],
+        llm_service: Any,
+        usage: Optional[Dict[str, Any]] = None,
+        status: str = "success",
+        error_message: Optional[str] = None,
+    ) -> None:
+        """写入聊天用量日志；失败不影响主流程。"""
+        try:
+            usage_data = usage or getattr(llm_service, "last_usage", None) or {}
+            provider = getattr(getattr(llm_service, "provider", None), "value", None) or str(
+                getattr(llm_service, "provider", "") or ""
+            )
+            model_name = (getattr(llm_service, "config", None) or {}).get("model")
+            await UsageLogService.record(
+                db=db,
+                user_id=user_id,
+                llm_config_id=getattr(llm_service, "llm_config_id", None),
+                provider=provider,
+                model_name=model_name,
+                source="chat",
+                conversation_id=conversation_id,
+                message_id=message_id,
+                usage=usage_data,
+                status=status,
+                error_message=error_message,
+                latency_ms=getattr(llm_service, "last_latency_ms", None),
+            )
+            await db.commit()
+        except Exception:
+            pass
     
     @staticmethod
     async def _record_mcp_execution(
@@ -1162,6 +1301,7 @@ class MessageService:
             data.content,
             meta_data={"attachments": data.attachments} if data.attachments else None,
         )
+        await MessageService._sync_conversation_title(db, conversation, data.content, user_id)
         
         # 2. 直连模式：跳过LLM，直接执行工具
         if MessageService._is_direct_mode(data):
@@ -1180,10 +1320,7 @@ class MessageService:
                 meta_data=assistant_meta,
                 tokens_used=0,
             )
-            if not conversation.title or conversation.title == "新对话":
-                conversation.title = data.content[:30] + ("..." if len(data.content) > 30 else "")
-                conversation.updated_by = user_id
-                await db.commit()
+            await MessageService._sync_conversation_title(db, conversation, data.content, user_id)
             return user_message, assistant_message, 0
 
         # 3. 获取对话历史
@@ -1229,10 +1366,7 @@ class MessageService:
                 skill_result,
                 tokens_used=0,
             )
-            if not conversation.title or conversation.title == "新对话":
-                conversation.title = data.content[:30] + ("..." if len(data.content) > 30 else "")
-                conversation.updated_by = user_id
-                await db.commit()
+            await MessageService._sync_conversation_title(db, conversation, data.content, user_id)
             return user_message, assistant_message, 0
         
         # 5. 调用LLM服务
@@ -1241,11 +1375,24 @@ class MessageService:
         else:
             llm_service = await get_llm_service()
         llm_messages = MessageService._apply_llm_runtime_controls(llm_messages, llm_service, data)
-        
-        response = await llm_service.chat_completion(
-            messages=llm_messages,
-            stream=False
-        )
+
+        try:
+            response = await llm_service.chat_completion(
+                messages=llm_messages,
+                stream=False
+            )
+        except Exception as e:
+            await MessageService._record_chat_usage(
+                db=db,
+                user_id=user_id,
+                conversation_id=conversation_id,
+                message_id=None,
+                llm_service=llm_service,
+                usage={},
+                status="error",
+                error_message=str(e),
+            )
+            raise
         
         # 6. 保存AI响应
         assistant_message = await MessageService.create_message(
@@ -1256,13 +1403,17 @@ class MessageService:
             response.content,
             tokens_used=response.total_tokens
         )
+        await MessageService._record_chat_usage(
+            db=db,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_id=assistant_message.id,
+            llm_service=llm_service,
+            usage=response.usage,
+            status="success",
+        )
         
-        # 7. 更新对话标题（如果是第一条消息）
-        if not conversation.title or conversation.title == "新对话":
-            # 使用用户第一条消息的前30个字符作为标题
-            conversation.title = data.content[:30] + ("..." if len(data.content) > 30 else "")
-            conversation.updated_by = user_id
-            await db.commit()
+        await MessageService._sync_conversation_title(db, conversation, data.content, user_id)
         
         return user_message, assistant_message, response.total_tokens
     
@@ -1288,6 +1439,8 @@ class MessageService:
             data.content,
             meta_data={"attachments": data.attachments} if data.attachments else None,
         )
+        # 用户消息落库后立即更新标题，确保刷新/切换后仍能显示
+        await MessageService._sync_conversation_title(db, conversation, data.content, user_id)
         
         # 发送用户消息事件
         yield {
@@ -1296,7 +1449,8 @@ class MessageService:
                 "id": user_message.id,
                 "role": "user",
                 "content": user_message.content,
-                "creation_date": user_message.creation_date.isoformat()
+                "creation_date": user_message.creation_date.isoformat(),
+                "conversation_title": conversation.title,
             }
         }
         
@@ -1333,10 +1487,7 @@ class MessageService:
                     "creation_date": assistant_message.creation_date.isoformat()
                 }
             }
-            if not conversation.title or conversation.title == "新对话":
-                conversation.title = data.content[:30] + ("..." if len(data.content) > 30 else "")
-                conversation.updated_by = user_id
-                await db.commit()
+            await MessageService._sync_conversation_title(db, conversation, data.content, user_id)
             return
 
         # 3. 获取对话历史
@@ -1439,10 +1590,7 @@ class MessageService:
                     "creation_date": assistant_message.creation_date.isoformat(),
                 },
             }
-            if not conversation.title or conversation.title == "新对话":
-                conversation.title = data.content[:30] + ("..." if len(data.content) > 30 else "")
-                conversation.updated_by = user_id
-                await db.commit()
+            await MessageService._sync_conversation_title(db, conversation, data.content, user_id)
             return
         
         # 5. 调用LLM服务（流式）
@@ -1454,9 +1602,12 @@ class MessageService:
         
         # 收集完整的响应内容
         full_content = ""
+        usage_data: Dict[str, Any] = {}
         
-        # 流式获取响应；若模型未返回 chunk（部分兼容模型常见），自动降级到非流式
+        # 流式获取响应；仅在“流式成功但无内容”时降级非流式。
+        # 连接/鉴权等致命错误立即失败，避免二次重试导致前端一直等待。
         got_chunk = False
+        stream_error: Optional[Exception] = None
         try:
             stream = await llm_service.chat_completion(
                 messages=llm_messages,
@@ -1474,22 +1625,62 @@ class MessageService:
                         "content": chunk
                     }
                 }
-        except Exception:
+            usage_data = getattr(llm_service, "last_usage", None) or {}
+        except Exception as e:
+            stream_error = e
+            await MessageService._record_chat_usage(
+                db=db,
+                user_id=user_id,
+                conversation_id=conversation_id,
+                message_id=None,
+                llm_service=llm_service,
+                usage={},
+                status="error",
+                error_message=str(e),
+            )
             got_chunk = False
 
         if not got_chunk:
-            fallback_resp = await llm_service.chat_completion(
-                messages=llm_messages,
-                stream=False
-            )
-            full_content = (fallback_resp.content or "").strip()
-            if full_content:
-                yield {
-                    "type": "content",
-                    "data": {
-                        "content": full_content
+            if stream_error is not None and MessageService._is_fatal_llm_error(stream_error):
+                raise ValueError(MessageService._friendly_llm_error(stream_error)) from stream_error
+            try:
+                fallback_resp = await llm_service.chat_completion(
+                    messages=llm_messages,
+                    stream=False
+                )
+                full_content = (fallback_resp.content or "").strip()
+                usage_data = fallback_resp.usage or getattr(llm_service, "last_usage", None) or {}
+                if full_content:
+                    yield {
+                        "type": "content",
+                        "data": {
+                            "content": full_content
+                        }
                     }
-                }
+                elif stream_error is not None:
+                    raise ValueError(MessageService._friendly_llm_error(stream_error)) from stream_error
+                else:
+                    raise ValueError("模型未返回任何内容，请检查模型配置或稍后重试")
+            except ValueError:
+                raise
+            except Exception as e:
+                await MessageService._record_chat_usage(
+                    db=db,
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                    message_id=None,
+                    llm_service=llm_service,
+                    usage={},
+                    status="error",
+                    error_message=str(e),
+                )
+                raise ValueError(MessageService._friendly_llm_error(e)) from e
+
+        tokens_used = int((usage_data or {}).get("total_tokens") or 0)
+        if tokens_used <= 0:
+            tokens_used = int((usage_data or {}).get("prompt_tokens") or 0) + int(
+                (usage_data or {}).get("completion_tokens") or 0
+            )
 
         # 6. 保存AI响应
         assistant_message = await MessageService.create_message(
@@ -1498,7 +1689,16 @@ class MessageService:
             user_id,
             "assistant",
             full_content,
-            tokens_used=len(full_content)  # 简单估算，实际应该从LLM响应中获取
+            tokens_used=tokens_used,
+        )
+        await MessageService._record_chat_usage(
+            db=db,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_id=assistant_message.id,
+            llm_service=llm_service,
+            usage=usage_data,
+            status="success",
         )
         
         # 发送完成事件
@@ -1513,11 +1713,7 @@ class MessageService:
             }
         }
         
-        # 7. 更新对话标题（如果是第一条消息）
-        if not conversation.title or conversation.title == "新对话":
-            conversation.title = data.content[:30] + ("..." if len(data.content) > 30 else "")
-            conversation.updated_by = user_id
-            await db.commit()
+        await MessageService._sync_conversation_title(db, conversation, data.content, user_id)
 
     @staticmethod
     async def get_mcp_execution_records(

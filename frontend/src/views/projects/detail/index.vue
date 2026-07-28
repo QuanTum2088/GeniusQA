@@ -42,6 +42,9 @@
             <el-descriptions-item label="项目描述" :span="2">
               {{ projectInfo.description || '-' }}
             </el-descriptions-item>
+            <el-descriptions-item label="本机工作目录" :span="2">
+              {{ projectInfo.workspace_path || '-' }}
+            </el-descriptions-item>
             <el-descriptions-item label="创建时间">
               {{ formatDateTime(projectInfo.creation_date) }}
             </el-descriptions-item>
@@ -268,6 +271,12 @@
             placeholder="请输入项目描述"
           />
         </el-form-item>
+        <el-form-item label="本机工作目录" prop="workspace_path">
+          <el-input
+            v-model="formData.workspace_path"
+            placeholder="本机绝对路径，如 E:\code\my-app（写出 .mcp.json 依赖）"
+          />
+        </el-form-item>
         <el-form-item label="项目状态" prop="status">
           <el-select v-model="formData.status" placeholder="请选择状态">
             <el-option label="活跃" value="active" />
@@ -330,6 +339,7 @@ const formRef = ref<FormInstance>();
 const formData = reactive({
   name: '',
   description: '',
+  workspace_path: '',
   status: 'active',
 });
 const submitLoading = ref(false);
@@ -468,6 +478,7 @@ const handleBack = () => {
 const handleEdit = () => {
   formData.name = projectInfo.value.name;
   formData.description = projectInfo.value.description;
+  formData.workspace_path = projectInfo.value.workspace_path || '';
   formData.status = projectInfo.value.status;
   editDialogVisible.value = true;
 };
@@ -484,6 +495,7 @@ const handleSubmit = async () => {
       const data = {
         name: formData.name,
         description: formData.description,
+        workspace_path: formData.workspace_path || null,
         status: formData.status,
       };
       

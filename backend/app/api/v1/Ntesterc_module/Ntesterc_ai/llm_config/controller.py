@@ -262,10 +262,8 @@ async def test_llm_config(
     data: LLMConfigTestSchema,
     db: AsyncSession = Depends(get_db)
 ):
-    """测试 LLM 配置"""
+    """测试 LLM 配置（业务结果放在 data 中，由 success 字段表示成败）"""
     result = await LLMConfigService.test_config(db, data)
-    
-    if result["success"]:
-        return success_response(data=result, message="测试成功")
-    else:
-        return error_response(data=result, message="测试失败")
+    # 统一用成功响应壳返回，避免前端拦截器把具体错误冲掉
+    message = result.get("message") or ("测试成功" if result.get("success") else "测试失败")
+    return success_response(data=result, message=message)

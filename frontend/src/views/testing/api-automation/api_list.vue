@@ -1,7 +1,7 @@
 <template>
 	<div class="api-list-container">
 		<el-card shadow="hover" :body-style="{ paddingBottom: '0' }">
-			<el-form :inline="true" :model="searchParams">
+			<el-form :inline="true" :model="searchParams" class="search-form">
 				<el-form-item label="服务名称">
 					<el-input
 						v-model="searchParams.name"
@@ -43,16 +43,27 @@
 					</el-select>
 				</el-form-item>
 				<el-form-item>
-					<el-button type="primary" icon="Search" @click="handleSearch">搜索</el-button>
-					<el-button icon="Refresh" @click="resetSearch">重置</el-button>
-				</el-form-item>
-				<el-form-item style="float: right">
-					<el-button type="primary" icon="Plus" @click="openAddDialog">新增</el-button>
+					<el-button type="primary" @click="handleSearch">
+						<el-icon><ele-Search /></el-icon>
+						搜索
+					</el-button>
+					<el-button @click="resetSearch">
+						<el-icon><ele-Refresh /></el-icon>
+						重置
+					</el-button>
 				</el-form-item>
 			</el-form>
 		</el-card>
 
 		<el-card shadow="hover" style="margin-top: 8px">
+			<el-row :gutter="10" style="margin-bottom: 8px">
+				<el-col :span="1.5">
+					<el-button type="primary" plain @click="openAddDialog">
+						<el-icon><ele-Plus /></el-icon>
+						新增
+					</el-button>
+				</el-col>
+			</el-row>
 			<el-table
 				ref="tableRef"
 				v-loading="loading"
@@ -209,8 +220,8 @@
 							:key="idx"
 							style="display: flex; gap: 8px; margin-bottom: 6px"
 						>
-							<el-input v-model="item.name" placeholder="配置项名（如 {{base_url}}）" style="flex: 1" />
-							<el-input v-model="item.value" placeholder="配置项值" style="flex: 1" />
+							<el-input v-model="item.name" placeholder="配置项名（如 base_url）" style="flex: 1" />
+							<el-input v-model="item.value" placeholder="配置项值（如 https://uapis.cn）" style="flex: 1" />
 							<el-button type="danger" size="small" @click="envForm.config.splice(idx, 1)">删除</el-button>
 						</div>
 						<el-button size="small" @click="envForm.config.push({ name: '', value: '' })">添加配置项</el-button>
@@ -223,7 +234,7 @@
 							:key="idx"
 							style="display: flex; gap: 8px; margin-bottom: 6px"
 						>
-							<el-input v-model="item.name" placeholder="变量名（如 {{token}}）" style="flex: 1" />
+							<el-input v-model="item.name" placeholder="变量名（如 token）" style="flex: 1" />
 							<el-input v-model="item.value" placeholder="变量值" style="flex: 1" />
 							<el-button type="danger" size="small" @click="envForm.variable.splice(idx, 1)">删除</el-button>
 						</div>
@@ -249,7 +260,12 @@ import { useUserApi } from '/@/api/v1/system/user';
 import { useProjectApi } from '/@/api/v1/projects/project';
 
 const emit = defineEmits<{
-	(e: 'select-service', service: { id: number; name: string }): void;
+	(e: 'select-service', service: {
+		id: number;
+		name: string;
+		source_type?: string;
+		source_addr?: string;
+	}): void;
 }>();
 
 const {
@@ -391,7 +407,12 @@ const resetSearch = () => {
 
 // ---- 双击行进入详情 ----
 const openServiceDetail = (row: any) => {
-	emit('select-service', { id: row.id, name: row.name });
+	emit('select-service', {
+		id: row.id,
+		name: row.name,
+		source_type: row.source_type || '',
+		source_addr: row.source_addr || '',
+	});
 };
 
 const onRowDblClick = (row: any) => {
@@ -641,6 +662,11 @@ onUnmounted(() => {
 <style scoped>
 .api-list-container {
 	padding: 10px;
+}
+
+.search-form :deep(.el-form-item) {
+	margin-right: 12px;
+	margin-bottom: 12px;
 }
 
 .action-cell {

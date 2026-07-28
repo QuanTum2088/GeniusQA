@@ -1,33 +1,39 @@
 <template>
 	<div class="api-db-popover">
-		<el-form :inline="true">
+		<el-form :inline="true" class="search-form">
 			<el-form-item label="名称">
-				<el-input v-model="searchParams.search.name__contains" placeholder="请输入名称" clearable style="width: 160px" />
+				<el-input
+					v-model="searchParams.search.name__contains"
+					placeholder="请输入名称"
+					clearable
+					style="width: 160px"
+					@keyup.enter="handleSearch"
+				/>
 			</el-form-item>
 			<el-form-item>
-				<el-button type="primary" @click="get_db">搜索</el-button>
+				<el-button type="primary" @click="handleSearch">搜索</el-button>
 				<el-button @click="reset_search">重置</el-button>
 				<el-button type="success" @click="openAdd">添加数据库</el-button>
 			</el-form-item>
 		</el-form>
-		<el-table :data="db_list" border stripe size="small" max-height="320">
-			<el-table-column prop="name" label="名称" width="100" />
-			<el-table-column label="地址" width="100">
+		<el-table :data="db_list" border stripe size="small" max-height="320" style="width: 100%">
+			<el-table-column prop="name" label="名称" min-width="100" show-overflow-tooltip />
+			<el-table-column label="地址" min-width="120" show-overflow-tooltip>
 				<template #default="{ row }">{{ row.config?.host ?? '-' }}</template>
 			</el-table-column>
-			<el-table-column label="端口" width="80">
+			<el-table-column label="端口" width="80" align="center">
 				<template #default="{ row }">{{ row.config?.port ?? '-' }}</template>
 			</el-table-column>
-			<el-table-column label="数据库" width="90">
+			<el-table-column label="数据库" min-width="100" show-overflow-tooltip>
 				<template #default="{ row }">{{ row.config?.database ?? '-' }}</template>
 			</el-table-column>
-			<el-table-column label="用户" width="90">
+			<el-table-column label="用户" min-width="90" show-overflow-tooltip>
 				<template #default="{ row }">{{ row.config?.user ?? '-' }}</template>
 			</el-table-column>
-			<el-table-column label="更新时间" width="160">
+			<el-table-column label="更新时间" min-width="160" show-overflow-tooltip>
 				<template #default="{ row }">{{ formatTime(row.update_time || row.creation_date || row.created_at) }}</template>
 			</el-table-column>
-			<el-table-column label="操作" width="180" fixed="right">
+			<el-table-column label="操作" width="200" align="center">
 				<template #default="{ row }">
 					<el-button type="success" link size="small" @click="Test_conn(row)">测试连接</el-button>
 					<el-button type="primary" link size="small" @click="openEdit(row)">编辑</el-button>
@@ -98,6 +104,11 @@ const get_db = async () => {
 	total.value = typeof raw?.total === 'number' ? raw.total : list.length;
 };
 
+const handleSearch = () => {
+	searchParams.value.currentPage = 1;
+	get_db();
+};
+
 const formatTime = (v: any) => {
 	if (!v) return '-';
 	const d = new Date(v);
@@ -161,6 +172,16 @@ onMounted(() => get_db());
 
 
 <style scoped>
-.api-db-popover { padding: 5px; }
-.api-db-popover .el-pagination { margin-top: 8px; }
+.api-db-popover {
+	padding: 5px;
+	width: 100%;
+	box-sizing: border-box;
+}
+.search-form :deep(.el-form-item) {
+	margin-right: 12px;
+	margin-bottom: 8px;
+}
+.api-db-popover .el-pagination {
+	margin-top: 8px;
+}
 </style>

@@ -121,6 +121,66 @@ export interface ApiInterfaceStatsData {
   };
 }
 
+export interface LlmUsageOverview {
+  total_tokens: number;
+  cached_tokens: number;
+  uncached_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cache_hit_rate: number;
+  request_count: number;
+  error_count: number;
+}
+
+export interface LlmUsageByModel {
+  model_name: string;
+  provider: string;
+  total_tokens: number;
+  cached_tokens: number;
+  request_count: number;
+  error_count: number;
+}
+
+export interface LlmUsageByDate {
+  date: string;
+  total_tokens: number;
+  cached_tokens: number;
+  request_count: number;
+  error_count: number;
+}
+
+export interface LlmUsageByCategory {
+  category: string;
+  source: string;
+  total_tokens: number;
+  request_count: number;
+  error_count: number;
+}
+
+export interface LlmUsageRequestItem {
+  id: number;
+  created_at: string | null;
+  model_name: string;
+  provider: string;
+  source: string;
+  source_label: string;
+  total_tokens: number;
+  cached_tokens: number;
+  status: string;
+  error_message?: string | null;
+  latency_ms?: number | null;
+}
+
+export interface LlmUsageStats {
+  tab: string;
+  days: number;
+  overview: LlmUsageOverview;
+  by_model: LlmUsageByModel[];
+  by_date: LlmUsageByDate[];
+  by_category: LlmUsageByCategory[];
+  recent_requests: LlmUsageRequestItem[];
+}
+
 export function useDashboardApi() {
   return {
     getOverview: () =>
@@ -159,6 +219,12 @@ export function useDashboardApi() {
       request({
         url: '/v1/Ntesterc_dashboard/api-interface-stats',
         method: 'GET',
+      }),
+    getLlmUsage: (params?: { days?: number; tab?: string }) =>
+      request({
+        url: '/v1/Ntesterc_dashboard/llm-usage',
+        method: 'GET',
+        params,
       }),
   };
 }

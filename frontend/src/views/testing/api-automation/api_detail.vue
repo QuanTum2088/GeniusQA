@@ -639,37 +639,48 @@ mode="assert"
 				</div>
 			</div>
 
-			<!-- Mock 面板 -->
+			<!-- Mock 面板：嵌入模式下由 ApiMockPanel 承载；此处保留独立打开时的完整能力 -->
 			<div v-show="mainTab==='mock'" class="side-panel mock-panel">
-				<!-- Mock 地址 -->
 				<div class="mock-section">
 					<div class="mock-section-title">Mock 地址</div>
 					<div class="mock-addr-bar">
-						<code class="mock-url">{{ mockBaseUrl }}/mock{{ req.url || '/api/path' }}</code>
+						<code class="mock-url">{{ mockDisplayUrl }}</code>
 						<el-button size="small" plain @click="copyMockUrl">复制</el-button>
 					</div>
+					<div class="mock-hint">
+						<p>如何使用：</p>
+						<ol>
+							<li>复制上方地址，用 Postman / 前端请求 / curl 访问后端 Mock 服务即可拿到配置的响应。</li>
+							<li>接口 URL 中的环境变量会自动剥离；地址指向后端服务（如 :8100），不是前端端口。</li>
+							<li>请求按「Mock 期望」匹配；未命中时若开启自定义脚本则走脚本。</li>
+						</ol>
+					</div>
 				</div>
-				<!-- Mock 期望 -->
 				<div class="mock-section" style="margin-top:20px">
 					<div class="mock-section-header">
 						<span class="mock-section-title">Mock 期望</span>
 						<el-button size="small" type="primary" plain @click="addMockExpect">+ 新建期望</el-button>
 					</div>
 					<el-table :data="mockExpects" size="small" style="margin-top:8px" empty-text="暂无期望">
-						<el-table-column prop="name" label="名称" />
-						<el-table-column prop="condition" label="条件" />
-						<el-table-column label="操作" width="100">
-							<template #default="{$index}">
+						<el-table-column prop="name" label="名称" min-width="120" show-overflow-tooltip />
+						<el-table-column label="条件" min-width="180" show-overflow-tooltip>
+							<template #default="{ row }">{{ formatMockCondition(row) }}</template>
+						</el-table-column>
+						<el-table-column label="操作" width="120">
+							<template #default="{ row, $index }">
+								<el-button type="primary" link size="small" @click="editMockExpect(row, $index)">编辑</el-button>
 								<el-button type="danger" link size="small" @click="mockExpects.splice($index,1)">删除</el-button>
 							</template>
 						</el-table-column>
 					</el-table>
 				</div>
-				<!-- Mock 脚本 -->
 				<div class="mock-section" style="margin-top:20px">
 					<div class="mock-section-header">
 						<span class="mock-section-title">Mock 脚本</span>
-						<el-switch v-model="mockScriptEnabled" size="small" />
+						<div style="display:flex;align-items:center;gap:8px">
+							<span style="font-size:12px;color:var(--el-text-color-regular)">开启自定义脚本</span>
+							<el-switch v-model="mockScriptEnabled" size="small" />
+						</div>
 					</div>
 					<div v-if="mockScriptEnabled" style="margin-top:10px">
 						<div class="code-editor-wrap">
@@ -680,18 +691,71 @@ mode="assert"
 				</div>
 			</div>
 
-			<!-- 新建 Mock 期望弹窗 -->
-			<el-dialog v-model="mockExpectDialogVisible" title="新建 Mock 期望" width="480px" destroy-on-close>
-				<el-form :model="newMockExpect" label-width="80px">
-					<el-form-item label="名称"><el-input v-model="newMockExpect.name" placeholder="期望名称" /></el-form-item>
-					<el-form-item label="条件"><el-input v-model="newMockExpect.condition" placeholder="匹配条件（可选）" /></el-form-item>
+			<!-- 新建/编辑 Mock 期望弹窗 -->
+			<el-dialog v-model="mockExpectDialogVisible" :title="mockExpectEditIndex>=0?'编辑 Mock 期望':'新建 Mock 期望'" width="680px" destroy-on-close append-to-body>
+				<el-form :model="newMockExpect" label-width="96px">
+					<el-form-item label="名称" required>
+						<el-input v-model="newMockExpect.name" placeholder="期望名称" />
+					</el-form-item>
+					<el-form-item label="IP 条件">
+						<div style="width:100%">
+							<div style="display:flex;align-items:center;gap:10px">
+								<el-switch v-model="newMockExpect.ipEnabled" />
+								<span style="font-size:12px;color:var(--el-text-color-placeholder)">开启后仅对指定的 IP 地址生效</span>
+							</div>
+							<el-input v-if="newMockExpect.ipEnabled" v-model="newMockExpect.ips" placeholder="多个 IP 用英文逗号分隔，如 127.0.0.1,192.168.1.10" style="margin-top:8px" />
+						</div>
+					</el-form-item>
+					<el-form-item label="参数条件">
+						<div style="width:100%">
+							<div style="font-size:12px;color:var(--el-text-color-placeholder);margin-bottom:8px">支持 query / path / header / cookie / body；多条件为「且」关系。</div>
+							<div v-for="(c, idx) in newMockExpect.paramConditions" :key="idx" style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+								<el-select v-model="c.location" style="width:100px">
+									<el-option label="query" value="query" />
+									<el-option label="path" value="path" />
+									<el-option label="header" value="header" />
+									<el-option label="cookie" value="cookie" />
+									<el-option label="body" value="body" />
+								</el-select>
+								<el-input v-model="c.name" :placeholder="c.location==='body'?'字段名或 JSONPath':'参数名'" style="flex:1" />
+								<el-select v-model="c.operator" style="width:110px">
+									<el-option label="等于" value="eq" />
+									<el-option label="不等于" value="neq" />
+									<el-option label="包含" value="contains" />
+									<el-option label="不包含" value="not_contains" />
+									<el-option label="正则" value="regex" />
+									<el-option label="存在" value="exists" />
+									<el-option label="不存在" value="not_exists" />
+								</el-select>
+								<el-input v-if="!['exists','not_exists'].includes(c.operator)" v-model="c.value" placeholder="期望值" style="flex:1" />
+								<el-button type="danger" link @click="newMockExpect.paramConditions.splice(idx,1)">删除</el-button>
+							</div>
+							<el-button size="small" plain @click="newMockExpect.paramConditions.push({ location:'query', name:'', operator:'eq', value:'' })">+ 添加参数条件</el-button>
+						</div>
+					</el-form-item>
+					<el-form-item label="状态码"><el-input-number v-model="newMockExpect.status" :min="100" :max="599" /></el-form-item>
+					<el-form-item label="响应延迟">
+						<div style="display:flex;align-items:center;gap:10px">
+							<el-input-number v-model="newMockExpect.delay" :min="0" :max="60000" :step="100" />
+							<span style="font-size:12px;color:var(--el-text-color-placeholder)">毫秒</span>
+						</div>
+					</el-form-item>
+					<el-form-item label="响应 Headers">
+						<div style="width:100%">
+							<div v-for="(h, idx) in newMockExpect.headers" :key="idx" style="display:flex;gap:8px;margin-bottom:8px">
+								<el-input v-model="h.key" placeholder="Header 名" style="flex:1" />
+								<el-input v-model="h.value" placeholder="Header 值" style="flex:1" />
+								<el-button type="danger" link @click="newMockExpect.headers.splice(idx,1)">删除</el-button>
+							</div>
+							<el-button size="small" plain @click="newMockExpect.headers.push({ key:'', value:'' })">+ 添加 Header</el-button>
+						</div>
+					</el-form-item>
 					<el-form-item label="响应体">
 						<div class="code-editor-wrap" style="width:100%">
 							<div class="code-editor-lang">JSON</div>
 							<textarea v-model="newMockExpect.body" class="code-textarea" placeholder='{"code":200,"data":{}}' spellcheck="false" style="min-height:100px"></textarea>
 						</div>
 					</el-form-item>
-					<el-form-item label="状态码"><el-input-number v-model="newMockExpect.status" :min="100" :max="599" /></el-form-item>
 				</el-form>
 				<template #footer>
 					<el-button @click="mockExpectDialogVisible=false">取消</el-button>
@@ -713,6 +777,7 @@ import { api_send, save_api, save_api_case, req_history, edit_history, api_param
 import { useFileApi } from '/@/api/v1/common/file';
 import OperationPanel from './components/OperationPanel.vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { getBaseApiUrl } from '/@/utils/config';
 
 const props = defineProps({
 	apiData: { type: Object, default: () => ({}) },
@@ -890,23 +955,88 @@ const docInfo = computed(() => {
 });
 
 // Mock
-const mockBaseUrl = ref(window.location.origin);
+const mockBaseUrl = computed(() => String(getBaseApiUrl() || window.location.origin).replace(/\/$/, ''));
 const mockExpects = ref<any[]>([]);
 const mockScriptEnabled = ref(false);
 const mockScript = ref('');
 const mockExpectDialogVisible = ref(false);
-const newMockExpect = ref({ name: '', condition: '', body: '{"code":200,"data":{}}', status: 200 });
+const mockExpectEditIndex = ref(-1);
+const emptyMockExpect = () => ({
+	name: '',
+	ipEnabled: false,
+	ips: '',
+	paramConditions: [] as Array<{ location: string; name: string; operator: string; value: string }>,
+	headers: [] as Array<{ key: string; value: string }>,
+	body: '{"code":200,"data":{}}',
+	status: 200,
+	delay: 0,
+	condition: '',
+});
+const newMockExpect = ref(emptyMockExpect());
+
+const normalizeMockPath = (raw: string) => {
+	let u = String(raw || '').trim();
+	u = u.replace(/\{\{[^{}]+\}\}/g, '').replace(/\$\{[^}]+\}/g, '');
+	try {
+		if (/^https?:\/\//i.test(u)) {
+			const parsed = new URL(u);
+			u = parsed.pathname + (parsed.search || '');
+		}
+	} catch { /* ignore */ }
+	u = u.replace(/([^:]\/)\/+/g, '$1');
+	if (!u.startsWith('/')) u = `/${u}`;
+	return u === '/' ? '/api/path' : u;
+};
+const mockDisplayUrl = computed(() => {
+	const id = Number(apiId.value || 0);
+	const base = `${mockBaseUrl.value}/mock${normalizeMockPath(req.value.url || '')}`;
+	return id ? `${base}?_api_id=${id}` : base;
+});
+
+const formatMockCondition = (row: any) => {
+	const parts: string[] = [];
+	if (row.ipEnabled && row.ips?.trim()) parts.push(`IP∈[${row.ips.trim()}]`);
+	const opMap: Record<string, string> = { eq: '等于', neq: '不等于', contains: '包含', not_contains: '不包含', regex: '正则', exists: '存在', not_exists: '不存在' };
+	for (const c of row.paramConditions || []) {
+		if (!c?.name) continue;
+		const op = opMap[c.operator] || c.operator;
+		parts.push(['exists', 'not_exists'].includes(c.operator) ? `${c.location}.${c.name} ${op}` : `${c.location}.${c.name} ${op} ${c.value ?? ''}`);
+	}
+	return parts.length ? parts.join(' 且 ') : (row.condition || '无条件（始终匹配）');
+};
+
 const copyMockUrl = () => {
-	const url = `${mockBaseUrl.value}/mock${req.value.url || '/api/path'}`;
-	navigator.clipboard?.writeText(url).then(() => ElMessage.success('已复制'));
+	navigator.clipboard?.writeText(mockDisplayUrl.value).then(() => ElMessage.success('已复制'));
 };
 const addMockExpect = () => {
-	newMockExpect.value = { name: '', condition: '', body: '{"code":200,"data":{}}', status: 200 };
+	mockExpectEditIndex.value = -1;
+	newMockExpect.value = emptyMockExpect();
+	mockExpectDialogVisible.value = true;
+};
+const editMockExpect = (row: any, index: number) => {
+	mockExpectEditIndex.value = index;
+	newMockExpect.value = {
+		...emptyMockExpect(),
+		...row,
+		paramConditions: Array.isArray(row.paramConditions) ? row.paramConditions.map((c: any) => ({ ...c })) : [],
+		headers: Array.isArray(row.headers) ? row.headers.map((h: any) => ({ ...h })) : [],
+	};
 	mockExpectDialogVisible.value = true;
 };
 const confirmAddMockExpect = () => {
 	if (!newMockExpect.value.name) { ElMessage.warning('请填写期望名称'); return; }
-	mockExpects.value.push({ ...newMockExpect.value });
+	if (newMockExpect.value.ipEnabled && !String(newMockExpect.value.ips || '').trim()) {
+		ElMessage.warning('已开启 IP 条件，请填写至少一个 IP 地址');
+		return;
+	}
+	const payload = {
+		...newMockExpect.value,
+		paramConditions: (newMockExpect.value.paramConditions || []).filter((c) => c.name?.trim()),
+		headers: (newMockExpect.value.headers || []).filter((h) => h.key?.trim()),
+	};
+	payload.condition = formatMockCondition(payload);
+	if (mockExpectEditIndex.value >= 0) mockExpects.value[mockExpectEditIndex.value] = payload;
+	else mockExpects.value.push(payload);
 	mockExpectDialogVisible.value = false;
 };
 
@@ -1119,6 +1249,11 @@ const uploadBinaryFile = async (options: any) => {
 const sendRequest = async () => {
 	const id = apiId.value;
 	if (!id) { ElMessage.warning('无法获取接口ID'); return; }
+	const urlText = String(req.value.url || '');
+	if (/\{\{.+\}\}/.test(urlText) && (props.envId == null || props.envId === '' || Number(props.envId) === 0)) {
+		ElMessage.warning('URL 含环境变量，请先在右上角选择环境后再发送');
+		return;
+	}
 	try {
 		const requestData: any = { id: Number(id), env_id: props.envId, url: req.value.url, req: req.value };
 		const response: any = await api_send(requestData);
@@ -1126,6 +1261,8 @@ const sendRequest = async () => {
 			const data = response.data;
 			res.value = data?.res ? { ...res.value, ...data.res } : (data || res.value);
 			ElMessage.success('请求发送成功');
+		} else {
+			ElMessage.error(response.message || '请求发送失败');
 		}
 	} catch (error) {
 		console.error('发送请求失败', error);
@@ -1377,6 +1514,9 @@ const confirmSaveAsCase = async () => {
 .mock-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .mock-addr-bar { display: flex; align-items: center; gap: 10px; background: var(--el-fill-color-light); border-radius: 6px; padding: 8px 12px; }
 .mock-url { font-family: monospace; font-size: 12px; color: #409eff; flex: 1; word-break: break-all; }
+.mock-hint { margin-top: 10px; padding: 10px 12px; background: var(--el-fill-color-lighter); border-radius: 6px; font-size: 12px; color: var(--el-text-color-regular); line-height: 1.7; }
+.mock-hint p { margin: 0 0 4px; font-weight: 600; color: var(--el-text-color-primary); }
+.mock-hint ol { margin: 0; padding-left: 18px; }
 .doc-panel { padding: 0; overflow-y: auto; }
 .doc-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: var(--el-fill-color-light); border-bottom: 1px solid var(--el-border-color); flex-shrink: 0; }
 .doc-header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
