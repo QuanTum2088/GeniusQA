@@ -485,7 +485,7 @@ frontend/src/
 #### 1. 克隆项目
 
 ```bash
-git clone https://github.com/rebort-hub/GeniusQA.git
+git clone https://github.com/QuanTum2088/GeniusQA.git
 cd GeniusQA
 ```
 
