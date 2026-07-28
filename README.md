@@ -14,10 +14,6 @@
 </div>
 
 ---
-## 线上体验地址
-http://106.54.166.76
-用户：admin  密码：123456
-
 ## 🌈 项目介绍
 
 GeniusQA AI 全栈测试平台是一个面向企业级应用的现代化智能测试管理系统，采用前后端完全分离的架构设计，集成了AI智能测试、API接口测试、UI自动化测试、数据工厂、评审管理等多个核心功能模块。
@@ -1115,14 +1111,6 @@ A:
 
 ---
 
-## 💬 交流群
-
-### 微信群
-<img src="static/img/weixin.png" width="200" alt="微信群" />
-
-### QQ 群
-<img src="static/img/qq.png" width="200" alt="QQ群" />
-
 ### 打赏作者，可以请作者喝杯咖啡，你的鼓励将是更新最大的动力
 <img src="static/img/wx.png" width="200" alt="wx" />
 
@@ -1132,7 +1120,7 @@ A:
 
 ## 💌 支持作者
 
-如果这个项目对你有帮助，请在 [GitHub](https://github.com/rebort-hub/GeniusQA) 上给个 ⭐ Star 支持一下！
+如果这个项目对你有帮助，请在 [GitHub](https://github.com/QuanTum2088/GeniusQA) 上给个 ⭐ Star 支持一下！
 
 你的支持是我持续更新的动力 🚀
 
