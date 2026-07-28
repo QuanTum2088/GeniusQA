@@ -46,7 +46,7 @@
       </div>
 
       <div class="login-copyright">
-        <span>N-Tester平台</span>
+        <span>GeniusQA</span>
         <span class="sep">|</span>
         <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">粤ICP备202698015号</a>
       </div>

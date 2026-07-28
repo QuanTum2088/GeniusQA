@@ -32,7 +32,7 @@
 								<el-dropdown-menu>
 									<el-dropdown-item command="claude">导出 Claude Code</el-dropdown-item>
 									<el-dropdown-item command="cursor">导出 Cursor</el-dropdown-item>
-									<el-dropdown-item command="n-tester" divided>重写 N-Tester 文件</el-dropdown-item>
+									<el-dropdown-item command="n-tester" divided>重写 GeniusQA 文件</el-dropdown-item>
 								</el-dropdown-menu>
 							</template>
 						</el-dropdown>
@@ -567,11 +567,11 @@ async function doSync() {
 
 async function doExport(format: 'claude' | 'cursor' | 'n-tester') {
 	if (!projectId.value) return;
-	const label = ({ claude: 'Claude Code', cursor: 'Cursor', 'n-tester': 'N-Tester' } as const)[format];
+	const label = ({ claude: 'Claude Code', cursor: 'Cursor', 'n-tester': 'GeniusQA' } as const)[format];
 	try {
 		await ElMessageBox.confirm(
 			format === 'n-tester'
-				? '将把当前可见 MCP 写入 ~/.n-tester/mcp.json 与项目 .n-tester/mcp.json。'
+				? '将把当前可见 MCP 写入 GeniusQA 配置（~/.n-tester/mcp.json 及项目 .n-tester/mcp.json）。'
 				: `将按 ${label} 格式写入对应客户端配置文件（按需导出，不影响平台默认文件）。`,
 			`导出到 ${label}`,
 			{ type: 'info', confirmButtonText: '导出', cancelButtonText: '取消' },

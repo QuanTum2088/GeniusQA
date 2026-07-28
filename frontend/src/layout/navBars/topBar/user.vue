@@ -71,13 +71,13 @@
               class="layout-navbars-breadcrumb-user-icon rounded-full bell-button"
               text
           >
-            <el-badge :is-dot="true">
+            <el-badge :is-dot="true" :hidden="!hasNotifications">
               <Bell class="icon-size shake-animation"></Bell>
             </el-badge>
           </el-button>
         </template>
         <template #default>
-          <UserNews/>
+          <UserNews @notification-count="onNotificationCount"/>
         </template>
       </el-popover>
     </div>
@@ -113,7 +113,8 @@
 
           <div class="mb5 mt5" style="height: 1px; background-color: var(--el-border-color)"></div>
 
-          <div class="avatar-box-menu-itme" @click="onMenuClick('doc')">
+          <!-- 外链入口已禁用 -->
+          <!-- <div class="avatar-box-menu-itme" @click="onMenuClick('doc')">
             <BookOpenText class="icon-size mr5"></BookOpenText>
             官方文档
           </div>
@@ -126,7 +127,7 @@
           <div class="avatar-box-menu-itme" @click="onMenuClick('GitHub')">
             <Github class="icon-size mr5"></Github>
             GitHub
-          </div>
+          </div> -->
 
           <div class="avatar-box-menu-itme" @click="onMenuClick('lock')">
             <LockKeyhole class="icon-size mr5"></LockKeyhole>
@@ -192,6 +193,15 @@ const state = reactive({
   isScreenfull: false,
   disabledSize: 'default',
 });
+
+// 通知未读状态
+const notificationCount = ref(0);
+const hasNotifications = computed(() => notificationCount.value > 0);
+
+// 接收子组件的通知数量更新
+const onNotificationCount = (count: number) => {
+  notificationCount.value = count;
+};
 
 // 设置分割样式
 const layoutUserFlexNum = computed(() => {

@@ -8,13 +8,13 @@ async def init_minio():
     """
     初始化Minio服务，检查或创建Minio Bucket对象
     """
-    # 确保 MinIO Bucket 存在（不存在时自动创建），每次超时10s，最多重试3次
+    # 确保 MinIO Bucket 存在（不存在时自动创建），每次超时3s，最多重试2次
     # 服务端已返回 HTTP 响应（配置错误）时不重试；仅超时或连接失败才重试
     from app.infra.storage.minio import MinioClient
     _minio_ok = False
-    for _attempt in range(1, 4):
+    for _attempt in range(1, 3):
         try:
-            await asyncio.wait_for(MinioClient.ensure_bucket(config.MINIO_BUCKET), timeout=10)
+            await asyncio.wait_for(MinioClient.ensure_bucket(config.MINIO_BUCKET), timeout=3)
             logger.info(f"MinIO Bucket 检查完成：{config.MINIO_BUCKET}")
             _minio_ok = True
             break
@@ -27,7 +27,7 @@ async def init_minio():
                 break
         else:
             break
-        if _attempt < 3:
-            await asyncio.sleep(5)
+        if _attempt < 2:
+            await asyncio.sleep(2)
     if not _minio_ok:
-        logger.error("MinIO Bucket 初始化失败，文件上传功能不可用，已跳过!")
+        logger.warning("MinIO Bucket 初始化失败，文件上传功能不可用，已跳过!")

@@ -1,7 +1,7 @@
 <template>
   <div class="layout-logo" v-if="setShowLogo" @click="onThemeConfigChange">
     <img :src="getLogo" class="layout-logo-medium-img"/>
-    <span class="layout-logo-title">N-Tester平台</span>
+    <span class="layout-logo-title">GeniusQA</span>
   </div>
   <div class="layout-logo-size" v-else @click="onThemeConfigChange">
     <img :src="getLogo" class="layout-logo-size-img"/>

@@ -35,18 +35,18 @@ const {themeConfig} = storeToRefs(storesThemeConfig);
 
 // 重置滚动条高度
 const updateScrollbar = () => {
-  // 更新父级 scrollbar
-  layoutScrollbarRef.value.update();
+  // 更新父级 scrollbar（加 null check 防止异步挂载时崩溃）
+  layoutScrollbarRef.value?.update();
   // 更新子级 scrollbar
-  layoutMainRef.value?.layoutMainScrollbarRef.update();
+  layoutMainRef.value?.layoutMainScrollbarRef?.update();
 };
 // 重置滚动条高度，由于组件是异步引入的
 const initScrollBarHeight = () => {
   nextTick(() => {
     setTimeout(() => {
       updateScrollbar();
-      layoutScrollbarRef.value.wrapRef.scrollTop = 0;
-      layoutMainRef.value!.layoutMainScrollbarRef.wrapRef.scrollTop = 0;
+      layoutScrollbarRef.value?.wrapRef && (layoutScrollbarRef.value.wrapRef.scrollTop = 0);
+      layoutMainRef.value?.layoutMainScrollbarRef?.wrapRef && (layoutMainRef.value.layoutMainScrollbarRef.wrapRef.scrollTop = 0);
     }, 500);
   });
 };

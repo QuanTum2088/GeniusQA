@@ -1,7 +1,7 @@
 {
 	"name": "N-Tester",
 	"version": "2.0.1",
-	"description": "N-Tester平台",
+	"description": "GeniusQA 智能全栈测试平台",
 	"author": "Rebort",
 	"license": "MIT",
 	"scripts": {

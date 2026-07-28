@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<el-drawer
 		v-model="drawerVisible"
 		direction="rtl"
@@ -221,7 +221,7 @@ const buildItems = (scene: any): DebugItem[] => {
 	return [
 		{
 			id: 'api_url', label: '压测接口', type: 'value', status: 'pending', hidden: false, delay: 600,
-			resultText: 'https://api.n-tester.com/v2/user/login（用户登录接口）',
+			resultText: 'https://api.geniusqa.com/v2/user/login（用户登录接口）',
 		},
 		{
 			id: 'threads', label: '单节点线程数', type: 'value', status: 'pending', hidden: false, delay: 350,

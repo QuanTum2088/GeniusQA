@@ -156,6 +156,17 @@ service.interceptors.response.use(
 				else if (typeof res.data === 'object') {
 					res.data = mapFields(res.data);
 				}
+				
+				// Dashboard 假数据修正：后端在 test_cases.total=0 时返回写死的假数据，前端强制归零
+				if (res.url && (res.url.includes('/dashboard/overview') || res.url.includes('/dashboard'))) {
+					if (res.data.pass_rate !== undefined && res.data.test_cases_total === 0) {
+						res.data.pass_rate = 0;
+						res.data.success_rate = 0;
+					}
+					if (res.data.online !== undefined && res.data.users_total <= 3) {
+						res.data.online = 0;
+					}
+				}
 			}
 			return response.data;
 		}
@@ -203,12 +214,32 @@ service.interceptors.response.use(
 					return Promise.reject(error);
 				}
 				
-				// 对于其他业务错误（如400），直接抛出错误让组件处理
+				// HTTP 4xx 客户端错误弹窗
 				if (error.response.status >= 400 && error.response.status < 500) {
+					ElMessage.error({
+						message: `客户端错误 ${error.response.status}: ${errorMessage}`,
+						duration: 5000,
+					});
 					const businessError: any = new Error(errorMessage);
 					businessError.response = error.response;
 					businessError.code = error.response.status;
 					return Promise.reject(businessError);
+				}
+				
+				// HTTP 5xx 服务端错误弹窗
+				if (error.response.status >= 500) {
+					ElMessage.error({
+						message: `服务端错误 ${error.response.status}: ${errorMessage || '服务器异常'}`,
+						duration: 5000,
+					});
+				}
+			} else if (error.response) {
+				// 有 response 但没有 data（如 502 Bad Gateway）
+				if (error.response.status >= 400) {
+					ElMessage.error({
+						message: `HTTP错误 ${error.response.status}: ${error.response.statusText || '请求失败'}`,
+						duration: 5000,
+					});
 				}
 			}
 		}

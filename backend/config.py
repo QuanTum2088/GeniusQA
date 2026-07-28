@@ -22,6 +22,8 @@ class Configs(BaseSettings):
     FRONTEND_BASE_URL: str = Field(default="", validation_alias="FRONTEND_BASE_URL")
 
     API_PREFIX: str = "/api"  # 接口前缀 - v1版本通过路由器添加
+    # 前端 dist 目录（SPA 托管），留空则默认 {BASEDIR}/frontend/dist
+    FRONTEND_DIST: str = Field(default="", validation_alias="FRONTEND_DIST")
     STATIC_DIR: str = 'static'  # 静态文件目录
     GLOBAL_ENCODING: str = 'utf8'  # 全局编码
     CORS_ORIGINS: typing.List[typing.Any] = ["*"]  # 跨域请求

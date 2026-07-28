@@ -123,6 +123,8 @@ def _apply_mapping(root: Path, data: Dict[str, Any]) -> None:
     if isinstance(fe, dict):
         if fe.get("dist_path"):
             os.environ["FRONTEND_DIST_PATH"] = _as_abs(root, str(fe["dist_path"]))
+        if fe.get("frontend_dist"):
+            os.environ["FRONTEND_DIST"] = _as_abs(root, str(fe["frontend_dist"]))
         if fe.get("public_base_url"):
             u = str(fe["public_base_url"]).strip().rstrip("/")
             os.environ["BASE_URL"] = u

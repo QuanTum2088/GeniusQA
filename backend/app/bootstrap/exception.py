@@ -8,7 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from loguru import logger
 from pydantic import ValidationError
-from sqlalchemy.exc import IntegrityError, ProgrammingError
+from sqlalchemy.exc import IntegrityError, ProgrammingError, OperationalError
 from sqlalchemy.orm.exc import UnmappedInstanceError
 from starlette.requests import Request
 
@@ -128,6 +128,25 @@ def init_exception(app: FastAPI):
             content=error_response(message=str(exc.errors()), code=500)
         )
 
+    @app.exception_handler(OperationalError)
+    async def operational_error_handler(request: Request, exc: OperationalError):
+        """ 数据库连接/操作错误（如密码错误、连接失败等）"""
+        error_msg = str(exc.orig) if exc.orig else str(exc)
+        logger.error(f"数据库操作错误\nURL:{request.method}-{request.url}\nerror:{error_msg}")
+        # 判断错误类型，返回用户友好的提示
+        if 'Access denied' in error_msg:
+            friendly_msg = '数据库连接失败：用户名或密码错误，请检查配置'
+        elif 'Can\'t connect' in error_msg or 'Connection refused' in error_msg:
+            friendly_msg = '数据库连接失败：无法连接到数据库服务器，请检查数据库是否启动'
+        elif 'Unknown database' in error_msg:
+            friendly_msg = '数据库连接失败：指定的数据库不存在'
+        else:
+            friendly_msg = '数据库操作失败，请稍后重试'
+        return JSONResponse(
+            status_code=500,
+            content=error_response(message=friendly_msg, code=500)
+        )
+
     @app.exception_handler(UnmappedInstanceError)
     async def un_mapped_instance_error_handler(request: Request, exc: UnmappedInstanceError):
         """ 删除数据的id在数据库中不存在 """
@@ -154,8 +173,9 @@ def init_exception(app: FastAPI):
         """ 捕获全局异常 """
         logger.error(
             f"全局异常\n{request.method} URL:{request.url}\nHeaders:{request.headers}\n{traceback.format_exc()}")
+        # 不要暴露原始错误详情给用户，返回通用错误信息
         return JSONResponse(
             status_code=500,
-            content=error_response(message=str(exc), code=CodeEnum.PARTNER_CODE_FAIL.code),
+            content=error_response(message='服务器内部错误，请稍后重试', code=CodeEnum.PARTNER_CODE_FAIL.code),
             headers={'Access-Control-Allow-Origin': '*'}
         )

@@ -3,10 +3,12 @@
 from contextlib import asynccontextmanager
 import asyncio
 import os
+from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from app.core.logger import init_logger, logger
 from app.bootstrap.cors import init_cors
 from app.bootstrap.exception import init_exception
@@ -87,17 +89,51 @@ def create_app() -> FastAPI:
     init_cors(app)  # 初始化跨域
     init_mount(app)  # 挂载静态文件
 
+    # 托管前端 dist（SPA）：静态资源 + 客户端路由回退 index.html
+    _fe_cfg = getattr(config, "FRONTEND_DIST", None)
+    if _fe_cfg:
+        _frontend_dist = Path(_fe_cfg)
+    else:
+        # 默认：项目根下 frontend/dist
+        _frontend_dist = config.BASEDIR / "frontend" / "dist"
+    if _frontend_dist.is_dir():
+        # 显式挂载子目录，避免与 /static、/media、/uploads 冲突
+        for _sub in ("assets", "monacoeditorwork"):
+            _sub_dir = _frontend_dist / _sub
+            if _sub_dir.is_dir():
+                app.mount(f"/{_sub}", StaticFiles(directory=str(_sub_dir)), name=f"frontend_{_sub}")
+
+        # 根路径与所有未匹配路径均回退到 index.html（SPA 客户端路由）
+        @app.get("/", include_in_schema=False)
+        async def _frontend_root():
+            return FileResponse(str(_frontend_dist / "index.html"))
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def _spa_catch_all(full_path: str):
+            # 排除 API、静态文件、文档等已注册路由
+            _reserved = ("api/", "static/", "media/", "uploads/", "docs", "redoc", "openapi", "monitor/", "common/", "system/")
+            if any(full_path.startswith(p) or full_path == p.rstrip("/") for p in _reserved):
+                raise HTTPException(status_code=404, detail="Not Found")
+            # 尝试直接返回静态文件（favicon 等）
+            _file = _frontend_dist / full_path
+            if _file.is_file():
+                return FileResponse(str(_file))
+            # 其余全部回退到 index.html
+            return FileResponse(str(_frontend_dist / "index.html"))
+
     # 自定义 API 文档路由
+    _swagger_dir = Path(__file__).resolve().parent / "static" / "swagger"
+
     @app.get("/docs", include_in_schema=False)
     async def custom_swagger_ui_html():
         """Swagger UI 文档"""
-        with open("static/swagger/swagger.html", "r", encoding="utf-8") as f:
+        with open(_swagger_dir / "swagger.html", "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
 
     @app.get("/redoc", include_in_schema=False)
     async def custom_redoc_html():
         """ReDoc 文档"""
-        with open("static/swagger/redoc.html", "r", encoding="utf-8") as f:
+        with open(_swagger_dir / "redoc.html", "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
 
     return app

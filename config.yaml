@@ -2,7 +2,7 @@
 
 server:
   host: "0.0.0.0"
-  port: 8100
+  port: 80
 
 database:
   host: localhost
@@ -26,9 +26,11 @@ celery:
 frontend:
   dist_path: "app/frontend"
   public_base_url: "http://127.0.0.1"
+  frontend_dist: "D:/GeniusQA/frontend/dist"
 
 security:
   secret_key: "change-me-in-production"
 
 optional:
   grant_admin_oauth: false
+

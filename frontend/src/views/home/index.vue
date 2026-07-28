@@ -4,8 +4,8 @@
       <el-icon class="notice-icon"><Bell /></el-icon>
       <div class="notice-track-wrap">
         <div class="notice-track">
-          <span class="notice-text">🚀 N-Tester AI全栈测试平台，提供接口自动化、双引擎UI自动化、APP自动化，支持MCP、知识库、自定义Skill管理，一站式解决方案！</span>
-          <span class="notice-text">🚀 N-Tester AI全栈测试平台，提供接口自动化、双引擎UI自动化、APP自动化，支持MCP、知识库、自定义Skill管理，一站式解决方案！</span>
+          <span class="notice-text">🚀🚀 GeniusQA AI全栈测试平台，提供接口自动化、双引擎UI自动化、APP自动化，支持MCP、知识库、自定义Skill管理，一站式解决方案！</span>
+          <span class="notice-text">🚀🚀 GeniusQA AI全栈测试平台，提供接口自动化、双引擎UI自动化、APP自动化，支持MCP、知识库、自定义Skill管理，一站式解决方案！</span>
         </div>
       </div>
     </div>
@@ -14,7 +14,7 @@
         <div class="hero-content">
           <div class="hero-left">
             <div class="hero-greeting">{{ greetingText }}，{{ userInfo.nickname || userInfo.username || '管理员' }}</div>
-            <div class="hero-sub">欢迎回到 N-Tester 全栈测试平台</div>
+            <div class="hero-sub">欢迎回到 GeniusQA 全栈测试平台</div>
             <div class="hero-meta">
               <span class="hero-date"><el-icon class="meta-icon"><Calendar /></el-icon>{{ currentDate }}</span>
               <span class="hero-time"><el-icon class="meta-icon"><Clock /></el-icon>{{ currentTime }}</span>

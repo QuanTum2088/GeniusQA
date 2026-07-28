@@ -66,6 +66,7 @@ const viteConfig = defineConfig((mode: ConfigEnv) => {
 			],
 		},
 		root: process.cwd(),
+		cacheDir: require('os').tmpdir() + '/vite-cache',
 		resolve: { alias },
 		base: mode.command === 'serve' ? './' : env.VITE_PUBLIC_PATH,
 		server: {

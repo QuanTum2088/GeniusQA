@@ -24,20 +24,20 @@
 </template>
 
 <script setup lang="ts" name="layoutBreadcrumbUserNews">
-import {reactive} from 'vue';
+import {reactive, watch, defineEmits} from 'vue';
 import WeixinImg from '/@/assets/weixin.png'
+
+const emit = defineEmits(['notification-count']);
 
 // 定义变量内容
 const state = reactive({
-  newsList: [
-    {
-      label: '加我微信进交流群（请备注下谢谢^_^）',
-      value: '',
-      img: WeixinImg,
-      time: '2026-01-16',
-    }
-  ],
+  newsList: [],
 });
+
+// 监听通知列表变化，向父组件发送数量
+watch(() => state.newsList.length, (count) => {
+  emit('notification-count', count);
+}, {immediate: true});
 
 // 全部已读点击
 const onAllReadClick = () => {

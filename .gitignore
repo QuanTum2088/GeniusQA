@@ -35,6 +35,11 @@ config.yaml
 .env
 .env.local
 
+# Local sync/personal scripts
+sync-git.ps1
+sync-git.cmd
+start-backend.cmd
+
 # Backup scripts generated locally
 start-source.bat
 start-source.cmd
@@ -54,3 +59,10 @@ build_output.txt
 # Run artifacts
 .runtime/
 .runtime/
+# Service binaries and runtime
+minio/
+playwright-mcp/
+backend/pip.ini
+start-backend-hidden.ps1
+idx
+$c

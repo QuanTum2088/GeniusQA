@@ -13,6 +13,25 @@ import NtestercDialog from '/@/components/ntesterc/NtestercDialog.vue';
 import NtestercDrawer from '/@/components/ntesterc/NtestercDrawer.vue';
 import NtestercUploadImages from '/@/components/ntesterc/NtestercUploadImages.vue';
 import NtestercUploadFiles from '/@/components/ntesterc/NtestercUploadFiles.vue';
+import { ElMessage } from 'element-plus';
+
+// 全局 JS 错误弹窗：所有未捕获的错误都通过 ElMessage.error 显示
+window.addEventListener('error', (event) => {
+	if (event.error) {
+		ElMessage.error({
+			message: `JS错误: ${event.error.message || '未知错误'}`,
+			duration: 5000,
+		});
+	}
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+	const message = event.reason?.message || event.reason?.msg || String(event.reason) || 'Promise 未处理异常';
+	ElMessage.error({
+		message: `异步错误: ${message}`,
+		duration: 5000,
+	});
+});
 
 async function initApplication() {
 	const app = createApp(App);
