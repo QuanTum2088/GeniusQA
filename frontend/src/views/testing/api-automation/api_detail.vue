@@ -639,7 +639,7 @@ mode="assert"
 				</div>
 			</div>
 
-			<!-- Mock 面板：嵌入模式下由 ApiMockPanel 承载；此处保留独立打开时的完整能力 -->
+			
 			<div v-show="mainTab==='mock'" class="side-panel mock-panel">
 				<div class="mock-section">
 					<div class="mock-section-title">Mock 地址</div>
@@ -691,7 +691,7 @@ mode="assert"
 				</div>
 			</div>
 
-			<!-- 新建/编辑 Mock 期望弹窗 -->
+		
 			<el-dialog v-model="mockExpectDialogVisible" :title="mockExpectEditIndex>=0?'编辑 Mock 期望':'新建 Mock 期望'" width="680px" destroy-on-close append-to-body>
 				<el-form :model="newMockExpect" label-width="96px">
 					<el-form-item label="名称" required>
@@ -709,28 +709,31 @@ mode="assert"
 					<el-form-item label="参数条件">
 						<div style="width:100%">
 							<div style="font-size:12px;color:var(--el-text-color-placeholder);margin-bottom:8px">支持 query / path / header / cookie / body；多条件为「且」关系。</div>
-							<div v-for="(c, idx) in newMockExpect.paramConditions" :key="idx" style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-								<el-select v-model="c.location" style="width:100px">
-									<el-option label="query" value="query" />
-									<el-option label="path" value="path" />
-									<el-option label="header" value="header" />
-									<el-option label="cookie" value="cookie" />
-									<el-option label="body" value="body" />
-								</el-select>
-								<el-input v-model="c.name" :placeholder="c.location==='body'?'字段名或 JSONPath':'参数名'" style="flex:1" />
-								<el-select v-model="c.operator" style="width:110px">
-									<el-option label="等于" value="eq" />
-									<el-option label="不等于" value="neq" />
-									<el-option label="包含" value="contains" />
-									<el-option label="不包含" value="not_contains" />
-									<el-option label="正则" value="regex" />
-									<el-option label="存在" value="exists" />
-									<el-option label="不存在" value="not_exists" />
-								</el-select>
-								<el-input v-if="!['exists','not_exists'].includes(c.operator)" v-model="c.value" placeholder="期望值" style="flex:1" />
-								<el-button type="danger" link @click="newMockExpect.paramConditions.splice(idx,1)">删除</el-button>
+							<div class="mock-scroll-list mock-param-scroll">
+								<div v-for="(c, idx) in newMockExpect.paramConditions" :key="idx" class="mock-param-row">
+									<el-select v-model="c.location" style="width:100px">
+										<el-option label="query" value="query" />
+										<el-option label="path" value="path" />
+										<el-option label="header" value="header" />
+										<el-option label="cookie" value="cookie" />
+										<el-option label="body" value="body" />
+									</el-select>
+									<el-input v-model="c.name" :placeholder="c.location==='body'?'字段名或 JSONPath':'参数名'" style="flex:1" />
+									<el-select v-model="c.operator" style="width:110px">
+										<el-option label="等于" value="eq" />
+										<el-option label="不等于" value="neq" />
+										<el-option label="包含" value="contains" />
+										<el-option label="不包含" value="not_contains" />
+										<el-option label="正则" value="regex" />
+										<el-option label="存在" value="exists" />
+										<el-option label="不存在" value="not_exists" />
+									</el-select>
+									<el-input v-if="!['exists','not_exists'].includes(c.operator)" v-model="c.value" placeholder="期望值" style="flex:1" />
+									<el-button type="danger" link @click="newMockExpect.paramConditions.splice(idx,1)">删除</el-button>
+								</div>
+								<div v-if="!newMockExpect.paramConditions.length" class="mock-scroll-empty">暂无参数条件</div>
 							</div>
-							<el-button size="small" plain @click="newMockExpect.paramConditions.push({ location:'query', name:'', operator:'eq', value:'' })">+ 添加参数条件</el-button>
+							<el-button size="small" plain style="margin-top:8px" @click="newMockExpect.paramConditions.push({ location:'query', name:'', operator:'eq', value:'' })">+ 添加参数条件</el-button>
 						</div>
 					</el-form-item>
 					<el-form-item label="状态码"><el-input-number v-model="newMockExpect.status" :min="100" :max="599" /></el-form-item>
@@ -742,12 +745,15 @@ mode="assert"
 					</el-form-item>
 					<el-form-item label="响应 Headers">
 						<div style="width:100%">
-							<div v-for="(h, idx) in newMockExpect.headers" :key="idx" style="display:flex;gap:8px;margin-bottom:8px">
-								<el-input v-model="h.key" placeholder="Header 名" style="flex:1" />
-								<el-input v-model="h.value" placeholder="Header 值" style="flex:1" />
-								<el-button type="danger" link @click="newMockExpect.headers.splice(idx,1)">删除</el-button>
+							<div class="mock-scroll-list mock-header-scroll">
+								<div v-for="(h, idx) in newMockExpect.headers" :key="idx" class="mock-param-row">
+									<el-input v-model="h.key" placeholder="Header 名" style="flex:1" />
+									<el-input v-model="h.value" placeholder="Header 值" style="flex:1" />
+									<el-button type="danger" link @click="newMockExpect.headers.splice(idx,1)">删除</el-button>
+								</div>
+								<div v-if="!newMockExpect.headers.length" class="mock-scroll-empty">暂无响应头</div>
 							</div>
-							<el-button size="small" plain @click="newMockExpect.headers.push({ key:'', value:'' })">+ 添加 Header</el-button>
+							<el-button size="small" plain style="margin-top:8px" @click="newMockExpect.headers.push({ key:'', value:'' })">+ 添加 Header</el-button>
 						</div>
 					</el-form-item>
 					<el-form-item label="响应体">
@@ -1517,6 +1523,34 @@ const confirmSaveAsCase = async () => {
 .mock-hint { margin-top: 10px; padding: 10px 12px; background: var(--el-fill-color-lighter); border-radius: 6px; font-size: 12px; color: var(--el-text-color-regular); line-height: 1.7; }
 .mock-hint p { margin: 0 0 4px; font-weight: 600; color: var(--el-text-color-primary); }
 .mock-hint ol { margin: 0; padding-left: 18px; }
+.mock-scroll-list {
+	width: 100%;
+	box-sizing: border-box;
+	border: 1px solid var(--el-border-color-lighter);
+	border-radius: 6px;
+	padding: 8px;
+	overflow-x: hidden;
+	overflow-y: auto;
+	background: var(--el-fill-color-blank);
+}
+.mock-param-scroll { max-height: 160px; min-height: 48px; }
+.mock-header-scroll { max-height: 120px; min-height: 48px; }
+.mock-scroll-empty {
+	font-size: 12px;
+	color: var(--el-text-color-placeholder);
+	text-align: center;
+	padding: 12px 0;
+}
+.mock-param-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
+	width: 100%;
+	flex-wrap: nowrap;
+}
+.mock-param-row:last-child { margin-bottom: 0; }
+
 .doc-panel { padding: 0; overflow-y: auto; }
 .doc-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: var(--el-fill-color-light); border-bottom: 1px solid var(--el-border-color); flex-shrink: 0; }
 .doc-header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }

@@ -97,27 +97,30 @@
 				<el-form-item label="参数条件">
 					<div class="field-block">
 						<div class="field-tip" style="margin-bottom:8px">支持 query / path / header / cookie / body；多条件为「且」关系，全部满足才匹配。</div>
-						<div v-for="(c, idx) in form.paramConditions" :key="idx" class="param-row">
-							<el-select v-model="c.location" placeholder="位置" style="width:100px">
-								<el-option v-for="opt in locationOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-							</el-select>
-							<el-input
-								v-model="c.name"
-								:placeholder="c.location === 'body' ? '字段名或 JSONPath，如 $.city' : '参数名'"
-								style="flex:1"
-							/>
-							<el-select v-model="c.operator" style="width:110px">
-								<el-option v-for="op in operatorOptions" :key="op.value" :label="op.label" :value="op.value" />
-							</el-select>
-							<el-input
-								v-if="!['exists', 'not_exists'].includes(c.operator)"
-								v-model="c.value"
-								placeholder="期望值"
-								style="flex:1"
-							/>
-							<el-button type="danger" link @click="form.paramConditions.splice(idx, 1)">删除</el-button>
+						<div class="scroll-list param-scroll">
+							<div v-for="(c, idx) in form.paramConditions" :key="idx" class="param-row">
+								<el-select v-model="c.location" placeholder="位置" style="width:100px">
+									<el-option v-for="opt in locationOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+								</el-select>
+								<el-input
+									v-model="c.name"
+									:placeholder="c.location === 'body' ? '字段名或 JSONPath，如 $.city' : '参数名'"
+									style="flex:1"
+								/>
+								<el-select v-model="c.operator" style="width:110px">
+									<el-option v-for="op in operatorOptions" :key="op.value" :label="op.label" :value="op.value" />
+								</el-select>
+								<el-input
+									v-if="!['exists', 'not_exists'].includes(c.operator)"
+									v-model="c.value"
+									placeholder="期望值"
+									style="flex:1"
+								/>
+								<el-button type="danger" link @click="form.paramConditions.splice(idx, 1)">删除</el-button>
+							</div>
+							<div v-if="!form.paramConditions.length" class="scroll-empty">暂无参数条件</div>
 						</div>
-						<el-button size="small" plain @click="addParamCondition">+ 添加参数条件</el-button>
+						<el-button size="small" plain style="margin-top:8px" @click="addParamCondition">+ 添加参数条件</el-button>
 					</div>
 				</el-form-item>
 
@@ -135,12 +138,15 @@
 				<!-- 响应 Headers -->
 				<el-form-item label="响应 Headers">
 					<div class="field-block">
-						<div v-for="(h, idx) in form.headers" :key="idx" class="param-row">
-							<el-input v-model="h.key" placeholder="Header 名，如 Content-Type" style="flex:1" />
-							<el-input v-model="h.value" placeholder="Header 值" style="flex:1" />
-							<el-button type="danger" link @click="form.headers.splice(idx, 1)">删除</el-button>
+						<div class="scroll-list header-scroll">
+							<div v-for="(h, idx) in form.headers" :key="idx" class="param-row">
+								<el-input v-model="h.key" placeholder="Header 名，如 Content-Type" style="flex:1" />
+								<el-input v-model="h.value" placeholder="Header 值" style="flex:1" />
+								<el-button type="danger" link @click="form.headers.splice(idx, 1)">删除</el-button>
+							</div>
+							<div v-if="!form.headers.length" class="scroll-empty">暂无响应头</div>
 						</div>
-						<el-button size="small" plain @click="form.headers.push({ key: '', value: '' })">+ 添加 Header</el-button>
+						<el-button size="small" plain style="margin-top:8px" @click="form.headers.push({ key: '', value: '' })">+ 添加 Header</el-button>
 					</div>
 				</el-form-item>
 
@@ -451,12 +457,31 @@ const confirm = async () => {
 .field-block { width: 100%; }
 .field-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .field-tip { font-size: 12px; color: var(--el-text-color-placeholder); line-height: 1.5; }
+.scroll-list {
+	width: 100%;
+	box-sizing: border-box;
+	border: 1px solid var(--el-border-color-lighter);
+	border-radius: 6px;
+	padding: 8px;
+	background: var(--el-fill-color-blank);
+	overflow-x: hidden;
+	overflow-y: auto;
+}
+.param-scroll { max-height: 160px; min-height: 48px; }
+.header-scroll { max-height: 120px; min-height: 48px; }
+.scroll-empty {
+	font-size: 12px;
+	color: var(--el-text-color-placeholder);
+	text-align: center;
+	padding: 12px 0;
+}
 .param-row {
 	display: flex;
 	align-items: center;
 	gap: 8px;
 	margin-bottom: 8px;
 	width: 100%;
-	flex-wrap: wrap;
+	flex-wrap: nowrap;
 }
+.param-row:last-child { margin-bottom: 0; }
 </style>
