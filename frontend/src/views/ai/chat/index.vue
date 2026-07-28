@@ -676,7 +676,6 @@ const streamingMessage = ref<MessageData | null>(null)  // 正在流式接收的
 const pendingUserMessageId = ref<number | null>(null)  // 当前发送中的用户消息 ID
 const wsConnection = ref<{ ws: WebSocket; send: (payload: any) => void; close: () => void } | null>(null)  // WebSocket 连接
 const isWsConnected = ref(false)  // WebSocket 真实连接状态
-/** 首包超时：模型不可用时避免一直转圈等待 */
 const REPLY_FIRST_TOKEN_TIMEOUT_MS = 35000
 let replyWatchdogTimer: ReturnType<typeof setTimeout> | null = null
 
