@@ -1104,19 +1104,10 @@ A:
 
 ## 🔗 相关链接
 
-- **GitHub**: https://github.com/rebort-hub/GeniusQA
+- **GitHub**: https://github.com/QuanTum2088/GeniusQA
 - **FastAPI 文档**: https://fastapi.tiangolo.com/
 - **Vue 3 文档**: https://vuejs.org/
 - **Element Plus 文档**: https://element-plus.org/
-
----
-
-### 打赏作者，可以请作者喝杯咖啡，你的鼓励将是更新最大的动力
-<img src="static/img/wx.png" width="200" alt="wx" />
-
-欢迎加入交流群，一起学习进步！
-
----
 
 ## 💌 支持作者
 
