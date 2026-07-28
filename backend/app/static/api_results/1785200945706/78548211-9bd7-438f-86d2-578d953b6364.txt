@@ -1,3 +1,0 @@
-2026-07-28 09:09:05 开始执行步骤-999 
-2026-07-28 09:09:06 响应: {'msg': '接口请求失败', 'exception': "Invalid URL '{{base_url}}/api/v1/misc/weather': No scheme supplied. Perhaps you meant https://{{base_url}}/api/v1/misc/weather?"} 
-2026-07-28 09:09:06 接口-999执行完成 

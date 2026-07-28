@@ -66,3 +66,10 @@ backend/pip.ini
 start-backend-hidden.ps1
 idx
 $c
+
+# Runtime generated files (never commit)
+static/swagger/
+backend/app/static/api_results/
+backend/static/upload/
+static/upload/
+backend/static/uploads/

@@ -1,5 +1,0 @@
-2026-07-28 20:12:29 开始执行步骤-HTTP 请求 
-2026-07-28 20:12:34 未知前置操作类型：4 
-2026-07-28 20:12:34 未知前置操作类型：5 
-2026-07-28 20:12:34 响应: {'msg': '接口请求失败', 'exception': "HTTPSConnectionPool(host='yastapayadmin.aitechprod.xyz', port=443): Read timed out. (read timeout=5)"} 
-2026-07-28 20:12:34 接口-HTTP 请求执行完成 
