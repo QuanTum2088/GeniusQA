@@ -36,12 +36,13 @@ def _row_to_dict(row) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 def _get_jacoco_jar_path() -> str:
     """Return the absolute path to org.jacoco.cli.jar."""
-    backend_root = Path(__file__).resolve().parents[4]
-    jar = backend_root / "org.jacoco.cli.jar"
+    # service.py -> precision_test -> module -> v1 -> api -> app -> backend
+    backend_root = Path(__file__).resolve().parents[5]
+    jar = backend_root / "static" / "tools" / "org.jacoco.cli.jar"
     if not jar.exists():
         raise FileNotFoundError(
             f"org.jacoco.cli.jar not found at {jar}. "
-            "Please place the jar in the project root directory."
+            "Please place the jar under backend/static/tools/."
         )
     return str(jar)
 

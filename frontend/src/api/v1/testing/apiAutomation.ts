@@ -129,7 +129,7 @@ export function useApiAutomationApi() {
       class_name?: string;
       service_id?: number;
     }) => postApiAutomation('/v1/Ntesterc_api/generate_code', data),
-    run_generated_code: (data: { code: string; framework: string }) =>
+    run_generated_code: (data: { code: string; framework: string; exec_mode?: 'sandbox' | 'native' }) =>
       postApiAutomation('/v1/Ntesterc_api/run_generated_code', data),
 
     // ---------- 服务排序 ----------

@@ -2,7 +2,13 @@
   <div class="sql-step-form">
     <el-form label-width="80px" size="small">
       <el-form-item label="数据库">
-        <el-select v-model="req.db_id" placeholder="请选择数据库配置" style="width:100%" filterable>
+        <el-select
+          v-model="req.db_id"
+          placeholder="请选择数据库配置"
+          style="width:100%"
+          filterable
+          @visible-change="(open: boolean) => { if (open) loadDbList() }"
+        >
           <el-option v-for="db in dbList" :key="db.id" :label="db.name" :value="db.id" />
         </el-select>
       </el-form-item>
@@ -26,8 +32,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { apiAutomationApi } from '/@/api/v1/testing/apiAutomation'
+import { onDbListChanged } from '../../composables/dbListSync'
 
 const props = defineProps<{ step: any }>()
 
@@ -38,12 +45,24 @@ const req = computed(() => {
   return props.step.request
 })
 
-onMounted(async () => {
+const loadDbList = async () => {
   try {
     const r: any = await apiAutomationApi.api_db_list()
     const raw = r?.data
     dbList.value = Array.isArray(raw) ? raw : (Array.isArray(raw?.content) ? raw.content : [])
-  } catch { dbList.value = [] }
+  } catch {
+    dbList.value = []
+  }
+}
+
+let offDbListSync: (() => void) | null = null
+onMounted(() => {
+  loadDbList()
+  offDbListSync = onDbListChanged(loadDbList)
+})
+onBeforeUnmount(() => {
+  offDbListSync?.()
+  offDbListSync = null
 })
 </script>
 

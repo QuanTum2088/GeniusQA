@@ -1,5 +1,5 @@
 <template>
-  <el-form ref="loginFormRef" :model="state.ruleForm" :rules="state.rules" size="large" class="login-content-form">
+  <el-form ref="loginFormRef" :model="state.ruleForm" :rules="loginRules" size="large" class="login-content-form">
     <el-form-item class="login-animation1" prop="userName">
       <el-input text placeholder="请输入用户名" v-model="state.ruleForm.userName" clearable
                 autocomplete="off">
@@ -28,9 +28,9 @@
         </template>
       </el-input>
     </el-form-item>
-    <el-form-item class="login-animation3" prop="code">
+    <el-form-item v-if="captchaEnable" class="login-animation3" prop="code">
       <el-col :span="15">
-        <el-input text maxlength="4" placeholder="请输入验证码" v-model="state.ruleForm.code" clearable
+        <el-input text maxlength="8" placeholder="请输入验证码" v-model="state.ruleForm.code" clearable
                   autocomplete="off" @keyup.enter="onSignIn">
           <template #prefix>
             <el-icon class="el-input__icon">
@@ -41,7 +41,13 @@
       </el-col>
       <el-col :span="1"></el-col>
       <el-col :span="8">
-        <Captcha ref="captchaRef" @update:code="onCaptchaUpdate" :width="100" :height="40" />
+        <Captcha
+          ref="captchaRef"
+          :img-base="captchaImg"
+          :width="100"
+          :height="40"
+          @refresh="loadCaptcha"
+        />
       </el-col>
     </el-form-item>
     <el-form-item class="login-animation4">
@@ -54,29 +60,26 @@
 </template>
 
 <script setup lang="ts" name="loginAccount">
-import {computed, reactive, ref} from 'vue';
+import {computed, onMounted, reactive, ref} from 'vue';
 import {useRoute, useRouter} from 'vue-router';
 import {ElMessage} from 'element-plus';
-import {storeToRefs} from 'pinia';
 import Captcha from '/@/components/Captcha/index.vue';
-import {useThemeConfig} from '/@/stores/themeConfig';
 import {initBackEndControlRoutes} from '/@/router/backEnd';
 import {Session} from '/@/utils/storage';
 import {formatAxis} from '/@/utils/formatTime';
 import {NextLoading} from '/@/utils/loading';
 import {useUserApi} from "/@/api/v1/system/user";
+import {useAuthApi} from "/@/api/v1/system/auth";
 import {useUserStore} from "/@/stores/user";
 
-// 定义变量内容
 const loginFormRef = ref();
 const captchaRef = ref();
-const storesThemeConfig = useThemeConfig();
-const {themeConfig} = storeToRefs(storesThemeConfig);
 const route = useRoute();
 const router = useRouter();
 
-// 验证码值
-const captchaCode = ref('');
+const captchaEnable = ref(true);
+const captchaKey = ref('');
+const captchaImg = ref('');
 
 const state = reactive({
   isShowPassword: false,
@@ -85,7 +88,13 @@ const state = reactive({
     password: '',
     code: '',
   },
-  rules: {
+  loading: {
+    signIn: false,
+  },
+});
+
+const loginRules = computed(() => {
+  const rules: Record<string, any[]> = {
     userName: [
       { required: true, message: '请输入用户名', trigger: 'blur' },
       { min: 2, max: 20, message: '用户名长度在 2 到 20 个字符', trigger: 'blur' }
@@ -94,56 +103,65 @@ const state = reactive({
       { required: true, message: '请输入密码', trigger: 'blur' },
       { min: 6, max: 20, message: '密码长度在 6 到 20 个字符', trigger: 'blur' }
     ],
-    code: [
+  };
+  if (captchaEnable.value) {
+    rules.code = [
       { required: true, message: '请输入验证码', trigger: 'blur' },
-      { len: 4, message: '验证码长度为 4 个字符', trigger: 'blur' },
-      { 
-        validator: (rule: any, value: any, callback: any) => {
-          if (value.toLowerCase() !== captchaCode.value.toLowerCase()) {
-            callback(new Error('验证码错误'));
-          } else {
-            callback();
-          }
-        }, 
-        trigger: 'blur' 
-      }
-    ]
-  },
-  loading: {
-    signIn: false,
-  },
+      { min: 3, max: 8, message: '验证码长度不正确', trigger: 'blur' },
+    ];
+  }
+  return rules;
 });
 
-// 验证码更新回调
-const onCaptchaUpdate = (code: string) => {
-  captchaCode.value = code;
-};
+async function loadCaptcha() {
+  try {
+    const res: any = await useAuthApi().getCaptcha();
+    const data = res?.data ?? res ?? {};
+    captchaEnable.value = data.enable !== false;
+    captchaKey.value = data.key || '';
+    captchaImg.value = data.img_base || '';
+    state.ruleForm.code = '';
+  } catch (e) {
+    console.error('获取验证码失败', e);
+    captchaEnable.value = true;
+  }
+}
 
-// 时间获取
 const currentTime = computed(() => {
   return formatAxis(new Date());
 });
-// 登录
+
 const onSignIn = async () => {
-  // 先进行表单验证
   if (!loginFormRef.value) return;
-  
+
   await loginFormRef.value.validate((valid: boolean) => {
     if (!valid) {
       ElMessage.error('请检查输入信息');
-      // 验证失败，刷新验证码
-      captchaRef.value?.refreshCode();
-      state.ruleForm.code = '';
+      if (captchaEnable.value) {
+        loadCaptcha();
+      }
       return false;
     }
-    
-    // 验证通过，开始登录
+
     state.loading.signIn = true;
-    useUserApi().signIn({username: state.ruleForm.userName, password: state.ruleForm.password})
+    const payload: {
+      username: string;
+      password: string;
+      captcha?: string;
+      captcha_key?: string;
+    } = {
+      username: state.ruleForm.userName,
+      password: state.ruleForm.password,
+    };
+    if (captchaEnable.value) {
+      payload.captcha = state.ruleForm.code;
+      payload.captcha_key = captchaKey.value;
+    }
+
+    useUserApi().signIn(payload)
         .then(async res => {
           const token = res.data.access_token || res.data.token;
           Session.set('token', token);
-          // 如果有refresh_token，也保存
           if (res.data.refresh_token) {
             Session.set('refresh_token', res.data.refresh_token);
           }
@@ -153,40 +171,40 @@ const onSignIn = async () => {
         })
         .catch((e) => {
           console.log('错误信息： ', e)
+          ElMessage.error(e?.message || '登录失败');
           state.loading.signIn = false;
-          // 登录失败，刷新验证码
-          captchaRef.value?.refreshCode();
-          state.ruleForm.code = '';
+          if (captchaEnable.value) {
+            loadCaptcha();
+          }
         })
   });
 };
-// 登录成功后的跳转
+
 const signInSuccess = (isNoPower: boolean) => {
   if (isNoPower) {
     ElMessage.warning('抱歉，您没有登录权限');
     Session.clear();
   } else {
-    // 初始化登录成功时间问候语
     let currentTimeInfo = currentTime.value;
-    // 登录成功，跳到转首页
-    // 如果是复制粘贴的路径，非首页/登录页，那么登录成功后重定向到对应的路径中
     const params = route.query!.params || {}
     if (route.query?.redirect) {
       router.push({
-        path: route.query?.redirect,
-        query: Object.keys(params).length > 0 ? JSON.parse(params) : '',
+        path: route.query?.redirect as string,
+        query: Object.keys(params).length > 0 ? JSON.parse(params as any) : '',
       });
     } else {
       router.push('/home');
     }
-    // 登录成功提示
     const signInText = '欢迎回来！';
     ElMessage.success(`${currentTimeInfo}，${signInText}`);
-    // 添加 loading，防止第一次进入界面时出现短暂空白
     NextLoading.start();
   }
   state.loading.signIn = false;
 };
+
+onMounted(() => {
+  loadCaptcha();
+});
 </script>
 
 <style scoped lang="scss">

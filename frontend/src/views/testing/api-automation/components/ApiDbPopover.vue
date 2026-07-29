@@ -84,6 +84,7 @@
 import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { api_db_list, add_api_db, edit_api_db, del_api_db, test_db_conn } from '/@/api/v1/testing/apiAutomation';
+import { notifyDbListChanged } from '../composables/dbListSync';
 
 const searchParams = ref({ currentPage: 1, pageSize: 10, search: { name__contains: '' } });
 const db_list = ref<any[]>([]);
@@ -133,6 +134,7 @@ const add_confirm = async () => {
 	ElMessage.success('添加成功');
 	addDialog.value = false;
 	await get_db();
+	notifyDbListChanged();
 };
 
 const openEdit = (row: any) => {
@@ -146,6 +148,7 @@ const edit_confirm = async () => {
 	ElMessage.success('保存成功');
 	editDialog.value = false;
 	await get_db();
+	notifyDbListChanged();
 };
 
 const Del_db = async (row: any) => {
@@ -153,6 +156,7 @@ const Del_db = async (row: any) => {
 	await del_api_db({ id: row.id });
 	ElMessage.success('已删除');
 	await get_db();
+	notifyDbListChanged();
 };
 
 const Test_conn = async (row: any) => {

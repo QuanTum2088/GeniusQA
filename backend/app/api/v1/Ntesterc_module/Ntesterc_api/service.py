@@ -18,9 +18,8 @@ import uuid
 from datetime import timedelta
 from jsonpath_ng import parse as jsonpath_parse
 import yaml
-from sqlalchemy import select, update, delete, text
+from sqlalchemy import select, update, delete, text, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import or_
 
 from .model import (
     ApiModel,
@@ -1921,11 +1920,31 @@ class ApiAutomationService:
 
   
     @staticmethod
-    async def get_request_history(db: AsyncSession, user_id: int) -> Dict[str, Any]:
+    async def get_request_history(
+        db: AsyncSession,
+        user_id: int,
+        api_id: Optional[int] = None,
+        page: int = 1,
+        page_size: int = 10,
+    ) -> Dict[str, Any]:
+        page = max(int(page or 1), 1)
+        page_size = min(max(int(page_size or 10), 1), 100)
+        conditions = [
+            ApiResultModel.enabled_flag == 1,
+            ApiResultModel.created_by == user_id,
+        ]
+        if api_id:
+            conditions.append(ApiResultModel.api_id == int(api_id))
+
+        count_stmt = select(func.count()).select_from(ApiResultModel).where(*conditions)
+        total = int((await db.execute(count_stmt)).scalar() or 0)
+
         stmt = (
             select(ApiResultModel)
-            .where(ApiResultModel.enabled_flag == 1, ApiResultModel.created_by == user_id)
+            .where(*conditions)
             .order_by(ApiResultModel.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
         )
         rows = (await db.execute(stmt)).scalars().all()
         data: List[Dict[str, Any]] = []
@@ -1933,7 +1952,7 @@ class ApiAutomationService:
             d = r.__dict__.copy()
             d.pop("_sa_instance_state", None)
             data.append(d)
-        return {"content": data, "total": len(data)}
+        return {"content": data, "total": total, "page": page, "pageSize": page_size}
 
     @staticmethod
     async def get_edit_history(db: AsyncSession, api_id: int, user_id: int) -> List[Dict[str, Any]]:
@@ -4555,9 +4574,22 @@ class ApiAutomationService:
     # ─── 脚本中心（NtestScript）CRUD ──────────────────────────────────────────
 
     @staticmethod
+    async def _ensure_ntest_script_language_column(db: AsyncSession) -> None:
+        """兼容旧库：缺少 language 列时自动补齐。"""
+        try:
+            await db.execute(text(
+                "ALTER TABLE api_automation_ntest_scripts "
+                "ADD COLUMN language VARCHAR(32) NOT NULL DEFAULT 'python'"
+            ))
+            await db.commit()
+        except Exception:
+            await db.rollback()
+
+    @staticmethod
     async def get_ntest_scripts(db: AsyncSession, api_service_id: int, user_id: int) -> List[Dict]:
         """查询指定服务下的公共脚本列表（仅返回未软删除的记录）"""
         from .model import NtestScriptModel
+        await ApiAutomationService._ensure_ntest_script_language_column(db)
         rows = (await db.execute(
             select(NtestScriptModel).where(
                 NtestScriptModel.api_service_id == api_service_id,
@@ -4570,6 +4602,7 @@ class ApiAutomationService:
                 "name": r.name,
                 "description": r.description,
                 "code": r.code,
+                "language": getattr(r, "language", None) or "python",
                 "api_service_id": r.api_service_id,
             }
             for r in rows
@@ -4579,16 +4612,20 @@ class ApiAutomationService:
     async def add_ntest_script(db: AsyncSession, body: Dict[str, Any], user_id: int) -> None:
         """新增公共脚本"""
         from .model import NtestScriptModel
+        from .script_runtime import normalize_language
+        await ApiAutomationService._ensure_ntest_script_language_column(db)
         name = (body.get("name") or "").strip()
         if not name:
             raise ValueError("脚本名称不能为空")
         api_service_id = body.get("api_service_id")
         if not api_service_id:
             raise ValueError("api_service_id 不能为空")
+        language = normalize_language(body.get("language") or "python")
         script = NtestScriptModel(
             name=name,
             description=body.get("description") or "",
             code=body.get("code") or "",
+            language=language,
             api_service_id=int(api_service_id),
             created_by=user_id,
             enabled_flag=1,
@@ -4599,6 +4636,8 @@ class ApiAutomationService:
     @staticmethod
     async def edit_ntest_script(db: AsyncSession, script_id: int, body: Dict[str, Any], user_id: int) -> None:
         """编辑公共脚本"""
+        from .script_runtime import normalize_language
+        await ApiAutomationService._ensure_ntest_script_language_column(db)
         name = (body.get("name") or "").strip()
         if "name" in body and not name:
             raise ValueError("脚本名称不能为空")
@@ -4609,6 +4648,8 @@ class ApiAutomationService:
             values["description"] = body["description"] or ""
         if "code" in body:
             values["code"] = body["code"] or ""
+        if "language" in body:
+            values["language"] = normalize_language(body.get("language") or "python")
         from .model import NtestScriptModel
         await db.execute(
             update(NtestScriptModel)

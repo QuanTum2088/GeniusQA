@@ -8,6 +8,7 @@
           placeholder="请选择数据库连接"
           clearable
           style="width:100%"
+          @visible-change="(open: boolean) => { if (open) loadDbList() }"
           @change="onDbChange"
         >
           <el-option v-for="db in dbList" :key="db.id" :label="db.name" :value="db.id" />
@@ -107,9 +108,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation'
+import { onDbListChanged } from './composables/dbListSync'
 
 defineProps<{ serviceId: number }>()
 
@@ -132,6 +134,7 @@ const executing = ref(false)
 const resultTabs = ref<ResultTab[]>([])
 const activeTab = ref('')
 let tabCounter = 0
+let offDbListSync: (() => void) | null = null
 
 async function loadDbList() {
   try {
@@ -202,14 +205,14 @@ async function execute() {
     const res: any = await execute_db_query({ db_id: selectedDbId.value, sql: sql.value.trim() })
     const rows: any[] = Array.isArray(res?.data) ? res.data : []
     const columns = rows.length > 0 ? Object.keys(rows[0]) : []
-    tabCounter++
+    tabCounter = 1
     const tab: ResultTab = {
-      name: `result-${tabCounter}`,
-      title: `结果 ${tabCounter}`,
+      name: 'result-1',
+      title: '结果',
       columns,
       rows,
     }
-    resultTabs.value.push(tab)
+    resultTabs.value = [tab]
     activeTab.value = tab.name
   } catch (e: any) {
     ElMessage.error(e?.message || '执行失败')
@@ -228,7 +231,16 @@ function removeTab(name: string) {
   }
 }
 
-onMounted(loadDbList)
+onMounted(() => {
+  loadDbList()
+  offDbListSync = onDbListChanged(loadDbList)
+})
+onBeforeUnmount(() => {
+  offDbListSync?.()
+  offDbListSync = null
+})
+
+defineExpose({ reloadDbList: loadDbList })
 </script>
 
 <style scoped>

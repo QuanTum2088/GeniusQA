@@ -211,5 +211,6 @@ class NtestScriptModel(Base):
 
     name = Column(String(255), nullable=False, comment='脚本名称')
     description = Column(Text, nullable=True, comment='脚本描述')
-    code = Column(Text, nullable=True, comment='Python代码')
+    code = Column(Text, nullable=True, comment='脚本代码')
+    language = Column(String(32), nullable=False, default='python', comment='脚本语言：python/javascript')
     api_service_id = Column(BigInteger, nullable=False, comment='所属服务ID')

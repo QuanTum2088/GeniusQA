@@ -7,6 +7,7 @@
         placeholder="引用公共脚本（可选）"
         clearable
         style="width: 100%"
+        @visible-change="(open: boolean) => { if (open) loadPublicScripts() }"
       >
         <el-option
           v-for="s in publicScripts"
@@ -49,8 +50,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation'
+import { onNtestScriptsChanged } from '../../composables/scriptListSync'
 
 const props = defineProps<{ step: any; serviceId?: number }>()
 
@@ -64,7 +66,7 @@ const req = computed(() => {
   return props.step.request
 })
 
-onMounted(async () => {
+const loadPublicScripts = async () => {
   if (!props.serviceId) return
   try {
     const res: any = await ntest_script_list({ api_service_id: props.serviceId })
@@ -72,6 +74,18 @@ onMounted(async () => {
   } catch {
     publicScripts.value = []
   }
+}
+
+let offScriptListSync: (() => void) | null = null
+onMounted(() => {
+  loadPublicScripts()
+  offScriptListSync = onNtestScriptsChanged((sid) => {
+    if (Number(props.serviceId || 0) === sid) loadPublicScripts()
+  })
+})
+onBeforeUnmount(() => {
+  offScriptListSync?.()
+  offScriptListSync = null
 })
 </script>
 

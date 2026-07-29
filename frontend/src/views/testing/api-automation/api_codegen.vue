@@ -192,14 +192,28 @@
         <div class="toolbar-right">
           <el-button size="small" :icon="CopyDocument" @click="copyCode">复制</el-button>
           <el-button size="small" :icon="Download" @click="downloadCode">下载</el-button>
-          <el-button
-            v-if="canRun"
-            size="small"
-            type="success"
-            :icon="VideoPlay"
-            :loading="running"
-            @click="runCode"
-          >运行</el-button>
+          <template v-if="canRun">
+            <el-radio-group v-model="execMode" size="small" class="exec-mode-group">
+              <el-radio-button value="sandbox">沙盒</el-radio-button>
+              <el-radio-button value="native">原生</el-radio-button>
+            </el-radio-group>
+            <el-tooltip placement="bottom" :show-after="200">
+              <template #content>
+                <div style="max-width:280px;line-height:1.6;font-size:12px">
+                  <b>沙盒</b>：进程内受限执行（允许 requests 发请求）<br/>
+                  <b>原生</b>：本机 Python 跑 pytest / unittest（可任意依赖）
+                </div>
+              </template>
+              <el-icon class="exec-mode-help"><QuestionFilled /></el-icon>
+            </el-tooltip>
+            <el-button
+              size="small"
+              type="success"
+              :icon="VideoPlay"
+              :loading="running"
+              @click="runCode"
+            >运行</el-button>
+          </template>
         </div>
       </div>
 
@@ -244,7 +258,7 @@ import { ElMessage } from 'element-plus';
 import {
   Setting, Connection, List, Files, Search, Folder, EditPen,
   Plus, Delete, Link, MagicStick, CopyDocument, Download,
-  VideoPlay, Close, ArrowUp, ArrowDown,
+  VideoPlay, Close, ArrowUp, ArrowDown, QuestionFilled,
 } from '@element-plus/icons-vue';
 import MonacoEditor from '/@/components/monaco/index.vue';
 import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation';
@@ -451,6 +465,7 @@ function downloadCode() {
 
 // ── 运行 ──────────────────────────────────────────────────────────────
 const canRun = computed(() => ['pytest', 'unittest'].includes(form.value.framework) && !!generatedCode.value);
+const execMode = ref<'sandbox' | 'native'>('sandbox');
 const running = ref(false);
 const runOutput = ref('');
 const runSuccess = ref(false);
@@ -460,7 +475,11 @@ async function runCode() {
   running.value = true;
   runOutput.value = '';
   try {
-    const res: any = await api.run_generated_code({ code: generatedCode.value, framework: form.value.framework });
+    const res: any = await api.run_generated_code({
+      code: generatedCode.value,
+      framework: form.value.framework,
+      exec_mode: execMode.value,
+    });
     const data = res?.data ?? res;
     runOutput.value = data?.output ?? '';
     runSuccess.value = data?.success ?? false;
@@ -671,6 +690,16 @@ loadServices();
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.exec-mode-group {
+  margin-left: 4px;
+}
+
+.exec-mode-help {
+  cursor: help;
+  color: var(--el-text-color-placeholder);
+  font-size: 14px;
 }
 
 .editor-wrap {

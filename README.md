@@ -15,7 +15,10 @@
 
 ---
 ## 线上体验地址
+React版本：
 http://106.54.166.76
+Vue3版本
+http://39.96.43.109/#/auth/login
 用户：admin  密码：123456
 
 ## 🌈 项目介绍
@@ -124,18 +127,18 @@ N-Tester AI 全栈测试平台是一个面向企业级应用的现代化智能�
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                  数据访问层 (SQLAlchemy)                     │
+│              数据访问层 (SQLAlchemy / Redis)                  │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │  Models  │  │ Schemas  │  │  会话    │  │  事务    │   │
-│  │  定义    │  │  验证    │  │  管理    │  │  管理    │   │
+│  │  Models  │  │ Schemas  │  │  会话    │  │  Redis   │   │
+│  │  (模块内) │  │  (模块内) │  │  管理    │  │缓存/验证码│   │
 │  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
 └────────────────────────┬────────────────────────────────────┘
                          │
          ┌───────────────┴───────────────┬──────────────┐
          ▼                               ▼              ▼
 ┌──────────────────┐          ┌──────────────┐  ┌─────────────┐
-│   MySQL 8.0      │          │  Redis 6.0   │  │   Celery    │
-│   主数据库       │          │  缓存/队列   │  │  任务队列   │
+│   MySQL 8.0      │          │  Redis       │  │   Celery    │
+│   主数据库       │          │  缓存/队列   │  │  异步任务   │
 └──────────────────┘          └──────────────┘  └─────────────┘
 ```
 
@@ -208,139 +211,106 @@ N-Tester AI 全栈测试平台
 
 ### 后端分层架构
 
+业务模块采用 **Controller / Service / CRUD / Model / Schema 同目录** 的分层方式（不单独拆 `models/`、`services/` 大目录）。
+
 ```
 backend/
+├── main.py                 # FastAPI 入口（uvicorn）
+├── config.py               # pydantic_settings，读取根目录 .env
+├── celery_app.py           # Celery -A 入口
+├── alembic.ini
+├── run_win.bat / run_linux.sh
+├── .env / .env.example
+├── requirements.txt
+├── requirements-windows.txt
+│
 ├── app/
-│   ├── api/               # API 路由层 - 处理 HTTP 请求
-│   │   ├── v1/            # API 版本控制
-│   │   │   ├── system/    # 系统管理模块
-│   │   │   ├── projects/  # 项目管理模块
-│   │   │   ├── testing/   # 测试管理模块
-│   │   │   ├── ai/        # AI智能测试模块
-│   │   │   ├── notifications/ # 通知系统模块
-│   │   │   ├── reviews/   # 评审管理模块
-│   │   │   ├── dashboard/ # 数据面板模块
-│   │   │   └── common/    # 公共模块
-│   │   └── __init__.py    # 路由注册
-│   │
-│   ├── core/              # 核心功能层
-│   │   ├── base_crud.py   # 基础 CRUD 操作
-│   │   ├── base_model.py  # 基础模型
-│   │   ├── base_schema.py # 基础 Schema
-│   │   ├── permission.py  # 权限控制核心
-│   │   ├── data_permission.py # 数据权限过滤
-│   │   └── api_permission.py  # API权限控制
-│   │
-│   ├── models/            # 数据模型层 - ORM 模型定义
-│   │   ├── rbac_models.py # RBAC 权限模型
-│   │   ├── api_models.py  # API 测试模型
-│   │   ├── ai/            # AI 模块模型
-│   │   └── base.py        # 基础模型
-│   │
-│   ├── schemas/           # 数据验证层 - Pydantic 模型
-│   │   ├── base.py        # 基础 Schema
-│   │   ├── common.py      # 公共 Schema
-│   │   └── __init__.py    # Schema 导出
-│   │
-│   ├── services/          # 业务服务层
-│   │   ├── ai/            # AI 服务
-│   │   └── __init__.py    # 服务导出
-│   │
-│   ├── utils/             # 工具函数
-│   │   ├── common.py      # 通用工具
-│   │   ├── security.py    # 安全工具
-│   │   ├── document_extractor.py # 文档提取工具
-│   │   └── excel_importer.py # Excel导入工具
-│   │
-│   └── static/            # 静态文件
-│       ├── upload/        # 上传文件
-│       ├── templates/     # 模板文件
-│       └── swagger/       # API 文档资源
+│   ├── api/v1/             # 业务 API（按模块分包）
+│   │   ├── system/         # 认证/用户/角色/菜单/部门/字典/日志…
+│   │   │   └── auth/       # 登录、验证码(Redis)、JWT、菜单权限
+│   │   ├── monitor/        # 在线用户、系统监控
+│   │   ├── common/         # 公共接口
+│   │   └── Ntesterc_module/
+│   │       ├── Ntesterc_api/            # 接口自动化 / 代码生成 / 脚本运行时
+│   │       ├── Ntesterc_ai/             # AI 对话、LLM 配置、用量
+│   │       ├── Ntesterc_performance/    # 性能测试
+│   │       ├── Ntesterc_web/            # Web UI 自动化
+│   │       ├── Ntesterc_app/            # App 自动化
+│   │       ├── Ntesterc_project/        # 项目管理
+│   │       ├── Ntesterc_notifications/  # 通知
+│   │       ├── Ntesterc_task_scheduler/ # 定时任务 + Celery worker
+│   │       └── …                      # intel / reviews / data_factory 等
+│   ├── alembic/            # 数据库迁移脚本（versions/）
+│   ├── bootstrap/          # 启动装配：路由、CORS、中间件、限流、MinIO…
+│   ├── common/             # 统一响应、常量、枚举
+│   ├── core/               # 基类 CRUD/Model/Schema、权限、日志、OAuth
+│   ├── infra/db/           # SQLAlchemy / Redis 连接池
+│   ├── middleware/         # 请求日志等中间件
+│   ├── utils/              # 工具（含 captcha_util 等）
+│   └── static/             # 应用内静态产物（如接口执行结果）
 │
-├── celery_worker/         # Celery 任务
-│   ├── tasks/             # 任务定义
-│   ├── scheduler/         # 定时任务调度器
-│   └── worker.py          # Worker 配置
-│
-├── alembic/               # 数据库迁移
-│   └── versions/          # 迁移版本文件
-│
-├── script/                # SQL脚本文件
-│   ├── system_menu.sql    # 系统菜单
-│   ├── api_testing_menu.sql # API测试菜单
-│   ├── ai_module_menu.sql # AI模块菜单
-│   └── notification_module_menu.sql # 通知模块菜单
-│
-├── config.py              # 配置文件
-├── main.py                # 应用入口
-└── requirements           # 依赖文件
+├── scripts/                # 运维 / 便携 / CLI（勿堆在根目录）
+│   ├── cli.py              # 库表初始化 / Alembic 命令
+│   ├── run_portable.py     # 便携版启动
+│   ├── scheduler_runner.py # 独立调度进程
+│   └── portable_env.py     # config.yaml → 环境变量
+├── sql/                    # 初始化 SQL（db_init.sql 等）
+├── deploy/                 # Dockerfile、Celery runner 镜像
+├── static/                 # 对外静态资源（swagger、tools/jacoco 等）
+├── docs/                   # 后端开发说明
+└── tests/                  # 后端测试
+```
+
+**单模块约定**（示例：`app/api/v1/system/user/`）：
+
+```
+controller.py   # 路由
+service.py      # 业务
+crud.py         # 数据访问
+model.py        # ORM
+schema.py       # Pydantic 入参/出参
 ```
 
 ### 前端目录架构
 
 ```
 frontend/src/
-├── api/                   # API 接口封装
-│   ├── v1/                # API 版本控制
-│   │   ├── system/        # 系统管理接口
-│   │   ├── projects/      # 项目管理接口
-│   │   ├── testing/       # 测试管理接口
-│   │   ├── ai/            # AI智能测试接口
-│   │   ├── notifications/ # 通知系统接口
-│   │   ├── reviews/       # 评审管理接口
-│   │   └── dashboard/     # 数据面板接口
-│   └── request.ts         # 请求封装
+├── api/v1/                 # 按域封装的后端接口
+│   ├── system/             # 认证、用户、角色、菜单…
+│   ├── testing/            # 接口/性能/UI/App/调度等测试 API
+│   ├── projects/           # 项目管理
+│   ├── ai/                 # AI 对话与 LLM 配置
+│   ├── notifications/      # 通知
+│   ├── reviews/            # 评审
+│   ├── monitor/            # 监控
+│   └── common/             # 公共接口
 │
-├── views/                 # 页面视图
-│   ├── system/            # 系统管理
-│   ├── projects/          # 项目管理
-│   ├── testing/           # 测试管理
-│   │   ├── api-testing/   # API接口测试
-│   │   ├── ui-automation/ # UI自动化测试
-│   │   ├── data-factory/  # 数据工厂
-│   │   ├── testcases/     # 测试用例管理
-│   │   ├── modules/       # 模块管理
-│   │   └── versions/      # 版本管理
-│   ├── ai/                # AI智能测试
-│   │   ├── chat/          # AI对话助手
-│   │   ├── intelligence/  # 智能测试
-│   │   └── llmConfig/     # LLM配置
-│   ├── notifications/     # 通知系统
-│   │   ├── configs/       # 通知配置
-│   │   ├── histories/     # 通知历史
-│   │   └── task-settings/ # 任务通知设置
-│   ├── reviews/           # 评审管理
-│   ├── assistant/         # 智能助手
-│   ├── monitor/           # 系统监控
-│   ├── home/              # 首页仪表板
-│   ├── login/             # 登录页
-│   └── error/             # 错误页面
+├── views/
+│   ├── login/              # 登录（验证码走后端 Redis）
+│   ├── home/               # 首页
+│   ├── system/             # 系统管理
+│   ├── projects/           # 项目管理
+│   ├── testing/            # 测试能力
+│   │   ├── api-automation/ # 接口自动化 / 脚本中心 / 代码生成
+│   │   ├── api-testing/    # 接口测试
+│   │   ├── performance/    # 性能测试
+│   │   ├── ui-automation/  # UI 自动化
+│   │   ├── app-management/ # App 自动化
+│   │   ├── data-factory/   # 数据工厂
+│   │   ├── scheduler/      # 任务调度
+│   │   └── …               # precision-test / cloud-device 等
+│   ├── ai/                 # AI 智能测试
+│   ├── notifications/      # 通知
+│   ├── reviews/            # 评审
+│   ├── monitor/            # 监控
+│   ├── assistant/          # 助手
+│   └── error/              # 错误页
 │
-├── components/            # 公共组件
-│   ├── Z-Table/           # 表格组件
-│   ├── CodeGenerator/     # 代码生成器
-│   ├── monaco/            # 代码编辑器
-│   └── ZeroCard/          # 卡片组件
-│
-├── stores/                # Pinia 状态管理
-│   ├── user.ts            # 用户状态
-│   ├── auth.ts            # 认证状态
-│   ├── menu.ts            # 菜单状态
-│   └── themeConfig.ts     # 主题配置
-│
-├── utils/                 # 工具函数
-│   ├── request.ts         # HTTP 请求封装
-│   ├── authFunction.ts    # 权限验证函数
-│   ├── common.ts          # 通用工具
-│   └── formatTime.ts      # 时间格式化
-│
-├── theme/                 # 主题配置
-│   ├── index.scss         # 主题入口
-│   ├── dark.scss          # 暗色主题
-│   └── element.scss       # Element Plus 样式
-│
-└── config/                # 配置文件
-    └── assets.ts          # 资源配置
+├── components/             # 公共组件（Captcha、monaco、表格等）
+├── stores/                 # Pinia（user / themeConfig …）
+├── router/                 # 路由（含后端菜单驱动）
+├── utils/                  # request、storage、权限等
+└── theme/                  # 主题样式
 ```
 
 ---
@@ -595,25 +565,25 @@ uv sync --group dev
 
 ```bash
 # 安装依赖(linux&mac)
-pip install -r requirements
+pip install -r requirements.txt
 # windows 用户
 pip install -r requirements-windows.txt
 ```
 
-> 依赖定义以 `backend/pyproject.toml` 为准；`requirements` 文件保留用于 Docker / pip 兼容。
+> 依赖定义以 `backend/pyproject.toml` 为准；`requirements.txt` / `requirements-windows.txt` 保留用于 Docker / pip 兼容。
 
 ##### 5. 初始化数据库
 
 ```bash
 # 一键初始化（推荐）
-python cli.py init-db
+python scripts/cli.py init-db
 #或者
-uv run python cli.py init-db
+uv run python scripts/cli.py init-db
 
 
 # 或手动使用 Alembic
 alembic upgrade heads
-python cli.py init-data
+python scripts/cli.py init-data
 ```
 
 ##### 6. 启动后端服务
@@ -633,16 +603,16 @@ gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8100
 
 ```bash
 # Windows 启动 Worker（单线程）
-celery -A celery_worker.worker.celery worker --pool=solo -l INFO
+celery -A celery_app.celery worker --pool=solo -l INFO
 
 # Linux 启动 Worker（多线程）
-celery -A celery_worker.worker.celery worker --loglevel=INFO -c 10 -P solo -n ntester-celery-worker
+celery -A celery_app.celery worker --loglevel=INFO -c 10 -P solo -n ntester-celery-worker
 
-# 启动定时任务调度器
-celery -A celery_worker.worker.celery beat -S celery_worker.scheduler.schedulers:DatabaseScheduler -l INFO
+# 启动定时任务调度器（数据库）
+celery -A celery_app.celery beat -S app.api.v1.Ntesterc_module.Ntesterc_task_scheduler.celery_worker.scheduler.schedulers:DatabaseScheduler -l INFO
 
 # 启动心跳监控
-celery -A celery_worker.worker.celery beat -l INFO
+celery -A celery_app.celery beat -l INFO
 ```
 
 #### 前端部署
@@ -720,7 +690,7 @@ yarn build
 
 ```bash
 # 初始化数据库（包含迁移和初始数据）
-python cli.py init-db
+python scripts/cli.py init-db
 
 # 生成迁移文件
 alembic revision --autogenerate -m "描述信息"
@@ -773,28 +743,27 @@ alembic current
 
 ### 后端开发
 
-#### 添加新的 API 接口
+#### 添加新的 API 模块
 
-1. 在 `app/models/` 创建数据模型
-2. 在 `app/schemas/` 创建 Pydantic Schema
-3. 在 `app/api/v1/` 创建路由处理器
-4. 使用权限装饰器控制访问权限
+1. 在 `app/api/v1/<域>/<模块名>/` 下同目录创建：`model.py` / `schema.py` / `crud.py` / `service.py` / `controller.py`
+2. 在 `app/api/v1/__init__.py`（或对应域 `__init__.py`）注册路由
+3. 新表模型需在 `app/alembic/env.py` 中 import，再执行 `python scripts/cli.py revision` / `upgrade`
+4. 需要鉴权的接口使用权限装饰器
 
-#### 示例：创建用户管理接口
+#### 示例：模块内分层（同目录）
 
 ```python
-# app/models/rbac_models.py
-from app.models.base import Base
+# app/api/v1/system/user/model.py
+from app.core.db_base import Base
 from sqlalchemy import Column, String, Integer
 
 class User(Base):
     __tablename__ = "sys_user"
-    
-    username = Column(String(50), nullable=False, unique=True, comment='用户名')
-    email = Column(String(100), nullable=True, comment='邮箱')
-    status = Column(Integer, nullable=False, default=1, comment='状态')
+    username = Column(String(50), nullable=False, unique=True)
+    email = Column(String(100), nullable=True)
+    status = Column(Integer, nullable=False, default=1)
 
-# app/schemas/common.py
+# app/api/v1/system/user/schema.py
 from pydantic import BaseModel
 from typing import Optional
 
@@ -810,24 +779,22 @@ class UserResponse(BaseModel):
     status: int
 
 # app/api/v1/system/user/controller.py
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from app.core.api_permission import ApiPermission
 from app.core.data_permission import DataPermission
 
 router = APIRouter()
 
 @router.post("/", response_model=UserResponse)
-@ApiPermission("system:user:add")  # API权限控制
+@ApiPermission("system:user:add")
 async def create_user(user: UserCreate):
-    # 业务逻辑
-    pass
+    ...
 
-@router.get("/", response_model=List[UserResponse])
+@router.get("/", response_model=list[UserResponse])
 @ApiPermission("system:user:list")
-@DataPermission(data_scope="dept")  # 数据权限控制
+@DataPermission(data_scope="dept")
 async def get_users():
-    # 业务逻辑
-    pass
+    ...
 ```
 
 #### 权限系统使用
@@ -854,19 +821,18 @@ async def update_user():
 
 #### 添加新页面
 
-1. 在 `src/views/` 创建页面组件
-2. 在 `src/router/routes.ts` 配置路由
-3. 在 `src/api/` 创建接口调用
-4. 在后台菜单管理中配置菜单
+1. 在 `src/views/<域>/` 创建页面组件
+2. 在 `src/api/v1/<域>/` 创建接口封装
+3. 后台菜单管理配置路由（后端菜单驱动时无需改死路由表）
 
 #### 示例：创建用户列表页面
 
 ```typescript
-// src/api/user.ts
-import request from './request'
+// src/api/v1/system/user.ts
+import request from '/@/utils/request'
 
 export const getUserList = (params: any) => {
-  return request.get('/api/v1/users', { params })
+  return request({ url: '/v1/system/user/list', method: 'GET', params })
 }
 
 // src/views/system/user/index.vue
@@ -881,7 +847,7 @@ export const getUserList = (params: any) => {
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getUserList } from '@/api/user'
+import { getUserList } from '/@/api/v1/system/user'
 
 const userList = ref([])
 
@@ -890,15 +856,9 @@ onMounted(async () => {
   userList.value = res.data
 })
 </script>
-
-// src/router/routes.ts
-{
-  path: '/system/user',
-  name: 'SystemUser',
-  component: () => import('@/views/system/user/index.vue'),
-  meta: { title: '用户管理', permission: 'system:user:list' }
-}
 ```
+
+> 菜单路由一般由后端菜单下发，在后台「菜单管理」配置即可；仅本地调试时再改 `src/router`。
 
 #### 权限控制
 
