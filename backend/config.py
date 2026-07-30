@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # @author: Rebort
-"""应用配置：从 backend/.env 加载，分节对齐 Fast 风格。"""
+"""应用配置"""
 import os
 import typing
 from urllib.parse import quote
