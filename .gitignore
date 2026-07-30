@@ -1,41 +1,96 @@
-# Python
+# ==================== OS ====================
+.DS_Store
+Thumbs.db
+
+# ==================== Editor / IDE ====================
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*~
+
+# ==================== Node.js ====================
+node_modules/
+/dist
+frontend/dist/
+frontend/node_modules/
+*.tsbuildinfo
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+*.log
+
+# ==================== Python ====================
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+
+# C extensions
 *.so
-*.egg-info/
+
+# Distribution / packaging
 .Python
+*.egg-info/
 *.egg
+build/
+dist/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+.installed.cfg
 
 # Virtual env
 backend/.venv/
 backend/uv.lock
 
-# Build outputs
-frontend/dist/
-frontend/node_modules/
-*.tsbuildinfo
+# PyInstaller
+*.manifest
+*.spec
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*~
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
 
-# OS
-Thumbs.db
-.DS_Store
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*,cover
 
-# Logs
-logs/
-*.log
+# Translations
+*.mo
+*.pot
 
-# Local config and scripts
-config.yaml
+# Sphinx documentation
+docs/_build/
+
+# ==================== Local env files ====================
 .env
 .env.local
+.env.*.local
 
-# Upstream merge: always keep local version
+# ==================== Local config & scripts ====================
+config.yaml
 README.md
 
 # Local sync/personal scripts
@@ -59,10 +114,8 @@ install-deps-and-start.ps1
 deploy-windows.ps1
 build_output.txt
 
-# Run artifacts
+# ==================== Runtime artifacts ====================
 .runtime/
-.runtime/
-# Service binaries and runtime
 minio/
 playwright-mcp/
 backend/pip.ini
@@ -70,11 +123,11 @@ start-backend-hidden.ps1
 idx
 $c
 
-# Runtime generated files (never commit)
+# Static / upload generated files
 static/swagger/
 static/api_results/
 static/media/playwright/
+static/upload/
 backend/app/static/api_results/
 backend/static/upload/
-static/upload/
 backend/static/uploads/
