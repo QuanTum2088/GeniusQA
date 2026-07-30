@@ -102,6 +102,12 @@ README.md
 sync-git.ps1
 sync-git.cmd
 start-backend.cmd
+start-master.cmd
+start-minio.cmd
+start-minio.vbs
+start-playwright-mcp.cmd
+start-playwright.vbs
+silent-run.vbs
 
 # Backup scripts generated locally
 start-source.bat
