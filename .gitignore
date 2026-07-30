@@ -89,6 +89,11 @@ docs/_build/
 .env.local
 .env.*.local
 
+# ==================== QwenPaw agent workspace (never commit) ====================
+.qwen-agent/
+skills/
+uploads/skills/
+
 # ==================== Local config & scripts ====================
 config.yaml
 README.md
