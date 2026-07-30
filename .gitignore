@@ -35,6 +35,9 @@ config.yaml
 .env
 .env.local
 
+# Upstream merge: always keep local version
+README.md
+
 # Local sync/personal scripts
 sync-git.ps1
 sync-git.cmd
