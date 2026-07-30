@@ -4,24 +4,100 @@
 
 from datetime import datetime, timedelta
 from typing import Optional
+from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
 from jose import JWTError, jwt
+from config import config
 from app.api.v1.system.auth.schema import (
     LoginSchema,
     LoginResponseSchema,
     UserInfoSchema,
     RefreshTokenSchema,
     ChangePasswordSchema,
-    RegisterSchema
+    RegisterSchema,
+    CaptchaOutSchema,
 )
 from app.api.v1.system.user.crud import UserCRUD
 from app.utils.security import verify_password, get_password_hash
-from app.common.constants import TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
+from app.utils.captcha_util import CaptchaUtil
 
-# JWT配置（实际项目中应该从配置文件读取）
-SECRET_KEY = "your-secret-key-here-change-in-production"
 ALGORITHM = "HS256"
+CAPTCHA_REDIS_PREFIX = "captcha_codes"
+
+
+def _access_token_expire_minutes() -> int:
+    return int(getattr(config, "ACCESS_TOKEN_EXPIRE_MINUTES", None) or 60 * 24)
+
+
+def _refresh_token_expire_days() -> int:
+    return int(getattr(config, "REFRESH_TOKEN_EXPIRE_DAYS", None) or 7)
+
+
+class CaptchaService:
+    """登录验证码：Redis 存答案，可开关。"""
+
+    @classmethod
+    def _redis_key(cls, key: str) -> str:
+        return f"{CAPTCHA_REDIS_PREFIX}:{key}"
+
+    @classmethod
+    async def _redis(cls):
+        from app.infra.db import get_redis_pool
+        pool = get_redis_pool()
+        if not pool.redis:
+            pool.init_by_config(config=config)
+        if not pool.redis:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Redis 未就绪，无法使用验证码",
+            )
+        return pool.redis
+
+    @classmethod
+    async def get_captcha_service(cls) -> dict:
+        if not bool(getattr(config, "CAPTCHA_ENABLE", True)):
+            return CaptchaOutSchema(enable=False, key="", img_base="").model_dump()
+
+        length = int(getattr(config, "CAPTCHA_LENGTH", 4) or 4)
+        expire = int(getattr(config, "CAPTCHA_EXPIRE_SECONDS", 60) or 60)
+        img_b64, captcha_value = CaptchaUtil.generate_captcha(length=length)
+        captcha_key = uuid4().hex
+        redis = await cls._redis()
+        await redis.set(cls._redis_key(captcha_key), str(captcha_value), ex=expire)
+        return CaptchaOutSchema(
+            enable=True,
+            key=captcha_key,
+            img_base=f"data:image/png;base64,{img_b64}",
+        ).model_dump()
+
+    @classmethod
+    async def check_captcha_service(cls, *, key: Optional[str], captcha: Optional[str]) -> None:
+        if not bool(getattr(config, "CAPTCHA_ENABLE", True)):
+            return
+        if not key or not captcha:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="验证码不能为空",
+            )
+        redis = await cls._redis()
+        redis_key = cls._redis_key(str(key).strip())
+        stored = await redis.get(redis_key)
+        if stored is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="验证码已过期",
+            )
+        expected = str(stored).strip()
+        # MyAsyncRedis.get 可能已 json.loads；兜底去引号
+        if expected.startswith('"') and expected.endswith('"'):
+            expected = expected[1:-1]
+        if str(captcha).strip().lower() != expected.lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="验证码错误",
+            )
+        await redis.delete(redis_key)
 
 
 class AuthService:
@@ -48,10 +124,10 @@ class AuthService:
         if expires_delta:
             expire = datetime.utcnow() + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(minutes=TOKEN_EXPIRE_MINUTES)
+            expire = datetime.utcnow() + timedelta(minutes=_access_token_expire_minutes())
         
         to_encode.update({"exp": expire})
-        encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+        encoded_jwt = jwt.encode(to_encode, config.SECRET_KEY, algorithm=ALGORITHM)
         
         return encoded_jwt
     
@@ -70,10 +146,10 @@ class AuthService:
             JWT刷新令牌
         """
         to_encode = data.copy()
-        expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        expire = datetime.utcnow() + timedelta(days=_refresh_token_expire_days())
         to_encode.update({"exp": expire, "type": "refresh"})
         
-        encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+        encoded_jwt = jwt.encode(to_encode, config.SECRET_KEY, algorithm=ALGORITHM)
         
         return encoded_jwt
     
@@ -92,7 +168,7 @@ class AuthService:
             HTTPException: 令牌无效或过期
         """
         try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            payload = jwt.decode(token, config.SECRET_KEY, algorithms=[ALGORITHM])
             return payload
         except JWTError:
             raise HTTPException(
@@ -124,6 +200,9 @@ class AuthService:
         from app.api.v1.system.log.service import LoginLogService
         from app.api.v1.monitor.online.service import OnlineUserService
         from app.utils.common import get_str_uuid
+
+        # 验证码（CAPTCHA_ENABLE=true 时强制 Redis 校验）
+        await CaptchaService.check_captcha_service(key=data.captcha_key, captcha=data.captcha)
         
         crud = UserCRUD(db)
         
@@ -233,7 +312,7 @@ class AuthService:
         return LoginResponseSchema(
             access_token=access_token,
             token_type="Bearer",
-            expires_in=TOKEN_EXPIRE_MINUTES * 60,
+            expires_in=_access_token_expire_minutes() * 60,
             refresh_token=refresh_token
         )
     
@@ -497,7 +576,7 @@ class AuthService:
         return LoginResponseSchema(
             access_token=access_token,
             token_type="Bearer",
-            expires_in=TOKEN_EXPIRE_MINUTES * 60,
+            expires_in=_access_token_expire_minutes() * 60,
             refresh_token=refresh_token
         )
     

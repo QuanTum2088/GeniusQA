@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-# Allow running via: python backend/runner/worker.py or cd backend/runner && python worker.py
+# Allow running via: python backend/deploy/celery/worker.py or cd backend/deploy/celery && python worker.py
 _THIS_FILE = Path(__file__).resolve()
 _BACKEND_ROOT = _THIS_FILE.parents[1]
 if str(_BACKEND_ROOT) not in sys.path:

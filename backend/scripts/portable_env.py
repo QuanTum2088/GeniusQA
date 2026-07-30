@@ -21,9 +21,10 @@ def _portable_roots() -> list[Path]:
     if raw:
         roots.append(Path(raw).resolve())
     roots.append(Path.cwd().resolve())
-    # backend/portable_env.py -> backend -> parent
+    # backend/scripts/portable_env.py -> scripts -> backend -> 仓库/便携根
     here = Path(__file__).resolve().parent
-    roots.append(here.parent.resolve())
+    roots.append(here.parent.parent.resolve())
+    roots.append(here.parent.resolve())  # backend 目录（兜底）
     # 去重保持顺序
     seen: set[Path] = set()
     out: list[Path] = []

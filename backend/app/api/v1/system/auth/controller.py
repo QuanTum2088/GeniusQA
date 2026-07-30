@@ -5,7 +5,7 @@
 from fastapi import APIRouter, Depends, Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.infra.db.sqlalchemy import get_db
-from app.api.v1.system.auth.service import AuthService
+from app.api.v1.system.auth.service import AuthService, CaptchaService
 from app.api.v1.system.auth.schema import (
     LoginSchema,
     LoginResponseSchema,
@@ -36,6 +36,18 @@ def get_client_ip(request: Request) -> str:
         return request.client.host
     
     return "unknown"
+
+
+@router.get("/captcha/get", summary="获取登录验证码")
+async def get_captcha():
+    """
+    获取图片验证码。
+
+    - CAPTCHA_ENABLE=true：返回 enable/key/img_base，答案存 Redis
+    - CAPTCHA_ENABLE=false：返回 enable=false，前端隐藏验证码
+    """
+    data = await CaptchaService.get_captcha_service()
+    return success_response(data=data, message="获取验证码成功")
 
 
 @router.post("/login", summary="用户登录", response_model=dict)

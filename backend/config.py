@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # @author: Rebort
+"""应用配置"""
 import os
 import typing
 from urllib.parse import quote
@@ -15,147 +16,120 @@ project_desc = """
 
 
 class Configs(BaseSettings):
+    # ================================================= #
+    # ******** 服务 *********** #
+    # ================================================= #
     SERVER_DESC: str = project_desc
     SERVER_VERSION: typing.Union[int, str] = 2.0
-    BASE_URL: AnyHttpUrl = Field(default="http://127.0.0.1:8100", validation_alias="BASE_URL")  # 开发环境
-    # 前端访问地址（用于通知中的“查看报告”链接）。未配置则回退 BASE_URL。
+    BASE_URL: AnyHttpUrl = Field(default="http://127.0.0.1:8100", validation_alias="BASE_URL")
     FRONTEND_BASE_URL: str = Field(default="", validation_alias="FRONTEND_BASE_URL")
+    API_PREFIX: str = "/api"
+    STATIC_DIR: str = "static"
+    GLOBAL_ENCODING: str = "utf8"
+    CORS_ORIGINS: typing.List[typing.Any] = ["*"]
+    BASEDIR: str = os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 
-    API_PREFIX: str = "/api"  # 接口前缀 - v1版本通过路由器添加
+    # ================================================= #
+    # ******** 安全 / JWT *********** #
+    # ================================================= #
+    SECRET_KEY: str = Field(..., validation_alias="SECRET_KEY")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60 * 24, validation_alias="ACCESS_TOKEN_EXPIRE_MINUTES")
+    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7, validation_alias="REFRESH_TOKEN_EXPIRE_DAYS")
     # 前端 dist 目录（SPA 托管），留空则默认 {BASEDIR}/frontend/dist
     FRONTEND_DIST: str = Field(default="", validation_alias="FRONTEND_DIST")
-    STATIC_DIR: str = 'static'  # 静态文件目录
-    GLOBAL_ENCODING: str = 'utf8'  # 全局编码
-    CORS_ORIGINS: typing.List[typing.Any] = ["*"]  # 跨域请求
 
-    SECRET_KEY: str = "kPBDjVk0o3Y1wLxdODxBpjwEjo7-Euegg4kdnzFIRjc"  # 密钥(每次重启服务密钥都会改变, token解密失败导致过期, 可设置为常量)
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 1  # token过期时间: 60 minutes * 24 hours * 1 days = 1 days
+    # ================================================= #
+    # ******** Redis *********** #
+    # ================================================= #
+    # 推荐：直接配置 REDIS_URI；也可填 HOST/PORT 等拆字段自动拼接
+    REDIS_URI: str = Field(default="", validation_alias="REDIS_URI")
+    REDIS_HOST: str = Field(default="", validation_alias="REDIS_HOST")
+    REDIS_PORT: int = Field(default=6379, validation_alias="REDIS_PORT")
+    REDIS_USER: str = Field(default="", validation_alias="REDIS_USER")
+    REDIS_PASSWORD: str = Field(default="", validation_alias="REDIS_PASSWORD")
+    REDIS_DB: int = Field(default=4, validation_alias="REDIS_DB")
 
-    # redis
-    REDIS_URI: str = Field(..., validation_alias="REDIS_URI")  # redis
-
-    # ---- 数据库独立字段----
+    # ================================================= #
+    # ******** 数据库 *********** #
+    # ================================================= #
     DB_HOST: str = Field(default="", validation_alias="DB_HOST")
     DB_PORT: int = Field(default=3306, validation_alias="DB_PORT")
     DB_USER: str = Field(default="", validation_alias="DB_USER")
     DB_PASSWORD: str = Field(default="", validation_alias="DB_PASSWORD")
     DB_NAME: str = Field(default="", validation_alias="DB_NAME")
+    # 兼容旧部署：MYSQL_DATABASE_URI / MYSQL_DATABASE_URI_SYNC
+    DATABASE_URI: str = Field(default="", validation_alias="MYSQL_DATABASE_URI")
+    DATABASE_URI_SYNC: str = Field(default="", validation_alias="MYSQL_DATABASE_URI_SYNC")
+    DATABASE_ECHO: bool = False
 
-    # ---- 完整 URL 字段（优先级低于独立字段） ----
-    # DATABASE_URI: str = "sqlite+aiosqlite:///./sql_app.db?check_same_thread=False"  # Sqlite(异步)
-    DATABASE_URI: str = Field(default="", validation_alias="MYSQL_DATABASE_URI")  # MySQL(异步)
-    DATABASE_URI_SYNC: str = Field(default="", validation_alias="MYSQL_DATABASE_URI_SYNC")  # MySQL(同步，用于 Alembic)
-    # DATABASE_URI: str = "postgresql+asyncpg://postgres:123456@localhost:5432/postgres"  # PostgreSQL(异步)
-    DATABASE_ECHO: bool = False  # 是否打印数据库日志 (可看到创建表、表数据增删改查的信息)
+    # ================================================= #
+    # ******** 验证码 *********** #
+    # ================================================= #
+    CAPTCHA_ENABLE: bool = Field(default=True, validation_alias="CAPTCHA_ENABLE")
+    CAPTCHA_EXPIRE_SECONDS: int = Field(default=60, validation_alias="CAPTCHA_EXPIRE_SECONDS")
+    CAPTCHA_LENGTH: int = Field(default=4, validation_alias="CAPTCHA_LENGTH")
 
-    @model_validator(mode="after")
-    def build_database_uris(self) -> "Configs":
-        """若配置了独立字段，自动拼接 URI"""
-        if self.DB_HOST and self.DB_USER and self.DB_NAME:
-            encoded_password = quote(self.DB_PASSWORD, safe="")
-            base = f"{self.DB_USER}:{encoded_password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset=UTF8MB4"
-            self.DATABASE_URI = f"mysql+aiomysql://{base}"
-            self.DATABASE_URI_SYNC = f"mysql+pymysql://{base}"
-            # celery beat 也用同一个数据库
-            if not self.beat_db_uri:
-                self.beat_db_uri = f"mysql+pymysql://{base}"
-        elif not self.DATABASE_URI or not self.DATABASE_URI_SYNC:
-            raise ValueError(
-                "请在 .env 中配置数据库连接：\n"
-                "  推荐方式（支持特殊字符密码）：DB_HOST / DB_PORT / DB_USER / DB_PASSWORD / DB_NAME\n"
-                "  兼容方式（旧格式）：MYSQL_DATABASE_URI / MYSQL_DATABASE_URI_SYNC"
-            )
-        return self
+    # ================================================= #
+    # ******** 日志 *********** #
+    # ================================================= #
+    LOGGER_DIR: str = "logs"
+    LOGGER_NAME: str = "N-Tester.log"
+    LOGGER_LEVEL: str = "INFO"
+    LOGGER_ROTATION: str = "10 MB"
+    LOGGER_RETENTION: str = "7 days"
 
-    # logger
-    LOGGER_DIR: str = "logs"  # 日志目录（相对 backend 根目录）
-    LOGGER_NAME: str = "N-Tester.log"  # 全量日志文件名
-    LOGGER_LEVEL: str = "INFO"  # 日志等级: ['DEBUG' | 'INFO']
-    LOGGER_ROTATION: str = "10 MB"  # 日志分片: 按 时间段/文件大小 切分日志. 例如 ["500 MB" | "12:00" | "1 week"]
-    LOGGER_RETENTION: str = "7 days"  # 日志保留的时间: 超出将删除最早的日志. 例如 ["1 days"]
-
-    # dir
-    BASEDIR: str = os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
-
-    # celery
+    # ================================================= #
+    # ******** Celery *********** #
+    # ================================================= #
     broker_url: str = Field(..., validation_alias="CELERY_BROKER_URL")
     result_backend: str = Field(..., validation_alias="CELERY_RESULT_BACKEND")
     accept_content: typing.List[str] = ["json"]
     result_serializer: str = "json"
     timezone: str = "Asia/Shanghai"
     enable_utc: bool = False
-    # 并发工作进程/线程/绿色线程执行任务的数量 默认10
     worker_concurrency: int = 10
-    # 一次预取多少消息乘以并发进程数 默认4
     worker_prefetch_multiplier: int = 4
-    # 池工作进程在被新任务替换之前可以执行的最大任务数。默认是没有限制
     worker_max_tasks_per_child: int = 100
-    # 连接池中可以打开的最大连接数 默认10
     broker_pool_limit: int = 10
-    # 传递给底层传输的附加选项的字典。设置可见性超时的示例（Redis 和 SQS 传输支持）
-    result_backend_transport_options: typing.Dict[str, typing.Any] = {'visibility_timeout': 3600}
+    result_backend_transport_options: typing.Dict[str, typing.Any] = {"visibility_timeout": 3600}
     include: typing.List[typing.Any] = [
-        'app.api.v1.Ntesterc_module.Ntesterc_task_scheduler.celery_worker.tasks.common',
+        "app.api.v1.Ntesterc_module.Ntesterc_task_scheduler.celery_worker.tasks.common",
     ]
-    # task_queues = (
-    #     Queue("case", )
-    # )
-    TEST_FILES_DIR: str = os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))), 'files')
-
+    TEST_FILES_DIR: str = os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))), "files")
     task_run_pool: int = 3
-
-    # celery beat
     beat_db_uri: str = Field(default="", validation_alias="CELERY_BEAT_DB_URL")
 
     # ================================================= #
-    # ******** OAuth 配置 *********** #
+    # ******** OAuth *********** #
     # ================================================= #
-    
-    # 是否给 OAuth 登录用户授予管理员权限（生产环境建议关闭）
     GRANT_ADMIN_TO_OAUTH_USER: bool = True
-    
-    # Gitee OAuth
     GITEE_CLIENT_ID: str = Field(default="", validation_alias="GITEE_CLIENT_ID")
     GITEE_CLIENT_SECRET: str = Field(default="", validation_alias="GITEE_CLIENT_SECRET")
     GITEE_REDIRECT_URI: str = Field(default="http://localhost:3000/oauth/gitee/callback", validation_alias="GITEE_REDIRECT_URI")
-    
-    # GitHub OAuth
     GITHUB_CLIENT_ID: str = Field(default="", validation_alias="GITHUB_CLIENT_ID")
     GITHUB_CLIENT_SECRET: str = Field(default="", validation_alias="GITHUB_CLIENT_SECRET")
     GITHUB_REDIRECT_URI: str = Field(default="http://localhost:3000/oauth/github/callback", validation_alias="GITHUB_REDIRECT_URI")
-    
-    # QQ 互联 OAuth
     QQ_APP_ID: str = Field(default="", validation_alias="QQ_APP_ID")
     QQ_APP_KEY: str = Field(default="", validation_alias="QQ_APP_KEY")
     QQ_REDIRECT_URI: str = Field(default="http://localhost:3000/oauth/qq/callback", validation_alias="QQ_REDIRECT_URI")
-    
-    # Google OAuth
     GOOGLE_CLIENT_ID: str = Field(default="", validation_alias="GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET: str = Field(default="", validation_alias="GOOGLE_CLIENT_SECRET")
     GOOGLE_REDIRECT_URI: str = Field(default="http://localhost:3000/oauth/google/callback", validation_alias="GOOGLE_REDIRECT_URI")
-    
-    # 微信开放平台 OAuth
     WECHAT_APP_ID: str = Field(default="", validation_alias="WECHAT_APP_ID")
     WECHAT_APP_SECRET: str = Field(default="", validation_alias="WECHAT_APP_SECRET")
     WECHAT_REDIRECT_URI: str = Field(default="http://localhost:3000/oauth/wechat/callback", validation_alias="WECHAT_REDIRECT_URI")
-    
-    # Microsoft OAuth
     MICROSOFT_CLIENT_ID: str = Field(default="", validation_alias="MICROSOFT_CLIENT_ID")
     MICROSOFT_CLIENT_SECRET: str = Field(default="", validation_alias="MICROSOFT_CLIENT_SECRET")
     MICROSOFT_REDIRECT_URI: str = Field(default="http://localhost:3000/oauth/microsoft/callback", validation_alias="MICROSOFT_REDIRECT_URI")
-    
-    # 钉钉 OAuth
     DINGTALK_APP_ID: str = Field(default="", validation_alias="DINGTALK_APP_ID")
     DINGTALK_APP_SECRET: str = Field(default="", validation_alias="DINGTALK_APP_SECRET")
     DINGTALK_REDIRECT_URI: str = Field(default="http://localhost:3000/oauth/dingtalk/callback", validation_alias="DINGTALK_REDIRECT_URI")
-    
-    # 飞书 OAuth
     FEISHU_APP_ID: str = Field(default="", validation_alias="FEISHU_APP_ID")
     FEISHU_APP_SECRET: str = Field(default="", validation_alias="FEISHU_APP_SECRET")
     FEISHU_REDIRECT_URI: str = Field(default="http://localhost:3000/oauth/feishu/callback", validation_alias="FEISHU_REDIRECT_URI")
-    
+
     # ================================================= #
-    # ******** 邮件配置 *********** #
+    # ******** 邮件 *********** #
     # ================================================= #
     EMAIL_HOST: str = Field(default="smtp.qq.com", validation_alias="EMAIL_HOST")
     EMAIL_PORT: int = Field(default=587, validation_alias="EMAIL_PORT")
@@ -163,31 +137,9 @@ class Configs(BaseSettings):
     EMAIL_HOST_USER: str = Field(default="", validation_alias="EMAIL_HOST_USER")
     EMAIL_HOST_PASSWORD: str = Field(default="", validation_alias="EMAIL_HOST_PASSWORD")
     DEFAULT_FROM_EMAIL: str = Field(default="", validation_alias="DEFAULT_FROM_EMAIL")
-    
-    # ================================================= #
-    # ******** AI 平台配置（已废弃） *********** #
-    # ================================================= #
-    # 注意：以下配置已不再使用！
-    # 保留这些字段仅为了向后兼容，避免启动报错
-    
-    # OpenAI
-    OPENAI_API_KEY: str = Field(default="", validation_alias="OPENAI_API_KEY")
-    OPENAI_API_BASE: str = Field(default="https://api.openai.com/v1", validation_alias="OPENAI_API_BASE")
-    
-    # Anthropic Claude
-    ANTHROPIC_API_KEY: str = Field(default="", validation_alias="ANTHROPIC_API_KEY")
-    
-    # 阿里通义千问
-    QWEN_API_KEY: str = Field(default="", validation_alias="QWEN_API_KEY")
-    
-    # 阿里云百炼 DashScope
-    DASHSCOPE_API_KEY: str = Field(default="", validation_alias="DASHSCOPE_API_KEY")
-    
-    # Ollama (本地)
-    OLLAMA_HOST: str = Field(default="http://localhost:11434", validation_alias="OLLAMA_HOST")
 
     # ================================================= #
-    # ******** MinIO 对象存储配置，性能测试模块使用 ******** #
+    # ******** MinIO *********** #
     # ================================================= #
     MINIO_ENDPOINT: str = Field(default="127.0.0.1:9000", validation_alias="MINIO_ENDPOINT")
     MINIO_ACCESS_KEY: str = Field(default="minioadmin", validation_alias="MINIO_ACCESS_KEY")
@@ -195,43 +147,73 @@ class Configs(BaseSettings):
     MINIO_SECURE: bool = Field(default=False, validation_alias="MINIO_SECURE")
     MINIO_BUCKET: str = Field(default="performance", validation_alias="MINIO_BUCKET")
 
-    # --------------压力机SSH连接相关配置-----------------
-    # 平台机（控制机）私钥文件绝对路径，paramiko 用此密钥 SSH 登录 Master/Slave/单机
-    # Windows 平台机路径示例：C:\Users\xxx\.ssh\id_rsa
+    # ================================================= #
+    # ******** SSH（压力机分发） *********** #
+    # ================================================= #
     PLATFORM_SSH_KEY_PATH: str = Field(default="/root/.ssh/id_rsa", validation_alias="PLATFORM_SSH_KEY_PATH")
-    # 目标压力机（Linux）上的默认私钥路径，Master 执行 ssh/scp 命令访问 Worker 时通过 -i 指定
     DEFAULT_SSH_KEY_PATH: str = Field(default="/root/.ssh/id_rsa", validation_alias="DEFAULT_SSH_KEY_PATH")
-    # 机器未配置 ssh_user/ssh_password 时的全局兜底凭据
     SSH_DEFAULT_USER: str = Field(default="root", validation_alias="SSH_DEFAULT_USER")
     SSH_DEFAULT_PASSWORD: str = Field(default="", validation_alias="SSH_DEFAULT_PASSWORD")
 
     # ================================================= #
-    # ******** APP 自动化（Airtest / 子进程执行器） *********** #
+    # ******** APP 自动化 *********** #
     # ================================================= #
-
-    # 项目根目录（media/app_result、相对模板路径等）；不填则自动推断仓库根
     APP_PROJECT_ROOT: str = Field(default="", validation_alias="APP_PROJECT_ROOT")
-
-    # 与config.settings.project_path 同名，可与 APP_PROJECT_ROOT 二选一
     PROJECT_PATH: str = Field(default="", validation_alias="PROJECT_PATH")
-
-    # 截图/视频 URL 前缀（浏览器可访问的后端或网关地址）；不填则尝试用下方 BASE_URL
     APP_PUBLIC_BASE_URL: str = Field(default="", validation_alias="APP_PUBLIC_BASE_URL")
-
-    # type=6「删除差更文件」：adb rm -rf 路径，多个用分号分隔
     APP_DEVICE_RM_PATHS: str = Field(default="", validation_alias="APP_DEVICE_RM_PATHS")
-
-    # 短信验证码步骤：短信正文需包含的关键字
     APP_SMS_BODY_KEYWORD: str = Field(default="识别文案", validation_alias="APP_SMS_BODY_KEYWORD")
-
-    # 设为 1/true/yes 时使用 Appium+OpenCV 执行器（无需安装 airtest）
     USE_APPIUM_APP_EXECUTOR: str = Field(default="", validation_alias="USE_APPIUM_APP_EXECUTOR")
     APPIUM_SERVER_URL: str = Field(default="http://127.0.0.1:4723", validation_alias="APPIUM_SERVER_URL")
-
-    # Appium 模板路径拼接根目录
     APP_TEMPLATE_ROOT: str = Field(default="backend", validation_alias="APP_TEMPLATE_ROOT")
 
-    model_config = SettingsConfigDict(case_sensitive=True, env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    # ================================================= #
+    # ******** 脚本执行 *********** #
+    # ================================================= #
+    SCRIPT_EXEC_MODE: str = Field(default="sandbox", validation_alias="SCRIPT_EXEC_MODE")
+    SCRIPT_NATIVE_PYTHON: str = Field(default="", validation_alias="SCRIPT_NATIVE_PYTHON")
+    SCRIPT_NATIVE_NODE: str = Field(default="", validation_alias="SCRIPT_NATIVE_NODE")
+    SCRIPT_NATIVE_TIMEOUT: int = Field(default=30, validation_alias="SCRIPT_NATIVE_TIMEOUT")
+
+    @model_validator(mode="after")
+    def build_uris(self) -> "Configs":
+        # Redis：拆字段 → REDIS_URI
+        if not str(self.REDIS_URI or "").strip():
+            if not self.REDIS_HOST:
+                raise ValueError(
+                    "请在 .env 中配置 Redis：\n"
+                    "  推荐：REDIS_URI=redis://localhost:6379/4\n"
+                    "  或拆字段：REDIS_HOST / REDIS_PORT / REDIS_USER / REDIS_PASSWORD / REDIS_DB"
+                )
+            user = quote(str(self.REDIS_USER or ""), safe="")
+            password = quote(str(self.REDIS_PASSWORD or ""), safe="")
+            auth = ""
+            if user or password:
+                auth = f"{user}:{password}@" if user else f":{password}@"
+            self.REDIS_URI = f"redis://{auth}{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+
+        # MySQL：DB_* → DATABASE_URI
+        if self.DB_HOST and self.DB_USER and self.DB_NAME:
+            encoded_password = quote(self.DB_PASSWORD, safe="")
+            base = f"{self.DB_USER}:{encoded_password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset=UTF8MB4"
+            self.DATABASE_URI = f"mysql+aiomysql://{base}"
+            self.DATABASE_URI_SYNC = f"mysql+pymysql://{base}"
+            if not self.beat_db_uri:
+                self.beat_db_uri = f"mysql+pymysql://{base}"
+        elif not self.DATABASE_URI or not self.DATABASE_URI_SYNC:
+            raise ValueError(
+                "请在 .env 中配置数据库连接：\n"
+                "  推荐：DB_HOST / DB_PORT / DB_USER / DB_PASSWORD / DB_NAME\n"
+                "  兼容旧格式：MYSQL_DATABASE_URI / MYSQL_DATABASE_URI_SYNC"
+            )
+        return self
+
+    model_config = SettingsConfigDict(
+        case_sensitive=True,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 config = Configs()

@@ -1,15 +1,20 @@
 <template>
   <div class="sc-root">
 
-    <!-- ── Fullscreen code detail view ── -->
+  
     <div v-if="detailScript" class="sc-fullscreen">
       <div class="sc-fullscreen__header">
         <div class="sc-fullscreen__title">
-          <span class="sc-lang-badge">Python</span>
+          <span class="sc-lang-badge" :class="langBadgeClass(detailScript.language)">{{ langLabel(detailScript.language) }}</span>
           <span style="color:#cdd6f4;font-size:15px;font-weight:600">{{ detailScript.name }}</span>
           <span v-if="detailScript.description" style="color:#6c7086;font-size:12px">{{ detailScript.description }}</span>
         </div>
         <div class="sc-fullscreen__actions">
+          <el-radio-group v-if="normalizeLang(detailScript.language)==='python'" v-model="execMode" size="small">
+            <el-radio-button value="sandbox">沙盒</el-radio-button>
+            <el-radio-button value="native">原生</el-radio-button>
+          </el-radio-group>
+          <el-tag v-else size="small" type="warning" effect="plain">JS 仅原生(Node)</el-tag>
           <el-tooltip content="ntest.get('var') / ntest.set('var', val) / ntest.env('KEY')" placement="bottom">
             <el-button type="info" link size="small" style="color:#a6adc8">API 说明</el-button>
           </el-tooltip>
@@ -48,6 +53,23 @@
         <el-button type="primary" @click="openAdd">
           <el-icon><ele-Plus /></el-icon>&nbsp;新增脚本
         </el-button>
+        <div class="sc-mode-switch">
+          <span class="sc-mode-label">执行模式</span>
+          <el-radio-group v-model="execMode" size="small">
+            <el-radio-button value="sandbox">沙盒</el-radio-button>
+            <el-radio-button value="native">原生</el-radio-button>
+          </el-radio-group>
+          <el-tooltip placement="bottom" :show-after="200">
+            <template #content>
+              <div style="max-width:280px;line-height:1.6;font-size:12px">
+                <b>沙盒</b>：仅 Python，受限执行<br/>
+                <b>原生</b>：本机 Python / Node，可任意依赖（仅信任环境）<br/>
+                JavaScript 脚本固定走 Node 原生执行
+              </div>
+            </template>
+            <el-icon style="cursor:help;color:var(--el-text-color-placeholder)"><ele-QuestionFilled /></el-icon>
+          </el-tooltip>
+        </div>
       </div>
 
       <el-table
@@ -63,16 +85,21 @@
             <el-button type="primary" link @click="openDetail(row)">{{ row.name }}</el-button>
           </template>
         </el-table-column>
-        <el-table-column label="脚本类型" width="90" align="center">
-          <template #default>
-            <el-tag size="small" style="background:#3776ab;border:none;color:#fff;font-weight:700">Py</el-tag>
+        <el-table-column label="脚本类型" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag
+              size="small"
+              :style="normalizeLang(row.language)==='javascript'
+                ? 'background:#f7df1e;border:none;color:#323330;font-weight:700'
+                : 'background:#3776ab;border:none;color:#fff;font-weight:700'"
+            >{{ normalizeLang(row.language)==='javascript' ? 'JS' : 'Py' }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="description" label="备注" min-width="160" show-overflow-tooltip />
         <el-table-column label="操作" width="220" align="center" fixed="right">
           <template #default="{ row }">
             <div style="display:flex;gap:4px;justify-content:center;flex-wrap:nowrap;white-space:nowrap">
-              <el-button type="primary" size="small" @click="openFuncList(row)">函数列表</el-button>
+              <el-button type="primary" size="small" @click="openFuncList(row)">执行</el-button>
               <el-button type="warning" size="small" @click="openEdit(row)">编辑</el-button>
               <el-button type="danger" size="small" @click="deleteScript(row)">删除</el-button>
             </div>
@@ -81,7 +108,6 @@
       </el-table>
     </template>
 
-    <!-- ── Add / Edit dialog ── -->
     <el-dialog
       v-model="dialogVisible"
       :title="isEdit ? '编辑脚本' : '新增脚本'"
@@ -93,13 +119,19 @@
         <el-form-item label="脚本名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入脚本名称" />
         </el-form-item>
+        <el-form-item label="语言" prop="language">
+          <el-radio-group v-model="form.language" size="small">
+            <el-radio-button value="python">Python</el-radio-button>
+            <el-radio-button value="javascript">JavaScript</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="form.description" placeholder="可选描述" />
         </el-form-item>
         <el-form-item label="代码">
           <div class="sc-editor-wrap">
             <div class="sc-editor-toolbar">
-              <span class="sc-lang-badge">Python</span>
+              <span class="sc-lang-badge" :class="langBadgeClass(form.language)">{{ langLabel(form.language) }}</span>
               <el-tooltip placement="top" :show-after="200">
                 <template #content>
                   <div style="font-size:12px;line-height:1.8">
@@ -115,7 +147,7 @@
             <textarea
               v-model="form.code"
               class="sc-code-editor"
-              placeholder="# 在此编写 Python 脚本&#10;# ntest.set('result', 'hello')&#10;# val = ntest.get('some_var')"
+              :placeholder="codePlaceholder"
               spellcheck="false"
             />
           </div>
@@ -127,7 +159,7 @@
       </template>
     </el-dialog>
 
-    <!-- ── 函数列表 dialog ── -->
+
     <el-dialog
       v-model="funcListVisible"
       :title="`函数列表 — ${funcListScript?.name || ''}`"
@@ -159,7 +191,7 @@
       </div>
     </el-dialog>
 
-    <!-- ── 函数调试 dialog ── -->
+  
     <el-dialog
       v-model="debugFuncVisible"
       :title="`函数调试 — ${debugFunc?.name || ''}`"
@@ -170,7 +202,14 @@
     >
       <el-descriptions :title="`${debugFunc?.name}(${debugFunc?.args})`" :column="1" border size="small">
         <template #extra>
-          <el-button type="primary" :loading="running" @click="execDebugFunc">执行</el-button>
+          <div style="display:flex;align-items:center;gap:10px">
+            <el-radio-group v-if="normalizeLang(funcListScript?.language)==='python'" v-model="execMode" size="small">
+              <el-radio-button value="sandbox">沙盒</el-radio-button>
+              <el-radio-button value="native">原生</el-radio-button>
+            </el-radio-group>
+            <el-tag v-else size="small" type="warning" effect="plain">JS 仅原生</el-tag>
+            <el-button type="primary" :loading="running" @click="execDebugFunc">执行</el-button>
+          </div>
         </template>
         <el-descriptions-item label="说明" width="100px">
           <span style="white-space:pre-wrap;font-weight:600">{{ debugFunc?.doc || '—' }}</span>
@@ -196,6 +235,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation'
+import { notifyNtestScriptsChanged } from './composables/scriptListSync'
 
 const props = defineProps<{ serviceId: number }>()
 
@@ -209,7 +249,13 @@ const saving = ref(false)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref<any>(null)
-const form = ref({ id: undefined as number | undefined, name: '', description: '', code: '' })
+const form = ref({
+  id: undefined as number | undefined,
+  name: '',
+  description: '',
+  code: '',
+  language: 'python' as 'python' | 'javascript',
+})
 
 // Detail / fullscreen
 const detailScript = ref<any>(null)
@@ -218,8 +264,23 @@ const detailScript = ref<any>(null)
 const running = ref(false)
 const runningId = ref<number | null>(null)
 const runOutput = ref<string | null>(null)
+/** sandbox=沙盒（默认，仅 Python）；native=本机运行时 */
+const execMode = ref<'sandbox' | 'native'>('sandbox')
 
-// ─── 函数列表 state ───────────────────────────────────────────────────────────
+const normalizeLang = (lang: any): 'python' | 'javascript' => {
+  const v = String(lang || 'python').toLowerCase()
+  return (v === 'js' || v === 'javascript' || v === 'node' || v === 'nodejs') ? 'javascript' : 'python'
+}
+const langLabel = (lang: any) => normalizeLang(lang) === 'javascript' ? 'JavaScript' : 'Python'
+const langBadgeClass = (lang: any) => normalizeLang(lang) === 'javascript' ? 'is-js' : ''
+const effectiveExecMode = (lang: any) => normalizeLang(lang) === 'javascript' ? 'native' : execMode.value
+const codePlaceholder = computed(() =>
+  form.value.language === 'javascript'
+    ? "// 在此编写 JavaScript 脚本\n// ntest.set('result', 'hello')\n// const val = ntest.get('some_var')"
+    : "# 在此编写 Python 脚本\n# ntest.set('result', 'hello')\n# val = ntest.get('some_var')"
+)
+
+
 const funcListVisible = ref(false)
 const funcListScript = ref<any>(null)
 const funcSearch = ref('')
@@ -252,7 +313,7 @@ const filteredList = computed(() => {
   )
 })
 
-// ─── Methods ──────────────────────────────────────────────────────────────────
+
 async function loadScripts() {
   loading.value = true
   try {
@@ -267,13 +328,19 @@ async function loadScripts() {
 
 function openAdd() {
   isEdit.value = false
-  form.value = { id: undefined, name: '', description: '', code: '' }
+  form.value = { id: undefined, name: '', description: '', code: '', language: 'python' }
   dialogVisible.value = true
 }
 
 function openEdit(row: any) {
   isEdit.value = true
-  form.value = { id: row.id, name: row.name, description: row.description || '', code: row.code || '' }
+  form.value = {
+    id: row.id,
+    name: row.name,
+    description: row.description || '',
+    code: row.code || '',
+    language: normalizeLang(row.language),
+  }
   dialogVisible.value = true
 }
 
@@ -292,9 +359,11 @@ async function saveDetail() {
       name: detailScript.value.name,
       description: detailScript.value.description,
       code: detailScript.value.code,
+      language: normalizeLang(detailScript.value.language),
     })
     ElMessage.success('保存成功')
     await loadScripts()
+    notifyNtestScriptsChanged(props.serviceId)
     // Sync back to list
     const idx = scriptList.value.findIndex(s => s.id === detailScript.value.id)
     if (idx >= 0) scriptList.value[idx] = { ...detailScript.value }
@@ -310,14 +379,27 @@ async function submitForm() {
   saving.value = true
   try {
     if (isEdit.value && form.value.id) {
-      await edit_ntest_script({ id: form.value.id, name: form.value.name, description: form.value.description, code: form.value.code })
+      await edit_ntest_script({
+        id: form.value.id,
+        name: form.value.name,
+        description: form.value.description,
+        code: form.value.code,
+        language: form.value.language,
+      })
       ElMessage.success('编辑成功')
     } else {
-      await add_ntest_script({ name: form.value.name, description: form.value.description, code: form.value.code, api_service_id: props.serviceId })
+      await add_ntest_script({
+        name: form.value.name,
+        description: form.value.description,
+        code: form.value.code,
+        language: form.value.language,
+        api_service_id: props.serviceId,
+      })
       ElMessage.success('添加成功')
     }
     dialogVisible.value = false
     await loadScripts()
+    notifyNtestScriptsChanged(props.serviceId)
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
   } finally {
@@ -335,6 +417,7 @@ async function deleteScript(row: any) {
     await del_ntest_script({ id: row.id })
     ElMessage.success('删除成功')
     await loadScripts()
+    notifyNtestScriptsChanged(props.serviceId)
   } catch {
     // cancelled
   }
@@ -353,37 +436,46 @@ async function runScript(row: any) {
   }
   runOutput.value = null
   try {
-    // Execute via backend run_api_script with a minimal script step
     const resultId = Date.now()
-    const res: any = await run_api_script({
+    const lang = normalizeLang(row.language)
+    await run_api_script({
       result_id: resultId,
       name: row.name,
-      script: [
-        {
+      api_service_id: props.serviceId,
+      config: { env_id: 0 },
+      run_list: [{
+        name: row.name,
+        config: {},
+        script: [{
           step_type: 'script',
           name: row.name,
           enable: true,
-          request: { script_content: code },
+          request: {
+            script_content: code,
+            exec_mode: effectiveExecMode(lang),
+            language: lang,
+          },
           extracts: [],
           validators: [],
           children_steps: [],
-        },
-      ],
-      config: { env_id: 0 },
+        }],
+      }],
     })
-    const result = res?.data
-    const stepResult = Array.isArray(result?.result) ? result.result[0] : null
-    if (stepResult) {
-      const output = stepResult.response?.body?.output || ''
-      const vars = stepResult.response?.body?.vars || {}
-      const lines = []
-      if (output) lines.push('--- 输出 ---\n' + output)
-      if (Object.keys(vars).length) lines.push('--- 变量 ---\n' + JSON.stringify(vars, null, 2))
-      if (stepResult.error) lines.push('--- 错误 ---\n' + stepResult.error)
-      runOutput.value = lines.join('\n') || '执行完成（无输出）'
-    } else {
-      runOutput.value = JSON.stringify(result, null, 2)
+    const step = await fetchScriptStepResult(resultId)
+    if (!step) {
+      runOutput.value = '执行完成，但未获取到结果'
+      return
     }
+    const resBody = step.res?.body || step.res || {}
+    const output: string = resBody.output || ''
+    const vars: Record<string, any> = resBody.vars || {}
+    const error: string = step.res?.error || step.error || resBody.exception || resBody.msg || ''
+    const lines: string[] = []
+    if (output) lines.push('--- 输出 ---\n' + output)
+    if (Object.keys(vars).length) lines.push('--- 变量 ---\n' + JSON.stringify(vars, null, 2))
+    if (error) lines.push('--- 错误 ---\n' + error)
+    if (!step.status && !error) lines.push('--- 状态 ---\n执行失败')
+    runOutput.value = lines.join('\n') || '执行完成（无输出）'
   } catch (e: any) {
     runOutput.value = '运行失败: ' + (e?.message || String(e))
   } finally {
@@ -392,17 +484,55 @@ async function runScript(row: any) {
   }
 }
 
-// ─── 函数列表 ─────────────────────────────────────────────────────────────────
-function parseFunctions(code: string): { name: string; args: string; doc: string }[] {
+
+async function fetchScriptStepResult(resultId: number) {
+  const res: any = await get_api_script_result({ result_id: resultId })
+  const list: any[] = Array.isArray(res?.data) ? res.data : []
+  return list.find((r: any) => r.name !== '执行结束' && r.name !== '执行开始') || null
+}
+
+
+function parseArgName(raw: string): string {
+  return String(raw || '')
+    .trim()
+    .split('=')[0]
+    .trim()
+    .split(':')[0]
+    .trim()
+}
+
+
+function parseFunctions(code: string, language: any = 'python'): { name: string; args: string; doc: string }[] {
   const funcs: { name: string; args: string; doc: string }[] = []
   if (!code) return funcs
-  // Match: def funcname(args): followed by optional docstring
-  const defRe = /^def\s+(\w+)\s*\(([^)]*)\)\s*:/gm
+  if (normalizeLang(language) === 'javascript') {
+    // function name(...) / async function name(...) / const name = (...) => / const name = function(
+    const patterns = [
+      /(?:^|\n)\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)/g,
+      /(?:^|\n)\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\(([^)]*)\)\s*=>/g,
+      /(?:^|\n)\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?function\s*\(([^)]*)\)/g,
+    ]
+    const seen = new Set<string>()
+    for (const re of patterns) {
+      let m: RegExpExecArray | null
+      while ((m = re.exec(code)) !== null) {
+        const name = m[1]
+        if (seen.has(name)) continue
+        seen.add(name)
+        const before = code.slice(Math.max(0, m.index - 200), m.index)
+        const docMatch = before.match(/\/\*\*([\s\S]*?)\*\/\s*$/)
+        const doc = docMatch ? docMatch[1].replace(/^\s*\*\s?/gm, '').trim() : ''
+        funcs.push({ name, args: (m[2] || '').trim(), doc })
+      }
+    }
+    return funcs
+  }
+  // Python
+  const defRe = /^def\s+(\w+)\s*\(([^)]*)\)\s*(?:->[^:]+)?\s*:/gm
   let m: RegExpExecArray | null
   while ((m = defRe.exec(code)) !== null) {
     const name = m[1]
     const args = m[2].trim()
-    // Try to extract docstring (first string literal after def line)
     const afterDef = code.slice(m.index + m[0].length)
     const docMatch = afterDef.match(/^\s*(?:"""([\s\S]*?)"""|'''([\s\S]*?)''')/)
     const doc = docMatch ? (docMatch[1] || docMatch[2] || '').trim() : ''
@@ -414,16 +544,15 @@ function parseFunctions(code: string): { name: string; args: string; doc: string
 function openFuncList(row: any) {
   funcListScript.value = row
   funcSearch.value = ''
-  parsedFuncs.value = parseFunctions(row.code || '')
+  parsedFuncs.value = parseFunctions(row.code || '', row.language)
   funcListVisible.value = true
 }
 
 function openDebugFunc(func: any) {
   debugFunc.value = func
   debugFuncResult.value = null
-  // Build args dict from param names
   const argNames = func.args
-    ? func.args.split(',').map((a: string) => a.trim().split('=')[0].trim()).filter(Boolean)
+    ? func.args.split(',').map((a: string) => parseArgName(a)).filter(Boolean)
     : []
   const argsObj: Record<string, string> = {}
   for (const a of argNames) argsObj[a] = ''
@@ -436,67 +565,69 @@ async function execDebugFunc() {
   running.value = true
   debugFuncResult.value = '执行中...'
   try {
-    const callCode = `${debugFunc.value.name}(${Object.values(debugFuncArgs.value).map(v => {
-      try { return JSON.stringify(JSON.parse(v)) } catch { return JSON.stringify(v) }
-    }).join(', ')})`
-    const fullCode = `${funcListScript.value.code || ''}\n\n_result = ${callCode}\nntest.set('_result', _result)\nprint('结果:', _result)`
+    const lang = normalizeLang(funcListScript.value.language)
+    const argsLiteral = Object.values(debugFuncArgs.value).map(v => {
+      const s = String(v ?? '').trim()
+      if (!s) return lang === 'javascript' ? 'undefined' : 'None'
+      try { return JSON.stringify(JSON.parse(s)) } catch { return JSON.stringify(s) }
+    }).join(', ')
+    const callCode = `${debugFunc.value.name}(${argsLiteral})`
+    const fullCode = lang === 'javascript'
+      ? `${funcListScript.value.code || ''}\n\nconst _result = ${callCode};\nntest.set('_result', _result);\nconsole.log('结果:', _result);`
+      : `${funcListScript.value.code || ''}\n\n_result = ${callCode}\nntest.set('_result', _result)\nprint('结果:', _result)`
     const resultId = Date.now()
+    const stepName = `调试: ${debugFunc.value.name}`
 
     await run_api_script({
       result_id: resultId,
-      name: `调试: ${debugFunc.value.name}`,
-      script: [{
-        step_type: 'script',
-        name: `调试: ${debugFunc.value.name}`,
-        enable: true,
-        request: { script_content: fullCode },
-        extracts: [],
-        validators: [],
-        children_steps: [],
-      }],
+      name: stepName,
+      api_service_id: props.serviceId,
       config: { env_id: 0 },
+      run_list: [{
+        name: stepName,
+        config: {},
+        script: [{
+          step_type: 'script',
+          name: stepName,
+          enable: true,
+          request: {
+            script_content: fullCode,
+            exec_mode: effectiveExecMode(lang),
+            language: lang,
+          },
+          extracts: [],
+          validators: [],
+          children_steps: [],
+        }],
+      }],
     })
 
-    // Poll for results (max 10s)
-    let attempts = 0
-    const poll = async (): Promise<void> => {
-      attempts++
-      const res: any = await get_api_script_result({ result_id: resultId })
-      const list: any[] = Array.isArray(res?.data) ? res.data : []
-      // Filter out the "执行结束" summary row, find the script step result
-      const step = list.find((r: any) => r.name !== '执行结束' && r.name !== '执行开始')
-      if (step || attempts >= 10) {
-        if (!step) {
-          debugFuncResult.value = '执行超时，未获取到结果'
-          return
-        }
-        // res field contains { body: { output, vars }, code }
-        const resBody = step.res?.body || step.res || {}
-        const output: string = resBody.output || ''
-        const vars: Record<string, any> = resBody.vars || {}
-        const error: string = step.res?.error || step.error || ''
-        const lines: string[] = []
-        if (vars._result !== undefined) {
-          lines.push('返回值:\n' + JSON.stringify(vars._result, null, 2))
-        }
-        if (output.trim()) {
-          lines.push('输出:\n' + output.trim())
-        }
-        if (error) {
-          lines.push('错误:\n' + error)
-        }
-        if (!lines.length) {
-          // Show raw response for debugging
-          lines.push(JSON.stringify(step.res, null, 2) || '执行完成（无输出）')
-        }
-        debugFuncResult.value = lines.join('\n\n')
-      } else {
-        await new Promise(r => setTimeout(r, 1000))
-        return poll()
-      }
+    const step = await fetchScriptStepResult(resultId)
+    if (!step) {
+      debugFuncResult.value = '执行完成，但未获取到结果'
+      return
     }
-    await new Promise(r => setTimeout(r, 1200)) // wait for execution to complete
-    await poll()
+    const resBody = step.res?.body || step.res || {}
+    const output: string = resBody.output || ''
+    const vars: Record<string, any> = resBody.vars || {}
+    const error: string = step.res?.error || step.error || resBody.exception || resBody.msg || ''
+    const lines: string[] = []
+    if (vars._result !== undefined) {
+      lines.push('返回值:\n' + JSON.stringify(vars._result, null, 2))
+    }
+    if (output.trim()) {
+      lines.push('输出:\n' + output.trim())
+    }
+    if (error) {
+      lines.push('错误:\n' + error)
+    }
+    if (!step.status && !error) {
+      lines.push('错误:\n执行失败')
+    }
+    if (!lines.length) {
+      lines.push(JSON.stringify(step.res, null, 2) || '执行完成（无输出）')
+    }
+    debugFuncResult.value = lines.join('\n\n')
   } catch (e: any) {
     debugFuncResult.value = '执行失败: ' + (e?.message || String(e))
   } finally {
@@ -522,6 +653,16 @@ onMounted(loadScripts)
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
+}
+.sc-mode-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.sc-mode-label {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 /* ── Fullscreen editor ── */
@@ -629,6 +770,10 @@ onMounted(loadScripts)
   padding: 1px 8px;
   border-radius: 4px;
   letter-spacing: 0.5px;
+}
+.sc-lang-badge.is-js {
+  color: #323330;
+  background: #f7df1e;
 }
 
 .sc-code-editor {

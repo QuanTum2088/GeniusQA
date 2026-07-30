@@ -222,7 +222,7 @@ export function useUserApi() {
     },
     
     // API：登录
-    signIn: (data: { username: string; password: string; captcha?: string }) => {
+    signIn: (data: { username: string; password: string; captcha?: string; captcha_key?: string }) => {
       return request({
         url: '/v1/system/auth/login',
         method: 'POST',
@@ -239,7 +239,7 @@ export function useUserApi() {
     },
     
     // API：登录
-    login: (data: { username: string; password: string; captcha?: string }) => {
+    login: (data: { username: string; password: string; captcha?: string; captcha_key?: string }) => {
       return request({
         url: '/v1/system/auth/login',
         method: 'POST',

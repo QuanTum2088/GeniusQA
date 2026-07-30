@@ -47,7 +47,7 @@
 | 缓存 | Redis |
 | 日志 | loguru |
 | 配置管理 | pydantic_settings（读取 `.env`） |
-| CLI 工具 | Typer（`cli.py`） |
+| CLI 工具 | Typer（`scripts/cli.py`） |
 
 ---
 
@@ -84,10 +84,12 @@ backend/
 │       ├── rbac_models.py      # RBAC 相关模型
 │       └── api_models.py       # 通用 API 模型
 ├── celery_app.py               # Celery CLI 入口（实现在 Ntesterc_task_scheduler）
-├── db_script/
+├── sql/
 │   └── db_init.sql             # 全量初始化 SQL（新部署时使用）
+├── scripts/
+│   └── cli.py                  # 命令行工具（数据库初始化/迁移）
+├── deploy/                     # Dockerfile、Celery runner
 ├── config.py                   # 全局配置（pydantic_settings，读 .env）
-├── cli.py                      # 命令行工具（数据库初始化/迁移）
 ├── main.py                     # FastAPI 应用入口
 ├── alembic.ini                 # Alembic 配置
 └── .env                        # 环境变量（不提交 Git）
@@ -213,7 +215,7 @@ uv sync --group dev
 # 运行命令（无需手动 activate）
 uv run python main.py
 uv run alembic upgrade head
-uv run python cli.py init-db
+uv run python scripts/cli.py init-db
 ```
 
 也可在项目根目录执行：
@@ -475,11 +477,11 @@ from app.api.v1.my_feature import model as my_feature_model
 **第 9 步：生成并执行数据库迁移**
 
 ```bash
-python cli.py revision -m "add my_feature table"
-python cli.py upgrade
+python scripts/cli.py revision -m "add my_feature table"
+python scripts/cli.py upgrade
 
 # 全新部署时也可直接全量初始化
-python cli.py init-db
+python scripts/cli.py init-db
 ```
 
 ---
@@ -496,7 +498,7 @@ python cli.py init-db
 3. 执行迁移
        alembic upgrade head
 
-4. 同步更新 db_script/db_init.sql
+4. 同步更新 sql/db_init.sql
    在文件末尾对应位置追加相同的 INSERT 语句
    （db_init.sql 用于全新部署初始化，必须与迁移保持一致）
 
@@ -875,7 +877,7 @@ alembic upgrade head
 
 ```cmd
 :: 1. 初始化数据库（执行 db_init.sql）
-mysql -u root -p 数据库名 < db_script/db_init.sql
+mysql -u root -p 数据库名 < sql/db_init.sql
 
 :: 2. 标记为当前最新版本（数据已通过 SQL 导入，无需再执行迁移）
 alembic stamp head

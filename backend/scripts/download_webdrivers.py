@@ -15,13 +15,13 @@ webdriver-manager 会自动管理驱动下载，无需手动预下载。
 
 【用法】
 开发环境：
-  .venv\Scripts\python.exe download_webdrivers.py
+  .venv\Scripts\python.exe scripts\download_webdrivers.py
 
 生产环境（Dockerfile）：
-  RUN python download_webdrivers.py
+  RUN python scripts/download_webdrivers.py
 
 生产环境（部署脚本）：
-  python download_webdrivers.py
+  python scripts/download_webdrivers.py
 """
 import os
 import sys

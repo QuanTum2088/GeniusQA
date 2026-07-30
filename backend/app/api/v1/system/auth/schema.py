@@ -16,6 +16,14 @@ class LoginSchema(BaseSchema):
     captcha_key: Optional[str] = Field(None, description="验证码key")
 
 
+class CaptchaOutSchema(BaseSchema):
+    """验证码响应"""
+
+    enable: bool = Field(..., description="是否启用验证码")
+    key: str = Field("", description="验证码 key")
+    img_base: str = Field("", description="验证码图片 base64（data URL）")
+
+
 class LoginResponseSchema(BaseSchema):
     """登录响应Schema"""
     

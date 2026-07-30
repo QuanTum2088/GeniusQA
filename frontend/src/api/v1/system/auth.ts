@@ -6,11 +6,19 @@ import request from '/@/utils/request';
 export function useAuthApi() {
   return {
     // 登录
-    login: (data: { username: string; password: string; captcha?: string }) => {
+    login: (data: { username: string; password: string; captcha?: string; captcha_key?: string }) => {
       return request({
         url: '/v1/system/auth/login',
         method: 'POST',
         data,
+      });
+    },
+
+    // 获取验证码
+    getCaptcha: () => {
+      return request({
+        url: '/v1/system/auth/captcha/get',
+        method: 'GET',
       });
     },
     

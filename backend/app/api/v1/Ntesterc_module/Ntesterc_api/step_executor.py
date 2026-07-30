@@ -16,6 +16,7 @@ from jsonpath_ng import parse as jsonpath_parse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from .model import ApiDatabaseModel, ApiModel, ApiFunctionModel
+from .script_runtime import normalize_language, resolve_exec_mode, run_native, run_sandbox
 
 
 # ---------------------------------------------------------------------------
@@ -499,7 +500,7 @@ class StepExecutor:
 
 
     # -----------------------------------------------------------------------
-    # _exec_script — Python 脚本步骤（受限沙箱）
+    # _exec_script — 沙盒（默认）或原生宿主进程
     # -----------------------------------------------------------------------
 
     async def _exec_script(self, step: Dict) -> StepResult:
@@ -507,6 +508,8 @@ class StepExecutor:
         req = step.get("request") or {}
         code = req.get("script_content") or ""
         script_id = req.get("script_id")
+        exec_mode = resolve_exec_mode(req.get("exec_mode") or req.get("script_exec_mode"))
+        language = normalize_language(req.get("language") or req.get("script_lang") or "python")
 
         # Load public script code if script_id is provided
         public_code = ""
@@ -522,6 +525,10 @@ class StepExecutor:
                 )).scalars().first()
                 if row and row.code:
                     public_code = row.code
+                    # 公共脚本自带语言时优先采用
+                    script_lang = getattr(row, "language", None)
+                    if script_lang:
+                        language = normalize_language(script_lang)
                 else:
                     result.logs.append(f"警告：未找到 script_id={script_id} 对应的公共脚本，跳过")
             except Exception as e:
@@ -532,50 +539,70 @@ class StepExecutor:
             result.error = "script 步骤缺少 script_content"
             return result
 
-        ntest = NtestContext(self.ctx)
-
-        # 加载公共函数代码
-        func_code = await self._load_function_code()
-
-        # 受限 builtins：禁止危险操作
-        safe_builtins = {
-            k: v for k, v in __builtins__.items()
-            if k not in ("open", "__import__", "exec", "eval", "compile",
-                         "breakpoint", "input", "memoryview")
-        } if isinstance(__builtins__, dict) else {}
-
-        import io, contextlib
-        captured = io.StringIO()
-        exec_globals = {
-            "__builtins__": safe_builtins,
-            "ntest": ntest,
-            "json": __import__("json"),
-            "re": __import__("re"),
-            "datetime": __import__("datetime"),
-        }
-
-        try:
-            # Order: func_code → public_code → inline code
+        # Python 才注入公共函数库；JS 仅拼接 public + inline
+        if language == "python":
+            func_code = await self._load_function_code()
             parts = [p for p in [func_code, public_code, code] if p and p.strip()]
-            full_code = "\n\n".join(parts)
-            with contextlib.redirect_stdout(captured):
-                exec(compile(full_code, "<script>", "exec"), exec_globals)  # noqa: S102
+        else:
+            parts = [p for p in [public_code, code] if p and p.strip()]
+        full_code = "\n\n".join(parts)
 
-            # 同步 exported_vars 回 session_vars
-            for k, v in ntest.exported_vars.items():
-                self.ctx.set(k, v)
+        # JS 只能走原生
+        if language == "javascript":
+            exec_mode = "native"
 
-            output = captured.getvalue()
-            result.response = {"body": {"output": output, "vars": ntest.exported_vars}, "code": 200}
-            result.logs.append(f"脚本输出: {output[:300]}" if output else "脚本执行完成")
-            result.success = True
+        ntest = NtestContext(self.ctx)
+        try:
+            if exec_mode == "native":
+                run_res = await asyncio.to_thread(
+                    run_native,
+                    full_code,
+                    language=language,
+                    session_vars=dict(self.ctx.session_vars),
+                    env_vars=dict(self.ctx.env_vars),
+                )
+            else:
+                run_res = await asyncio.to_thread(run_sandbox, full_code, ntest=ntest)
 
+            result.logs.extend(run_res.logs or [])
+            if run_res.success:
+                for k, v in (run_res.vars or {}).items():
+                    self.ctx.set(k, v)
+                    ntest.exported_vars[k] = v
+                result.response = {
+                    "body": {
+                        "output": run_res.output or "",
+                        "vars": run_res.vars or {},
+                        "exec_mode": run_res.mode,
+                        "language": language,
+                    },
+                    "code": 200,
+                }
+                result.success = True
+            else:
+                result.success = False
+                result.error = run_res.error or "脚本执行失败"
+                result.response = {
+                    "body": {
+                        "output": run_res.output or "",
+                        "vars": run_res.vars or {},
+                        "exception": result.error,
+                        "exec_mode": run_res.mode,
+                        "language": language,
+                    },
+                    "code": 500,
+                }
         except Exception as e:
             result.success = False
             result.error = str(e)[:500]
             result.logs.append(f"脚本执行失败: {traceback.format_exc()[:300]}")
 
-        result.request = {"script_content": code, "script_id": script_id}
+        result.request = {
+            "script_content": code,
+            "script_id": script_id,
+            "exec_mode": exec_mode,
+            "language": language,
+        }
         return result
 
     async def _load_function_code(self) -> str:

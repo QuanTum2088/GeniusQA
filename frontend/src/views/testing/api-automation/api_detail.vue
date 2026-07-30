@@ -215,6 +215,8 @@
 											:script-list="scriptList"
 											:res-type-list="res_type_list"
 											:val-type-list="val_type_list"
+											@refresh-scripts="loadScriptList"
+											@refresh-dbs="loadLocalDbList"
 										/>
 									</div>
 								</el-tab-pane>
@@ -234,6 +236,8 @@ mode="after"
 :script-list="scriptList"
 :res-type-list="res_type_list"
 :val-type-list="val_type_list"
+@refresh-scripts="loadScriptList"
+@refresh-dbs="loadLocalDbList"
 />
 </div>
 </el-tab-pane>
@@ -250,6 +254,7 @@ mode="assert"
 :db-list="effectiveDbList"
 :res-type-list="res_type_list"
 :val-type-list="val_type_list"
+@refresh-dbs="loadLocalDbList"
 />
 </div>
 </el-tab-pane>
@@ -537,106 +542,12 @@ mode="assert"
 
 			<!-- 接口文档面板 -->
 			<div v-show="mainTab==='doc'" class="side-panel doc-panel">
-				<template v-if="docInfo">
-					<!-- 标题栏 -->
-					<div class="doc-header">
-						<div class="doc-header-left">
-							<span class="doc-method-badge" :style="{background: currentMethodColor}">{{ docInfo.methodName }}</span>
-							<span class="doc-path">{{ docInfo.url }}</span>
-						</div>
-						<div class="doc-header-right">
-							<el-tag size="small" effect="plain" type="info">{{ docInfo.name }}</el-tag>
-						</div>
-					</div>
-					<div v-if="docInfo.description" class="doc-desc-block">{{ docInfo.description }}</div>
-
-					<!-- 请求参数 -->
-					<div v-if="docInfo.parameters&&docInfo.parameters.length" class="doc-section">
-						<div class="doc-section-title">请求参数</div>
-						<table class="doc-table">
-							<thead><tr><th>参数名</th><th>位置</th><th>类型</th><th>必填</th><th>说明</th></tr></thead>
-							<tbody>
-								<tr v-for="p in docInfo.parameters" :key="p.name">
-									<td class="doc-param-name">{{ p.name }}</td>
-									<td><span class="doc-in-badge" :class="'in-'+p.in">{{ p.in }}</span></td>
-									<td class="doc-type">{{ p.schema?.type || p.type || '-' }}</td>
-									<td><el-tag v-if="p.required" size="small" type="danger" effect="plain">必填</el-tag><span v-else class="doc-optional">可选</span></td>
-									<td class="doc-desc-cell">{{ p.description || '-' }}</td>
-								</tr>
-							</tbody>
-						</table>
-					</div>
-
-					<!-- 请求体 -->
-					<div v-if="docInfo.requestBody" class="doc-section">
-						<div class="doc-section-title">请求体</div>
-						<div class="doc-content-type">Content-Type: <code>{{ docInfo.requestBodyType }}</code></div>
-						<table v-if="docInfo.requestBodyFields&&docInfo.requestBodyFields.length" class="doc-table">
-							<thead><tr><th>字段名</th><th>类型</th><th>必填</th><th>说明</th></tr></thead>
-							<tbody>
-								<tr v-for="f in docInfo.requestBodyFields" :key="f.name">
-									<td class="doc-param-name">{{ f.name }}</td>
-									<td class="doc-type">{{ f.type || '-' }}</td>
-									<td><el-tag v-if="f.required" size="small" type="danger" effect="plain">必填</el-tag><span v-else class="doc-optional">可选</span></td>
-									<td class="doc-desc-cell">{{ f.description || '-' }}</td>
-								</tr>
-							</tbody>
-						</table>
-						<div v-else class="doc-raw-schema">
-							<pre class="doc-pre">{{ docInfo.requestBodyRaw }}</pre>
-						</div>
-					</div>
-
-					<!-- 响应 -->
-					<div v-if="docInfo.responses&&docInfo.responses.length" class="doc-section">
-						<div class="doc-section-title">返回响应</div>
-						<div v-for="resp in docInfo.responses" :key="resp.code" class="doc-response-item">
-							<div class="doc-response-header">
-								<el-tag size="small" :type="resp.code>=200&&resp.code<300?'success':resp.code>=400?'danger':'warning'" effect="light">{{ resp.code }}</el-tag>
-								<span class="doc-response-desc">{{ resp.description }}</span>
-							</div>
-							<div v-if="resp.fields&&resp.fields.length" style="margin-top:8px">
-								<table class="doc-table">
-									<thead><tr><th>字段名</th><th>类型</th><th>说明</th></tr></thead>
-									<tbody>
-										<tr v-for="f in resp.fields" :key="f.name">
-											<td class="doc-param-name">{{ f.name }}</td>
-											<td class="doc-type">{{ f.type || '-' }}</td>
-											<td class="doc-desc-cell">{{ f.description || '-' }}</td>
-										</tr>
-									</tbody>
-								</table>
-							</div>
-							<div v-else-if="resp.example" class="doc-raw-schema">
-								<pre class="doc-pre">{{ resp.example }}</pre>
-							</div>
-						</div>
-					</div>
-				</template>
-				<div v-else class="side-panel-empty">
-					<el-icon style="font-size:40px;color:#dcdfe6"><Document /></el-icon>
-					<p>暂无接口文档，请先拉取 Swagger / Apifox 文档</p>
-				</div>
+				<ApiDocPanel :api-data="apiData" />
 			</div>
 
 			<!-- 调试记录面板 -->
-			<div v-show="mainTab==='history'" class="side-panel">
-				<div class="side-panel-toolbar">
-					<el-button size="small" @click="loadDebugHistory">刷新</el-button>
-				</div>
-				<div v-if="!debugRecordList.length" class="side-panel-empty">
-					<el-icon style="font-size:40px;color:#dcdfe6"><Document /></el-icon>
-					<p>暂无调试记录</p>
-				</div>
-				<div v-else class="history-list">
-					<div v-for="(r,i) in debugRecordList" :key="i" class="history-item">
-						<div class="history-item-left">
-							<el-tag size="small" :type="r.status_code>=200&&r.status_code<300?'success':r.status_code>=400?'danger':'warning'" effect="light">{{ r.status_code }}</el-tag>
-							<span class="history-url">{{ r.req?.url || '-' }}</span>
-						</div>
-						<span class="history-time">{{ r.create_time ? String(r.create_time).replace('T',' ') : '' }}</span>
-					</div>
-				</div>
+			<div v-if="mainTab==='history'" class="side-panel history-side-panel">
+				<ApiHistoryPanel :api-data="apiData" />
 			</div>
 
 			
@@ -778,12 +689,16 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import VueJsonPretty from 'vue-json-pretty';
 import JsonEditor from '/@/components/code-editor/JsonEditor.vue';
 import 'vue-json-pretty/lib/styles.css';
-import { ArrowDown, Operation, Clock, CircleCheck, Coin, Delete, Connection, EditPen, Document, InfoFilled, View, Folder } from '@element-plus/icons-vue';
-import { api_send, save_api, save_api_case, req_history, edit_history, api_params, apiAutomationApi } from '/@/api/v1/testing/apiAutomation';
+import { ArrowDown, Operation, Clock, CircleCheck, Coin, Delete, Connection, EditPen, InfoFilled, View, Folder } from '@element-plus/icons-vue';
+import { api_send, save_api, save_api_case, edit_history, api_params, apiAutomationApi } from '/@/api/v1/testing/apiAutomation';
 import { useFileApi } from '/@/api/v1/common/file';
 import OperationPanel from './components/OperationPanel.vue';
+import ApiHistoryPanel from './components/ApiHistoryPanel.vue';
+import ApiDocPanel from './components/ApiDocPanel.vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { getBaseApiUrl } from '/@/utils/config';
+import { onNtestScriptsChanged } from './composables/scriptListSync';
+import { onDbListChanged } from './composables/dbListSync';
 
 const props = defineProps({
 	apiData: { type: Object, default: () => ({}) },
@@ -885,80 +800,7 @@ const caseTypeOptions = [
 	{ label: '边界值', value: 3 }, { label: '安全性', value: 4 }, { label: '其他', value: 5 },
 ];
 
-const debugRecordList = ref<any[]>([]);
-const apiDocInfo = ref<any>({});
 
-// 解析接口文档（Swagger/OpenAPI/Apifox document 字段）
-const docInfo = computed(() => {
-	const info = props.apiData?.api_info || props.apiData || {};
-	const doc = info.document;
-	if (!doc) return null;
-
-	const methodNames: Record<number,string> = { 1:'GET', 2:'POST', 3:'PUT', 4:'DELETE', 5:'PATCH', 6:'OPTIONS' };
-	const methodName = methodNames[info.req?.method ?? 2] || 'GET';
-
-	// parameters
-	const parameters: any[] = Array.isArray(doc.parameters) ? doc.parameters : [];
-
-	// requestBody
-	let requestBody = null;
-	let requestBodyType = '';
-	let requestBodyFields: any[] = [];
-	let requestBodyRaw = '';
-	if (doc.requestBody) {
-		const content = doc.requestBody.content || {};
-		const ct = Object.keys(content)[0] || 'application/json';
-		requestBodyType = ct;
-		const schema = content[ct]?.schema || {};
-		if (schema.properties) {
-			const required = schema.required || [];
-			requestBodyFields = Object.entries(schema.properties).map(([k, v]: any) => ({
-				name: k, type: v.type || v.$ref?.split('/').pop() || '-',
-				required: required.includes(k), description: v.description || ''
-			}));
-		} else {
-			requestBodyRaw = JSON.stringify(schema, null, 2);
-		}
-		requestBody = doc.requestBody;
-	}
-
-	// responses
-	const responses: any[] = [];
-	if (doc.responses) {
-		for (const [code, resp] of Object.entries(doc.responses as Record<string, any>)) {
-			const content = resp.content || {};
-			const ct = Object.keys(content)[0] || '';
-			const schema = ct ? (content[ct]?.schema || {}) : {};
-			let fields: any[] = [];
-			let example = '';
-			if (schema.properties) {
-				fields = Object.entries(schema.properties).map(([k, v]: any) => ({
-					name: k, type: v.type || '-', description: v.description || ''
-				}));
-			} else if (schema.items?.properties) {
-				fields = Object.entries(schema.items.properties).map(([k, v]: any) => ({
-					name: k, type: v.type || '-', description: v.description || ''
-				}));
-			} else if (Object.keys(schema).length) {
-				example = JSON.stringify(schema, null, 2);
-			}
-			responses.push({ code: Number(code), description: resp.description || '', fields, example });
-		}
-	}
-
-	return {
-		name: info.name || doc.summary || doc.operationId || '接口文档',
-		url: info.url || '',
-		methodName,
-		description: doc.description || doc.summary || '',
-		parameters,
-		requestBody,
-		requestBodyType,
-		requestBodyFields,
-		requestBodyRaw,
-		responses,
-	};
-});
 
 // Mock
 const mockBaseUrl = computed(() => String(getBaseApiUrl() || window.location.origin).replace(/\/$/, ''));
@@ -1046,14 +888,6 @@ const confirmAddMockExpect = () => {
 	mockExpectDialogVisible.value = false;
 };
 
-// 调试记录
-const loadDebugHistory = async () => {
-	try {
-		const r: any = await req_history({});
-		debugRecordList.value = Array.isArray(r?.data) ? r.data : [];
-	} catch { debugRecordList.value = []; }
-};
-watch(mainTab, (v) => { if (v === 'history') loadDebugHistory(); });
 const functionList = ref<any[]>([]);
 const scriptList = ref<any[]>([]);  // 脚本中心的脚本列表
 const localDbList = ref<any[]>([]);  // 内部加载的数据库列表，优先级高于 props
@@ -1143,9 +977,26 @@ const tips = ref<any>('路径示例，结果{"code":200,"info":{"username":"admi
 const viewportH = ref(typeof window !== 'undefined' ? window.innerHeight : 900);
 const onResize = () => { viewportH.value = window.innerHeight; };
 const resCollapsed = ref(false);
-onMounted(() => { window.addEventListener('resize', onResize); loadFunctionList(); loadScriptList(); loadLocalDbList(); });
+let offScriptListSync: (() => void) | null = null;
+let offDbListSync: (() => void) | null = null;
+onMounted(() => {
+	window.addEventListener('resize', onResize);
+	loadFunctionList();
+	loadScriptList();
+	loadLocalDbList();
+	offScriptListSync = onNtestScriptsChanged((sid) => {
+		if (Number(props.serviceId || 0) === sid) loadScriptList();
+	});
+	offDbListSync = onDbListChanged(loadLocalDbList);
+});
 watch(() => props.serviceId, (v) => { if (v) loadScriptList(); });
-onBeforeUnmount(() => window.removeEventListener('resize', onResize));
+onBeforeUnmount(() => {
+	window.removeEventListener('resize', onResize);
+	offScriptListSync?.();
+	offScriptListSync = null;
+	offDbListSync?.();
+	offDbListSync = null;
+});
 
 const resJsonHeight = computed(() => Math.max(120, Math.floor(viewportH.value * 0.28)));
 
@@ -1507,13 +1358,7 @@ const confirmSaveAsCase = async () => {
 .main-tabs :deep(.el-tabs__active-bar) { height: 2px; background: #409eff; }
 .main-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }
 .side-panel { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; background: var(--el-bg-color); border-radius: 8px; border: 1px solid var(--el-border-color); }
-.side-panel-toolbar { margin-bottom: 12px; }
-.side-panel-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 200px; color: var(--el-text-color-placeholder); font-size: 13px; gap: 8px; }
-.history-list { display: flex; flex-direction: column; gap: 6px; }
-.history-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--el-fill-color-light); border-radius: 6px; }
-.history-item-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.history-url { font-size: 12px; color: var(--el-text-color-regular); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.history-time { font-size: 11px; color: var(--el-text-color-placeholder); flex-shrink: 0; margin-left: 8px; }
+.history-side-panel { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
 .mock-panel { }
 .mock-section { }
 .mock-section-title { font-size: 14px; font-weight: 600; color: var(--el-text-color-primary); margin-bottom: 10px; }
@@ -1551,37 +1396,7 @@ const confirmSaveAsCase = async () => {
 }
 .mock-param-row:last-child { margin-bottom: 0; }
 
-.doc-panel { padding: 0; overflow-y: auto; }
-.doc-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: var(--el-fill-color-light); border-bottom: 1px solid var(--el-border-color); flex-shrink: 0; }
-.doc-header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.doc-method-badge { display: inline-block; padding: 3px 10px; border-radius: 4px; color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .5px; flex-shrink: 0; }
-.doc-path { font-family: 'Consolas','Monaco',monospace; font-size: 14px; color: var(--el-text-color-primary); word-break: break-all; }
-.doc-header-right { flex-shrink: 0; margin-left: 12px; }
-.doc-desc-block { padding: 10px 20px; font-size: 13px; color: var(--el-text-color-regular); background: var(--el-color-warning-light-9); border-bottom: 1px solid var(--el-color-warning-light-5); line-height: 1.6; }
-.doc-section { padding: 16px 20px; border-bottom: 1px solid var(--el-border-color-lighter); }
-.doc-section:last-child { border-bottom: none; }
-.doc-section-title { font-size: 13px; font-weight: 600; color: var(--el-text-color-primary); margin-bottom: 12px; padding-left: 8px; border-left: 3px solid #409eff; }
-.doc-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.doc-table th { background: var(--el-fill-color-light); color: var(--el-text-color-placeholder); font-weight: 500; padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--el-border-color); white-space: nowrap; }
-.doc-table td { padding: 8px 12px; border-bottom: 1px solid var(--el-border-color-lighter); vertical-align: top; color: var(--el-text-color-primary); }
-.doc-table tr:last-child td { border-bottom: none; }
-.doc-table tr:hover td { background: var(--el-fill-color-lighter); }
-.doc-param-name { font-family: 'Consolas','Monaco',monospace; font-size: 12px; color: #e6a23c; font-weight: 600; }
-.doc-type { font-family: 'Consolas','Monaco',monospace; font-size: 12px; color: #67c23a; }
-.doc-optional { color: var(--el-text-color-placeholder); font-size: 12px; }
-.doc-desc-cell { color: var(--el-text-color-regular); }
-.doc-in-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 500; }
-.in-query { background: var(--el-color-primary-light-9); color: #409eff; }
-.in-path { background: var(--el-color-warning-light-9); color: #e6a23c; }
-.in-header { background: var(--el-color-success-light-9); color: #67c23a; }
-.in-cookie { background: var(--el-color-danger-light-9); color: #f56c6c; }
-.doc-content-type { font-size: 12px; color: var(--el-text-color-placeholder); margin-bottom: 10px; }
-.doc-content-type code { background: var(--el-fill-color-light); padding: 1px 6px; border-radius: 3px; font-family: monospace; color: var(--el-text-color-regular); }
-.doc-raw-schema { background: #1e1e1e; border-radius: 6px; overflow: hidden; margin-top: 8px; }
-.doc-pre { margin: 0; padding: 12px 14px; font-family: 'Consolas','Monaco',monospace; font-size: 12px; color: #d4d4d4; white-space: pre-wrap; word-break: break-all; line-height: 1.6; }
-.doc-response-item { margin-bottom: 12px; }
-.doc-response-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.doc-response-desc { font-size: 13px; color: var(--el-text-color-regular); }
+.doc-panel { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
 .res-code-toolbar { display: flex; justify-content: flex-end; padding: 5px 10px; background: #252526; border-bottom: 1px solid #3c3c3c; flex-shrink: 0; }
 .res-copy-btn { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; background: transparent; border: 1px solid #4a4a4a; border-radius: 3px; color: #aaa; font-size: 11px; cursor: pointer; transition: all .15s; }
 .res-copy-btn:hover { background: #3c3c3c; color: #e0e0e0; border-color: #666; }

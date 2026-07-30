@@ -46,9 +46,9 @@
 				<ScriptCenter :serviceId="currentServiceId" />
 			</el-tab-pane>
 			<el-tab-pane label="数据查询" name="querydb">
-				<QueryDbTab :serviceId="currentServiceId" />
+				<QueryDbTab ref="queryDbRef" :serviceId="currentServiceId" />
 			</el-tab-pane>
-			<el-tab-pane label="精准测试" name="precision">
+			<el-tab-pane label="代码覆盖率" name="precision">
 				<PrecisionTestTab :serviceId="currentServiceId" />
 			</el-tab-pane>
 			<el-tab-pane label="执行结果" name="result">
@@ -128,7 +128,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, ref } from 'vue';
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation';
 import ApiManagePanel from './ApiManagePanel.vue';
@@ -169,6 +169,11 @@ const emit = defineEmits<{
 
 const activeTab = ref<'manage' | 'case' | 'script' | 'querydb' | 'precision' | 'result' | 'codegen'>('manage');
 const selectedEnvId = ref<number | null>(null);
+const queryDbRef = ref<InstanceType<typeof QueryDbTab> | null>(null);
+
+watch(activeTab, (tab) => {
+	if (tab === 'querydb') queryDbRef.value?.reloadDbList?.();
+});
 
 const currentServiceId = ref<number>(props.serviceId);
 

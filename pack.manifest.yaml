@@ -1,0 +1,132 @@
+product:
+  name: n-tester
+  version: "2.0.2"
+  appId: com.rebort.ntester
+  displayName: NTesterc
+  vendor: Rebort
+  installer:
+    file_name: NTesterc-2.0.2
+    # Icons default to pack-platform/branding/app-icon.png (shared across projects).
+    # Uncomment only when this product needs a different mark:
+    # icon: frontend/public/apple-touch-icon.png
+
+frontend:
+  adapter: vite
+  dir: frontend
+  install: yarn install
+  build: yarn build
+  dist: frontend/dist
+
+backend:
+  adapter: python-nuitka
+  dir: backend
+  entry: scripts/run_portable.py
+  python: "3.11"
+  workers:
+    - scripts/scheduler_runner.py
+  packages:
+    - app
+    - scripts
+    - passlib
+    # Appium-Python-Client（模块名 appium）；安装包需内置，勿再放入 excludes
+    - appium
+    # AI 聊天 / 智能化（Nuitka 须强制打入，否则运行时报未安装）
+    - langchain
+    - langchain_core
+    - langchain_openai
+    - langchain_mcp_adapters
+    - langgraph
+    - openai
+    - anthropic
+    - browser_use
+  collect_all: []
+  hiddenimports:
+    - main
+    - config
+    - passlib.handlers
+    - passlib.handlers.bcrypt
+    - bcrypt
+    - uvicorn
+    - fastapi
+    - pydantic
+    - pydantic_settings
+    - sqlalchemy
+    - alembic
+    - portable_env
+    - scripts.portable_env
+    - scripts.run_portable
+    - scripts.scheduler_runner
+    - langchain
+    - langchain_core
+    - langchain_openai
+    - langchain_mcp_adapters
+    - langgraph
+    - openai
+    - anthropic
+    - browser_use
+    - tiktoken
+    - httpx
+    - websockets
+  excludes:
+    - tkinter
+    - matplotlib
+  data:
+    - static
+    - sql
+    - app/alembic
+    - alembic.ini
+  healthcheck_url: "http://127.0.0.1/api/health/health"
+  nuitka:
+    jobs: 0
+    include_package_data: true
+    plugins: []
+    include_data_dirs: []
+
+runtime:
+  database: external
+  cache: external
+  provider: external
+  config_template: config.example.yaml
+  nginx:
+    enabled: true
+    archive: nginx-1.28.0.zip
+    listen_port: 80
+    backend_port: 8100
+
+security:
+  compile: true
+  strip_symbols: true
+  sign: false
+  sbom: true
+  checksums: true
+  signing:
+    enabled: false
+
+release:
+  channel: stable
+  upgrade:
+    enabled: false
+
+pack:
+  output_dir: dist/pack
+  targets:
+    - os: windows
+      arch: x64
+      shell: headless
+      format: inno
+    - os: windows
+      arch: x64
+      shell: headless
+      format: msi
+    - os: linux
+      arch: x64
+      shell: headless
+      format: zip
+    - os: macos
+      arch: arm64
+      shell: headless
+      format: zip
+    - os: windows
+      arch: x64
+      shell: tauri
+      format: dir

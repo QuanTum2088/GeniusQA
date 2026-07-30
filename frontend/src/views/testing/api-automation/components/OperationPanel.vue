@@ -112,6 +112,7 @@
                   placeholder="选择数据库"
                   size="small"
                   style="width:220px"
+                  @visible-change="(open: boolean) => { if (open) emit('refresh-dbs') }"
                   @change="(v: any) => { const db = dbList?.find((d: any) => d.id === v); item.db_name = db?.name || '' }"
                 >
                   <el-option v-for="db in dbList" :key="db.id" :label="db.name" :value="db.id" />
@@ -142,6 +143,7 @@
                   filterable
                   size="small"
                   style="width:260px"
+                  @visible-change="(open: boolean) => { if (open) emit('refresh-scripts') }"
                   @change="(v: any) => { const fn = scriptList?.find((f: any) => f.id === v); item.func_name = fn?.name || '' }"
                 >
                   <el-option v-for="fn in scriptList" :key="fn.id" :label="fn.name" :value="fn.id" />
@@ -205,6 +207,7 @@
                   placeholder="选择数据库"
                   size="small"
                   style="width:220px"
+                  @visible-change="(open: boolean) => { if (open) emit('refresh-dbs') }"
                   @change="(v: any) => { const db = dbList?.find((d: any) => d.id === v); item.db_name = db?.name || '' }"
                 >
                   <el-option v-for="db in dbList" :key="db.id" :label="db.name" :value="db.id" />
@@ -243,6 +246,7 @@
                   filterable
                   size="small"
                   style="width:260px"
+                  @visible-change="(open: boolean) => { if (open) emit('refresh-scripts') }"
                   @change="(v: any) => { const fn = scriptList?.find((f: any) => f.id === v); item.func_name = fn?.name || '' }"
                 >
                   <el-option v-for="fn in scriptList" :key="fn.id" :label="fn.name" :value="fn.id" />
@@ -306,7 +310,12 @@
             <template v-else-if="item.type === 4">
               <div class="op-row">
                 <label class="op-label">数据库</label>
-                <el-select v-model="item.local_db" size="small" style="width:200px">
+                <el-select
+                  v-model="item.local_db"
+                  size="small"
+                  style="width:200px"
+                  @visible-change="(open: boolean) => { if (open) emit('refresh-dbs') }"
+                >
                   <el-option v-for="db in dbList" :key="db.id" :label="db.name" :value="db.id" />
                 </el-select>
                 <label class="op-label" style="margin-left:12px">查询表</label>
@@ -411,6 +420,11 @@ const props = withDefaults(defineProps<{
   resTypeList: () => [],
   valTypeList: () => [],
 })
+
+const emit = defineEmits<{
+  (e: 'refresh-scripts'): void
+  (e: 'refresh-dbs'): void
+}>()
 
 // ---- Collapse state ----
 const collapsed = ref<Record<number, boolean>>({})

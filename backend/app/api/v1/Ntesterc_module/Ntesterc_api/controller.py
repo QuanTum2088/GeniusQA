@@ -274,7 +274,17 @@ async def req_history(
 ):
     """请求历史"""
     try:
-        data = await ApiAutomationService.get_request_history(db, current_user_id)
+        body = await body_to_json(request) or {}
+        api_id = body.get("api_id") or body.get("id")
+        page = int(body.get("page") or body.get("currentPage") or 1)
+        page_size = int(body.get("pageSize") or body.get("limit") or 10)
+        data = await ApiAutomationService.get_request_history(
+            db,
+            current_user_id,
+            api_id=int(api_id) if api_id else None,
+            page=page,
+            page_size=page_size,
+        )
         return success_response(data, message="请求成功")
     except Exception as e:
         return error_response(f"接口请求异常，原因是：{str(e)}")
@@ -1134,59 +1144,41 @@ async def run_generated_code(
     current_user_id: int = Depends(get_current_user_id),
 ):
     """
-    在沙箱中运行生成的 pytest / unittest 代码（仅支持 Python 框架）。
+    运行生成的 pytest / unittest 代码。
 
     body:
       code:      代码字符串
       framework: pytest | unittest
+      exec_mode: sandbox | native（可选，默认读配置）
     """
-    import subprocess
-    import tempfile
-    import os
+    from .script_runtime import run_generated_code_async
 
     try:
         body = await body_to_json(request) or {}
         code = body.get("code", "")
-        framework = body.get("framework", "pytest").lower()
+        framework = str(body.get("framework", "pytest") or "pytest").lower()
+        exec_mode = body.get("exec_mode") or body.get("script_exec_mode")
 
         if framework not in ("pytest", "unittest"):
             return error_response("运行调试仅支持 pytest / unittest（Python 框架）")
-        if not code.strip():
+        if not str(code).strip():
             return error_response("代码不能为空")
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False, encoding="utf-8"
-        ) as f:
-            f.write(code)
-            tmp_path = f.name
-
-        try:
-            cmd = ["python", "-m", "pytest", tmp_path, "-v", "--tb=short", "--no-header"]
-            if framework == "unittest":
-                cmd = ["python", "-m", "unittest", tmp_path]
-
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=60,
-                encoding="utf-8",
-                errors="replace",
-            )
-            output = (result.stdout or "") + (result.stderr or "")
-            return success_response(
-                {
-                    "output": output,
-                    "exit_code": result.returncode,
-                    "success": result.returncode == 0,
-                },
-                message="执行完成",
-            )
-        finally:
-            os.unlink(tmp_path)
-
-    except subprocess.TimeoutExpired:
-        return error_response("执行超时（60s）")
+        result = await run_generated_code_async(code, framework=framework, mode=exec_mode)
+        output = result.output or ""
+        if result.error and not result.success:
+            if output:
+                output = f"{output}\n{result.error}"
+            else:
+                output = result.error
+        return success_response(
+            {
+                "output": output,
+                "success": result.success,
+                "exec_mode": result.mode,
+            },
+            message="执行完成",
+        )
     except Exception as e:
         return error_response(f"执行失败：{str(e)}")
 

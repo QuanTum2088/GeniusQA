@@ -161,8 +161,8 @@ async def websocket_chat(
                                 # 发送事件到客户端
                                 await websocket.send_json(event)
                             
-                            # 发送完成事件（附带最新对话标题）
-                            # populate_existing：覆盖 WebSocket 长会话 identity map 中的旧标题
+                            # 发送完成事件
+                            # populate_existing：覆盖 WebSocket 长会话 identity map
                             from sqlalchemy import select as sa_select
                             from app.api.v1.Ntesterc_module.Ntesterc_ai.conversation.model import ConversationModel as _Conv
                             title_row = (

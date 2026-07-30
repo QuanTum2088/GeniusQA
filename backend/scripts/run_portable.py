@@ -4,10 +4,13 @@
 import os
 import sys
 
-# 确保可导入同目录下的 main、portable_env
-_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+# 本文件位于 backend/scripts/；把 backend 根加入 path 以便导入 main/config
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+_BACKEND_DIR = os.path.dirname(_SCRIPTS_DIR)
 if _BACKEND_DIR not in sys.path:
     sys.path.insert(0, _BACKEND_DIR)
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
 
 if __name__ == "__main__":
     import traceback

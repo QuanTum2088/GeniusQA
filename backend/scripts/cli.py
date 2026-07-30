@@ -13,8 +13,9 @@ import typer
 from alembic import command
 from alembic.config import Config
 
-# 添加项目根目录到路径
-sys.path.insert(0, os.path.dirname(__file__))
+
+_BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _BACKEND_ROOT)
 
 # 创建 CLI 应用
 app = typer.Typer(
@@ -53,7 +54,7 @@ def parse_db_url(url: str) -> dict:
 def get_alembic_config() -> Config:
     """获取 Alembic 配置"""
     # Alembic 配置文件路径
-    alembic_ini_path = os.path.join(os.path.dirname(__file__), "alembic.ini")
+    alembic_ini_path = os.path.join(_BACKEND_ROOT, "alembic.ini")
     
     # 创建 Alembic 配置对象
     alembic_cfg = Config(alembic_ini_path)
@@ -61,7 +62,7 @@ def get_alembic_config() -> Config:
     # 设置脚本位置（使用 app/alembic）
     alembic_cfg.set_main_option(
         "script_location",
-        os.path.join(os.path.dirname(__file__), "app", "alembic")
+        os.path.join(_BACKEND_ROOT, "app", "alembic")
     )
     
     return alembic_cfg
@@ -76,8 +77,8 @@ def revision(
     生成新的 Alembic 迁移脚本
     
     示例:
-        python cli.py revision -m "add user table"
-        python cli.py revision --message "update user model" --env prod
+        python scripts/cli.py revision -m "add user table"
+        python scripts/cli.py revision --message "update user model" --env prod
     """
     if env not in ["dev", "prod"]:
         typer.echo(f"错误: 无效的环境参数 '{env}'", err=True)
@@ -106,7 +107,7 @@ def revision(
         typer.echo("迁移脚本已生成！")
         typer.echo()
         typer.echo("下一步:")
-        typer.echo("  python cli.py upgrade")
+        typer.echo("  python scripts/cli.py upgrade")
         typer.echo()
         
     except Exception as e:
@@ -123,9 +124,9 @@ def upgrade(
     应用最新的 Alembic 迁移
     
     示例:
-        python cli.py upgrade
-        python cli.py upgrade --revision ae1027a6acf
-        python cli.py upgrade --env prod
+        python scripts/cli.py upgrade
+        python scripts/cli.py upgrade --revision ae1027a6acf
+        python scripts/cli.py upgrade --env prod
     """
     if env not in ["dev", "prod"]:
         typer.echo(f"错误: 无效的环境参数 '{env}'", err=True)
@@ -168,9 +169,9 @@ def downgrade(
     回滚 Alembic 迁移
     
     示例:
-        python cli.py downgrade
-        python cli.py downgrade -r -2
-        python cli.py downgrade --revision ae1027a6acf
+        python scripts/cli.py downgrade
+        python scripts/cli.py downgrade -r -2
+        python scripts/cli.py downgrade --revision ae1027a6acf
     """
     if env not in ["dev", "prod"]:
         typer.echo(f"错误: 无效的环境参数 '{env}'", err=True)
@@ -218,7 +219,7 @@ def current(
     显示当前迁移版本
     
     示例:
-        python cli.py current
+        python scripts/cli.py current
     """
     if env not in ["dev", "prod"]:
         typer.echo(f"错误: 无效的环境参数 '{env}'", err=True)
@@ -250,8 +251,8 @@ def history(
     显示迁移历史
     
     示例:
-        python cli.py history
-        python cli.py history --verbose
+        python scripts/cli.py history
+        python scripts/cli.py history --verbose
     """
     if env not in ["dev", "prod"]:
         typer.echo(f"错误: 无效的环境参数 '{env}'", err=True)
@@ -284,10 +285,10 @@ def init_db(
     初始化数据库（一键完成：检查/创建 alembic + 生成迁移 + 应用迁移）
     
     示例:
-        python cli.py init-db
-        python cli.py init-db -m "initial setup"
-        python cli.py init-db --force
-        python cli.py init-db --env prod
+        python scripts/cli.py init-db
+        python scripts/cli.py init-db -m "initial setup"
+        python scripts/cli.py init-db --force
+        python scripts/cli.py init-db --env prod
     """
     # 验证环境参数
     if env not in ["dev", "prod"]:
@@ -303,7 +304,7 @@ def init_db(
     
     try:
         # 检查 alembic 目录是否存在
-        alembic_dir = os.path.join(os.path.dirname(__file__), "app", "alembic")
+        alembic_dir = os.path.join(_BACKEND_ROOT, "app", "alembic")
         if not os.path.exists(alembic_dir):
             typer.echo("检测到 alembic 目录不存在")
             typer.echo("正在自动初始化 Alembic...")
@@ -497,7 +498,7 @@ def downgrade() -> None:
                 raise typer.Exit()
             
 
-            versions_dir = os.path.join(os.path.dirname(__file__), "app", "alembic", "versions")
+            versions_dir = os.path.join(_BACKEND_ROOT, "app", "alembic", "versions")
             if os.path.exists(versions_dir):
                 import glob
                 for file in glob.glob(os.path.join(versions_dir, "*.py")):
@@ -550,7 +551,7 @@ def downgrade() -> None:
             cursor = conn.cursor()
             
             # 读取 SQL 文件
-            sql_file = os.path.join(os.path.dirname(__file__), "db_script", "db_init.sql")
+            sql_file = os.path.join(_BACKEND_ROOT, "sql", "db_init.sql")
             
             if os.path.exists(sql_file):
                 typer.echo(f"读取 SQL 文件: {sql_file}")
@@ -646,7 +647,7 @@ def check(
     检查数据库配置
     
     示例:
-        python cli.py check
+        python scripts/cli.py check
     """
     if env not in ["dev", "prod"]:
         typer.echo(f"错误: 无效的环境参数 '{env}'", err=True)
@@ -705,8 +706,8 @@ def seed(
     导入初始数据（用户、角色、菜单等）
     
     示例:
-        python cli.py seed
-        python cli.py seed --force
+        python scripts/cli.py seed
+        python scripts/cli.py seed --force
     """
     if env not in ["dev", "prod"]:
         typer.echo(f"错误: 无效的环境参数 '{env}'", err=True)
@@ -751,7 +752,7 @@ def seed(
                 raise typer.Exit()
         
         # 读取 SQL 文件
-        sql_file = os.path.join(os.path.dirname(__file__), "db_script", "db_init.sql")
+        sql_file = os.path.join(_BACKEND_ROOT, "sql", "db_init.sql")
         
         if not os.path.exists(sql_file):
             typer.echo(f"错误：找不到初始数据文件: {sql_file}")

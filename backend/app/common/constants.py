@@ -21,9 +21,12 @@ CACHE_EXPIRE_ROLE = 3600  # 1小时
 CACHE_EXPIRE_PERMISSION = 3600  # 1小时
 CACHE_EXPIRE_MENU = 3600  # 1小时
 
-# Token相关
+# Token相关（兼容旧引用；实际过期时间以 config.ACCESS_TOKEN_EXPIRE_MINUTES 为准）
 TOKEN_EXPIRE_MINUTES = 60 * 24  # 24小时
 REFRESH_TOKEN_EXPIRE_DAYS = 7  # 7天
+
+# 验证码 Redis key 前缀
+CAPTCHA_REDIS_PREFIX = "captcha_codes"
 
 # 密码相关
 PASSWORD_MIN_LENGTH = 6

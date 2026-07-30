@@ -3,7 +3,7 @@
 # @author: Rebort
 
 """
-LLM 用量日志写入服务（失败不影响主流程）
+LLM 用量日志写入服务
 """
 from __future__ import annotations
 

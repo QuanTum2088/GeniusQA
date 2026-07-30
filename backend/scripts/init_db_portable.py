@@ -5,9 +5,12 @@ import os
 import subprocess
 import sys
 
-_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+_BACKEND_DIR = os.path.dirname(_SCRIPTS_DIR)
 if _BACKEND_DIR not in sys.path:
     sys.path.insert(0, _BACKEND_DIR)
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
 
 
 def main() -> int:
@@ -21,7 +24,7 @@ def main() -> int:
         )
         return 1
 
-    cli_py = os.path.join(_BACKEND_DIR, "cli.py")
+    cli_py = os.path.join(_SCRIPTS_DIR, "cli.py")
     proc = subprocess.run(
         [sys.executable, cli_py, "init-db", "--yes"],
         cwd=_BACKEND_DIR,
