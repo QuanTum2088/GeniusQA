@@ -413,6 +413,16 @@ async def kb_stats(
     return await S.kb_statistics(project_id, current_user_id, kb_id, db)
 
 
+@router.get("/{project_id}/knowledge-bases/{kb_id}/vector-status", summary="知识库向量状态")
+async def kb_vector_status(
+    project_id: int,
+    kb_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    return await S.kb_vector_status(project_id, current_user_id, kb_id, db)
+
+
 @router.get("/{project_id}/knowledge-bases/{kb_id}/documents", summary="文档列表")
 async def list_docs(
     project_id: int,
@@ -445,6 +455,17 @@ async def del_doc(
     current_user_id: int = Depends(get_current_user_id),
 ):
     return await S.delete_document(project_id, current_user_id, kb_id, doc_id, db)
+
+
+@router.get("/{project_id}/knowledge-bases/{kb_id}/documents/{doc_id}/chunks", summary="文档分块详情")
+async def doc_chunks(
+    project_id: int,
+    kb_id: int,
+    doc_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    return await S.get_document_chunks(project_id, current_user_id, kb_id, doc_id, db)
 
 
 class KbQueryBody(BaseModel):
