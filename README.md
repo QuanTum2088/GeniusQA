@@ -1,4 +1,4 @@
-# GeniusQA AI 全栈测试平台
+# GeniusQA
 
 <div align="center">
 
