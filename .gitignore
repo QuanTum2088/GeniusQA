@@ -69,6 +69,8 @@ $c
 
 # Runtime generated files (never commit)
 static/swagger/
+static/api_results/
+static/media/playwright/
 backend/app/static/api_results/
 backend/static/upload/
 static/upload/
