@@ -67,21 +67,27 @@ class DocumentExtractor:
     def _extract_pdf(file_path: str) -> str:
         """提取PDF文件文本"""
         try:
-            import PyPDF2
-            
+            # 优先使用 pypdf（新版本），兼容 PyPDF2（旧版本）
+            try:
+                import pypdf
+                PdfReader = pypdf.PdfReader
+            except ImportError:
+                import PyPDF2
+                PdfReader = PyPDF2.PdfReader
+
             text_content = []
             with open(file_path, 'rb') as f:
-                pdf_reader = PyPDF2.PdfReader(f)
+                pdf_reader = PdfReader(f)
                 for page_num in range(len(pdf_reader.pages)):
                     page = pdf_reader.pages[page_num]
                     text = page.extract_text()
                     if text:
                         text_content.append(text)
-            
+
             return '\n\n'.join(text_content)
         except ImportError:
-            logger.warning("PyPDF2未安装，无法提取PDF文本。请安装: pip install PyPDF2")
-            return "PDF文本提取需要安装PyPDF2库"
+            logger.warning("pypdf/PyPDF2 均未安装，无法提取PDF文本。请安装: pip install pypdf")
+            return "PDF文本提取需要安装pypdf库"
         except Exception as e:
             logger.error(f"提取PDF文本失败: {e}")
             return f"PDF文本提取失败: {str(e)}"

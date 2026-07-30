@@ -557,7 +557,8 @@ const handleViewRequirementDetail = (row: any) => {
 }
 
 // 获取需求级别标签类型
-const getLevelType = (level: string) => {
+const getLevelType = (level?: string | null) => {
+  if (!level) return 'info'
   const map: Record<string, string> = {
     '高': 'danger',
     '中': 'warning',
@@ -601,7 +602,7 @@ const getStatusTagType = (status?: string) => {
     completed: 'success',
     failed: 'danger'
   }
-  return map[status || 'pending'] || ''
+  return map[status || 'pending'] || 'info'
 }
 
 const formatFileSize = (size?: number) => {
@@ -627,12 +628,14 @@ const formatDateTime = (dateStr?: string) => {
   }
 }
 
+// 路由必须在 setup 顶层调用
+const route = useRoute()
+
 onMounted(async () => {
   getProjectList()
   await getList()
   
   // 处理从Figma配置页面跳转过来的documentId参数
-  const route = useRoute()
   const documentId = route.query.documentId
   
   if (documentId) {

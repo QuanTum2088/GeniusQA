@@ -39,7 +39,7 @@ async def create_project(
 @router.get("/", summary="获取项目列表")
 async def get_project_list(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(20, ge=1, le=1000, description="每页数量"),
     name: Optional[str] = Query(None, description="项目名称"),
     status: Optional[str] = Query(None, description="项目状态"),
     db: AsyncSession = Depends(get_db),

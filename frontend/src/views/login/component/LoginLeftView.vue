@@ -302,4 +302,10 @@ const getThemeConfig = computed(() => themeConfig.value);
     }
   }
 }
+
+@media (max-width: 768px) {
+  .login-left-view {
+    display: none;
+  }
+}
 </style>

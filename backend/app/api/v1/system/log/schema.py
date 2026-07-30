@@ -4,7 +4,7 @@
 
 from typing import Optional, Any
 from datetime import datetime
-from pydantic import Field
+from pydantic import Field, ConfigDict
 from app.core.base_schema import BaseSchema, PageQuerySchema, TimestampSchema
 
 
@@ -33,6 +33,7 @@ class OperationLogCreateSchema(BaseSchema):
 
 
 class OperationLogOutSchema(TimestampSchema):
+    model_config = ConfigDict(from_attributes=True, extra="ignore")
     """操作日志输出Schema"""
     
     id: int = Field(..., description="日志ID")
@@ -91,6 +92,7 @@ class LoginLogCreateSchema(BaseSchema):
 
 
 class LoginLogOutSchema(TimestampSchema):
+    model_config = ConfigDict(from_attributes=True, extra="ignore")
     """登录日志输出Schema"""
     
     id: int = Field(..., description="日志ID")

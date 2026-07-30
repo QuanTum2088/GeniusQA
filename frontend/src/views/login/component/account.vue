@@ -239,4 +239,39 @@ const signInSuccess = (isNoPower: boolean) => {
     }
   }
 }
+
+.captcha-form-item {
+  :deep(.el-form-item__content) {
+    flex-wrap: nowrap;
+  }
+}
+.captcha-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.captcha-input-wrap {
+  flex: 1;
+  min-width: 0;
+}
+.captcha-img-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+
+  :deep(.login-content-code) {
+    height: 40px;
+  }
+}
+
+@media (max-width: 480px) {
+  .captcha-row {
+    gap: 6px;
+  }
+  .login-content-submit {
+    height: 44px !important;
+    font-size: 15px;
+  }
+}
 </style>

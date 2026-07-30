@@ -255,7 +255,10 @@ export function backEndComponent(routes: any) {
 			item.children.forEach((child: any) => processRoute(child, item.path, level + 1));
 		}
 		
-		return item;
+		
+        // Ensure every route has a meta object (prevent "Cannot read properties of undefined (reading 'meta')")
+        if (!item.meta) item.meta = {};
+        return item;
 	};
 	
 	return routes.map((item: any) => processRoute(item));

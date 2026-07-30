@@ -32,6 +32,22 @@ from app.common.response import page_response, success_response, error_response
 UPLOAD_ROOT = Path(os.getenv("KNOWLEDGE_UPLOAD_DIR", "uploads/knowledge"))
 
 
+def _unwrap_exception_group(exc: BaseException) -> str:
+    """Unwrap ExceptionGroup (Python 3.11+) to expose the real sub-exception message."""
+    import traceback as _tb
+
+    if isinstance(exc, BaseExceptionGroup):
+        parts: list[str] = []
+        for sub in exc.exceptions:
+            parts.append(_unwrap_exception_group(sub))
+        return "; ".join(parts) if parts else str(exc)
+    # Include chained cause if present
+    cause = exc.__cause__
+    if cause is not None:
+        return f"{exc} (caused by {cause})"
+    return str(exc)
+
+
 async def _check_member(project_id: int, user_id: int, db: AsyncSession) -> None:
     await ProjectService._check_project_member(project_id, user_id, db)  # noqa: SLF001
 
@@ -497,7 +513,8 @@ async def mcp_list_tools(project_id: int, user_id: int, config_id: int, db: Asyn
             )
         return success_response(data={"tools": items}, message="ok")
     except Exception as e:
-        return error_response(message=f"列出工具失败: {e}")
+        detail = _unwrap_exception_group(e) if isinstance(e, BaseExceptionGroup) else str(e)
+        return error_response(message=f"列出工具失败: {detail}")
 
 
 async def mcp_call_tool(
@@ -523,7 +540,8 @@ async def mcp_call_tool(
             result = await target.ainvoke(arguments or {})
         return success_response(data={"result": result}, message="ok")
     except Exception as e:
-        return error_response(message=f"调用工具失败: {e}")
+        detail = _unwrap_exception_group(e) if isinstance(e, BaseExceptionGroup) else str(e)
+        return error_response(message=f"调用工具失败: {detail}")
 
 
 async def import_mcp_from_file(project_id: int, user_id: int, db: AsyncSession, data: dict) -> dict:

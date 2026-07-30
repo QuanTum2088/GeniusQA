@@ -74,7 +74,37 @@ const viteConfig = defineConfig((mode: ConfigEnv) => {
 			port: env.VITE_PORT as unknown as number,
 			open: env.VITE_OPEN?.toLowerCase() === 'true',
 			hmr: true,
-			proxy: {},
+			allowedHosts: ['genius.tail83d0a7.ts.net'],
+			proxy: {
+				// API 文档与 OpenAPI 直通到后端，避免被前端 SPA 路由拦截
+				'/docs': {
+					target: 'http://127.0.0.1:8100',
+					changeOrigin: true,
+					secure: false,
+				},
+				'/redoc': {
+					target: 'http://127.0.0.1:8100',
+					changeOrigin: true,
+					secure: false,
+				},
+				'/openapi.json': {
+					target: 'http://127.0.0.1:8100',
+					changeOrigin: true,
+					secure: false,
+				},
+				// Swagger UI 静态资源（CSS/JS）
+				'/static': {
+					target: 'http://127.0.0.1:8100',
+					changeOrigin: true,
+					secure: false,
+				},
+				// 所有 /api 请求也代理到后端
+				'/api': {
+					target: 'http://127.0.0.1:8100',
+					changeOrigin: true,
+					secure: false,
+				},
+			},
 		},
 		build: {
 			outDir: 'dist',

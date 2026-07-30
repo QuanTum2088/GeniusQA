@@ -95,7 +95,7 @@ def create_app() -> FastAPI:
         _frontend_dist = Path(_fe_cfg)
     else:
         # 默认：项目根下 frontend/dist
-        _frontend_dist = config.BASEDIR / "frontend" / "dist"
+        _frontend_dist = Path(config.BASEDIR) / "frontend" / "dist"
     if _frontend_dist.is_dir():
         # 显式挂载子目录，避免与 /static、/media、/uploads 冲突
         for _sub in ("assets", "monacoeditorwork"):
@@ -103,25 +103,7 @@ def create_app() -> FastAPI:
             if _sub_dir.is_dir():
                 app.mount(f"/{_sub}", StaticFiles(directory=str(_sub_dir)), name=f"frontend_{_sub}")
 
-        # 根路径与所有未匹配路径均回退到 index.html（SPA 客户端路由）
-        @app.get("/", include_in_schema=False)
-        async def _frontend_root():
-            return FileResponse(str(_frontend_dist / "index.html"))
-
-        @app.get("/{full_path:path}", include_in_schema=False)
-        async def _spa_catch_all(full_path: str):
-            # 排除 API、静态文件、文档等已注册路由
-            _reserved = ("api/", "static/", "media/", "uploads/", "docs", "redoc", "openapi", "monitor/", "common/", "system/")
-            if any(full_path.startswith(p) or full_path == p.rstrip("/") for p in _reserved):
-                raise HTTPException(status_code=404, detail="Not Found")
-            # 尝试直接返回静态文件（favicon 等）
-            _file = _frontend_dist / full_path
-            if _file.is_file():
-                return FileResponse(str(_file))
-            # 其余全部回退到 index.html
-            return FileResponse(str(_frontend_dist / "index.html"))
-
-    # 自定义 API 文档路由
+    # 自定义 API 文档路由（必须在 catch-all 前面注册，否则被拦截）
     _swagger_dir = Path(__file__).resolve().parent / "static" / "swagger"
 
     @app.get("/docs", include_in_schema=False)
@@ -135,6 +117,24 @@ def create_app() -> FastAPI:
         """ReDoc 文档"""
         with open(_swagger_dir / "redoc.html", "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
+
+    # 根路径与所有未匹配路径均回退到 index.html（SPA 客户端路由）
+    @app.get("/", include_in_schema=False)
+    async def _frontend_root():
+        return FileResponse(str(_frontend_dist / "index.html"), headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def _spa_catch_all(full_path: str):
+        # 排除 API、静态文件、文档等已注册路由
+        _reserved = ("api/", "static/", "media/", "uploads/", "docs", "redoc", "openapi")
+        if any(full_path.startswith(p) or full_path == p.rstrip("/") for p in _reserved):
+            raise HTTPException(status_code=404, detail="Not Found")
+        # 尝试直接返回静态文件（favicon 等）
+        _file = _frontend_dist / full_path
+        if _file.is_file():
+            return FileResponse(str(_file))
+        # 其余全部回退到 index.html
+        return FileResponse(str(_frontend_dist / "index.html"), headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
 
     return app
 

@@ -246,7 +246,7 @@ onMounted(() => {
   top: 49%;
   right: 0;
   left: 0;
-  width: 440px;
+  width: min(440px, calc(100vw - 40px));
   margin: 0 auto;
   padding: 0 5px;
   opacity: 0;

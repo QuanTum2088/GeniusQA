@@ -111,7 +111,7 @@ const {isRequestRoutes} = themeConfig.value;
 		NProgress.done();
 	} else {
 		if (!token) {
-			next(`/login?redirect=${to.path}&params=${JSON.stringify(to.query ? to.query : to.params)}`);
+			next('/login');
 			Session.clear();
 			NProgress.done();
 		} else if (token && to.path === '/login') {

@@ -4,8 +4,8 @@
       <el-icon class="notice-icon"><Bell /></el-icon>
       <div class="notice-track-wrap">
         <div class="notice-track">
-          <span class="notice-text">🚀🚀 GeniusQA AI全栈测试平台，提供接口自动化、双引擎UI自动化、APP自动化，支持MCP、知识库、自定义Skill管理，一站式解决方案！</span>
-          <span class="notice-text">🚀🚀 GeniusQA AI全栈测试平台，提供接口自动化、双引擎UI自动化、APP自动化，支持MCP、知识库、自定义Skill管理，一站式解决方案！</span>
+          <span class="notice-text">🚀 GeniusQA AI全栈测试平台，提供接口自动化、双引擎UI自动化、APP自动化，支持MCP、知识库、自定义Skill管理，一站式解决方案！</span>
+          <span class="notice-text">🚀 GeniusQA AI全栈测试平台，提供接口自动化、双引擎UI自动化、APP自动化，支持MCP、知识库、自定义Skill管理，一站式解决方案！</span>
         </div>
       </div>
     </div>
