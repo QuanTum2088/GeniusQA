@@ -1,6 +1,6 @@
-# GeniusQA AI 全栈测试平台
-
 <div align="center">
+
+# GeniusQA AI 全栈测试平台
 
 **基于 FastAPI + Vue3 的AI智能化全栈测试管理平台**
 
