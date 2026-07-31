@@ -1,11 +1,11 @@
 name: Sync Upstream
 
 # 触发方式：
-#   1. 定时：每天 UTC 0 点（北京时间 08:00）自动执行
+#   1. 定时：每天 UTC 10 点（北京时间 18:00）自动执行
 #   2. 手动：在 Actions 页面点 "Run workflow"
 on:
   schedule:
-    - cron: "0 0 * * *"
+    - cron: "0 10 * * *"
   workflow_dispatch:
 
 # 允许工作流推送回当前仓库
