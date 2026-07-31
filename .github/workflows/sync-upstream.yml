@@ -1,0 +1,55 @@
+name: Sync Upstream
+
+# 触发方式：
+#   1. 定时：每天 UTC 0 点（北京时间 08:00）自动执行
+#   2. 手动：在 Actions 页面点 "Run workflow"
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+# 允许工作流推送回当前仓库
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0   # 拉全量历史，保证三方合并可行
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge upstream into main
+        run: |
+          # 上游地址（若以后变更，只改这一行）
+          UPSTREAM_REPO="https://github.com/rebort-hub/N-Tester.git"
+          UPSTREAM_BRANCH="main"
+
+          git remote add upstream "$UPSTREAM_REPO"
+          git fetch upstream
+
+          echo "== 当前分支 =="
+          git branch --show-current
+
+          echo "== 合并 upstream/$UPSTREAM_BRANCH 到 main =="
+          # --no-edit：自动生成合并信息，遇冲突则命令失败（不推送，保持 origin 干净）
+          git merge "upstream/$UPSTREAM_BRANCH" --no-edit
+
+          echo "== 推送到 origin/main =="
+          git push origin main
+
+      - name: 合并失败提示
+        if: failure()
+        run: |
+          echo "::error::合并上游时出现冲突，origin/main 未被修改。"
+          echo "请在本地执行： git pull origin main  然后手动解决冲突后再 push。"
+          exit 1
