@@ -41,15 +41,17 @@ jobs:
           git branch --show-current
 
           echo "== 合并 upstream/$UPSTREAM_BRANCH 到 main =="
-          # --no-edit：自动生成合并信息，遇冲突则命令失败（不推送，保持 origin 干净）
-          git merge "upstream/$UPSTREAM_BRANCH" --no-edit
+          # -X ours        : 冲突段保留本地(你的定制)，非冲突段(上游新功能)照常合入
+          # --allow-unrelated-histories : 首次合并两独立历史仓库时必须
+          # --no-edit      : 自动生成合并信息，不弹编辑器
+          git merge "upstream/$UPSTREAM_BRANCH" -X ours --allow-unrelated-histories --no-edit
 
           echo "== 推送到 origin/main =="
           git push origin main
 
-      - name: 合并失败提示
+      - name: 失败提示
         if: failure()
         run: |
-          echo "::error::合并上游时出现冲突，origin/main 未被修改。"
-          echo "请在本地执行： git pull origin main  然后手动解决冲突后再 push。"
+          echo "::error::同步上游失败（冲突已自动以本地版本解决；此处失败多为推送被拒，如分支保护）。"
+          echo "请检查仓库分支保护规则，或改用带 write 权限的 PAT。"
           exit 1
