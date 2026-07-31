@@ -177,3 +177,12 @@ backend/nl
 
 # Dependency lock files (generated, environment-specific)
 requirements-full*.txt
+
+# ==================== Local debug/temp files (auto-filter) ====================
+# bat/cmd/vbs 均为本地脚本，无需入库
+*.bat
+*.cmd
+*.vbs
+
+# 本地调试 py：约定用 debug_ 前缀命名，自动忽略
+backend/debug_*.py
