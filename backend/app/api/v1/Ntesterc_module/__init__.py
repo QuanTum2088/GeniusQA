@@ -15,7 +15,6 @@ from app.api.v1.Ntesterc_module.Ntesterc_project import router as projects_route
 from app.api.v1.Ntesterc_module.Ntesterc_intel.controller import router as intel_router
 from app.api.v1.Ntesterc_module.Ntesterc_skills import router as skill_router
 from app.api.v1.Ntesterc_module.Ntesterc_testcases.controller import router as case_router
-from app.api.v1.Ntesterc_module.Ntesterc_api_testing.controller import router as apitest_router
 from app.api.v1.Ntesterc_module.Ntesterc_ui.controller import router as ui_router
 from app.api.v1.Ntesterc_module.Ntesterc_data_factory.controller import router as data_router
 from app.api.v1.Ntesterc_module.Ntesterc_reviews.controller import router as review_router
@@ -45,7 +44,6 @@ router.include_router(skill_router, prefix="/Ntesterc_skills", tags=["Skill管�
 router.include_router(asst_router, prefix="/Ntesterc_assistant", tags=["AI助手"])
 
 router.include_router(case_router, prefix="/Ntesterc_testcases", tags=["测试用例管理"])
-router.include_router(apitest_router, prefix="/Ntesterc_api_testing", tags=["API测试"])
 router.include_router(api_router, prefix="/Ntesterc_api", tags=["接口自动化"])
 router.include_router(ui_router, prefix="/Ntesterc_ui", tags=["UI自动化"])
 router.include_router(web_router, prefix="/Ntesterc_web", tags=["Web管理模块"])

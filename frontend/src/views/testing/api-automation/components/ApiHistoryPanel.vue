@@ -35,13 +35,13 @@
 			<el-table-column label="时间" width="170" align="center">
 				<template #default="{ row }">{{ formatTime(row.creation_date || row.create_time) }}</template>
 			</el-table-column>
-			<el-table-column label="操作" width="90" align="center" fixed="right">
+			<el-table-column label="操作" width="140" align="center" fixed="right">
 				<template #default="{ row }">
 					<el-button type="primary" link size="small" @click.stop="openDetail(row)">详情</el-button>
+					<el-button type="danger" link size="small" @click.stop="removeRow(row)">删除</el-button>
 				</template>
 			</el-table-column>
 		</el-table>
-
 		<div class="history-pagination" v-show="total > 0">
 			<el-pagination
 				background
@@ -96,7 +96,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { req_history } from '/@/api/v1/testing/apiAutomation';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { req_history, del_req_history } from '/@/api/v1/testing/apiAutomation';
 
 const props = defineProps<{ apiData?: any }>();
 
@@ -109,8 +110,13 @@ const detailVisible = ref(false);
 const detail = ref<any>(null);
 
 const apiId = computed(() => {
-	const info = props.apiData?.api_info || props.apiData || {};
-	return Number(info.id || info.api_id || 0) || null;
+	const d = props.apiData || {};
+	const candidates = [d.api_id, d.api_info?.id, d.api_info?.api_id];
+	for (const c of candidates) {
+		const n = Number(c);
+		if (Number.isFinite(n) && n > 0) return n;
+	}
+	return null;
 });
 
 const methodMap: Record<number, string> = { 1: 'GET', 2: 'POST', 3: 'PUT', 4: 'DELETE', 5: 'PATCH', 6: 'OPTIONS' };
@@ -175,6 +181,37 @@ const reload = () => {
 const openDetail = (row: any) => {
 	detail.value = row;
 	detailVisible.value = true;
+};
+
+const removeRow = async (row: any) => {
+	const id = Number(row?.id || 0);
+	if (!id) {
+		ElMessage.warning('无法获取记录 ID');
+		return;
+	}
+	try {
+		await ElMessageBox.confirm('确认删除该调试记录？删除后不可恢复。', '提示', {
+			type: 'warning',
+			confirmButtonText: '删除',
+			cancelButtonText: '取消',
+		});
+	} catch {
+		return;
+	}
+	try {
+		await del_req_history({ id });
+		ElMessage.success('已删除');
+		if (detail.value?.id === id) {
+			detailVisible.value = false;
+			detail.value = null;
+		}
+		if (list.value.length <= 1 && currentPage.value > 1) {
+			currentPage.value -= 1;
+		}
+		await load();
+	} catch (e: any) {
+		ElMessage.error(e?.message || '删除失败');
+	}
 };
 
 watch(apiId, () => { reload(); });

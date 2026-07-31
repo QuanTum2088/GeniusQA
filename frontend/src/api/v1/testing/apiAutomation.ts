@@ -19,6 +19,10 @@ export function useApiAutomationApi() {
       postApiAutomation('/v1/Ntesterc_api/edit_api_service', data),
     del_api_service: (data: { id: number }) => postApiAutomation('/v1/Ntesterc_api/del_api_service', data),
     api_service_list: (data: { project_id?: number | null } = {}) => postApiAutomation('/v1/Ntesterc_api/api_service_list', data),
+    get_common_params: (data: { api_service_id: number }) =>
+      postApiAutomation('/v1/Ntesterc_api/get_common_params', data),
+    save_common_params: (data: { api_service_id: number; common_params: Record<string, any> }) =>
+      postApiAutomation('/v1/Ntesterc_api/save_common_params', data),
 
     // ---------- 树/菜单 ----------
     api_tree: (data: { search?: Record<string, any> } = {}) => postApiAutomation('/v1/Ntesterc_api/api_tree', data),
@@ -31,11 +35,13 @@ export function useApiAutomationApi() {
 
     // ---------- API 接口详情/保存/发送 ----------
     api_info: (data: { api_id: number }) => postApiAutomation('/v1/Ntesterc_api/api_info', data),
-    save_api: (data: { id: number; url?: string; req?: Record<string, any> }) => postApiAutomation('/v1/Ntesterc_api/save_api', data),
+    save_api: (data: { id: number; url?: string; req?: Record<string, any>; document?: Record<string, any>; name?: string; description?: string }) =>
+      postApiAutomation('/v1/Ntesterc_api/save_api', data),
     save_api_case: (data: Record<string, any>) => postApiAutomation('/v1/Ntesterc_api/save_api_case', data),
     api_send: (data: { id?: number; env_id?: number; url?: string; req?: Record<string, any> }) =>
       postApiAutomation('/v1/Ntesterc_api/api_send', data),
     req_history: (data: Record<string, any> = {}) => postApiAutomation('/v1/Ntesterc_api/req_history', data),
+    del_req_history: (data: { id: number }) => postApiAutomation('/v1/Ntesterc_api/del_req_history', data),
     edit_history: (data: { api_id: number }) => postApiAutomation('/v1/Ntesterc_api/edit_history', data),
 
     // ---------- 环境 ----------
@@ -59,30 +65,6 @@ export function useApiAutomationApi() {
     del_api_db: (data: { id: number }) => postApiAutomation('/v1/Ntesterc_api/del_api_db', data),
     test_db_conn: (data: { id: number }) => postApiAutomation('/v1/Ntesterc_api/test_db_conn', data),
 
-    // ---------- 参数依赖 ----------
-    api_params_list: (data: Record<string, any> = {}) => postApiAutomation('/v1/Ntesterc_api/api_params_list', data),
-    add_api_params: (data: { name: string; value?: Record<string, any> }) => postApiAutomation('/v1/Ntesterc_api/add_api_params', data),
-    edit_api_params: (data: { id: number; name?: string; value?: Record<string, any> }) => postApiAutomation('/v1/Ntesterc_api/edit_api_params', data),
-    del_api_params: (data: { id: number }) => postApiAutomation('/v1/Ntesterc_api/del_api_params', data),
-    api_params: (data: Record<string, any> = {}) => postApiAutomation('/v1/Ntesterc_api/api_params', data),
-    params_select: (data: Record<string, any> = {}) => postApiAutomation('/v1/Ntesterc_api/params_select', data),
-
-    // ---------- 公共函数 ----------
-    api_function_list: (data: Record<string, any> = {}) => postApiAutomation('/v1/Ntesterc_api/api_function_list', data),
-    add_api_function: (data: { name: string; description?: string | null }) => postApiAutomation('/v1/Ntesterc_api/add_api_function', data),
-    edit_api_function: (data: { id: number; name?: string; description?: string | null }) => postApiAutomation('/v1/Ntesterc_api/edit_api_function', data),
-    del_api_function: (data: { id: number }) => postApiAutomation('/v1/Ntesterc_api/del_api_function', data),
-    api_function: (data: Record<string, any> = {}) => postApiAutomation('/v1/Ntesterc_api/api_function', data),
-
-    // ---------- 错误码 ----------
-    api_code_list: (data: Record<string, any> = {}) => postApiAutomation('/v1/Ntesterc_api/api_code_list', data),
-    api_code: (data: Record<string, any> = {}) => postApiAutomation('/v1/Ntesterc_api/api_code', data),
-    add_code: (data: Record<string, any>) => postApiAutomation('/v1/Ntesterc_api/add_code', data),
-    edit_code: (data: Record<string, any>) => postApiAutomation('/v1/Ntesterc_api/edit_code', data),
-    del_code: (data: Record<string, any>) => postApiAutomation('/v1/Ntesterc_api/del_code', data),
-
-    // ---------- 文档同步变更 ----------
-    api_update_list: (data: { api_service_id?: number | null } = {}) => postApiAutomation('/v1/Ntesterc_api/api_update_list', data),
     pull_api_doc: (data: {
       api_service_id: number;
       source_type: 'swagger' | 'apifox';
@@ -157,7 +139,7 @@ export function useApiAutomationApi() {
       postApiAutomation('/v1/Ntesterc_api/edit_api_case', data),
     del_api_case: (data: { id: number }) =>
       postApiAutomation('/v1/Ntesterc_api/del_api_case', data),
-    run_api_case: (data: { case_ids: number[]; env_id: number; params_id?: number | null; name?: string }) =>
+    run_api_case: (data: { case_ids: number[]; env_id: number; name?: string }) =>
       postApiAutomation('/v1/Ntesterc_api/run_api_case', data),
     save_api_case_to_suite: (data: { name: string; description?: string; suite_id: number; script?: any[]; case_type?: number }) =>
       postApiAutomation('/v1/Ntesterc_api/save_api_case_to_suite', data),
@@ -183,15 +165,13 @@ export function useApiAutomationApi() {
 }
 export const apiAutomationApi = useApiAutomationApi();
 export const {
-  api_project,
-  add_api_project,
-  edit_api_project,
-  del_api_project,
   api_service,
   add_api_service,
   edit_api_service,
   del_api_service,
   api_service_list,
+  get_common_params,
+  save_common_params,
   api_tree,
   api_tree_list,
   add_menu,
@@ -203,6 +183,7 @@ export const {
   save_api_case,
   api_send,
   req_history,
+  del_req_history,
   edit_history,
   api_env,
   env_info,
@@ -219,29 +200,6 @@ export const {
   edit_api_db,
   del_api_db,
   test_db_conn,
-  api_params_list,
-  add_api_params,
-  edit_api_params,
-  del_api_params,
-  api_params,
-  add_params,
-  edit_params,
-  del_params,
-  params_select,
-  api_function_list,
-  add_api_function,
-  edit_api_function,
-  del_api_function,
-  api_function,
-  add_function,
-  edit_function,
-  del_function,
-  api_code_list,
-  api_code,
-  add_code,
-  edit_code,
-  del_code,
-  api_update_list,
   pull_api_doc,
   api_script_list,
   add_api_script,

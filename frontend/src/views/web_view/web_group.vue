@@ -3,12 +3,21 @@
     <!-- 顶部工具栏 -->
     <div class="group-toolbar">
       <div class="toolbar-left">
-        <el-input v-model="searchParams.search.name__icontains" placeholder="搜索脚本名称" clearable style="width:200px" @keyup.enter="group_list" />
-        <el-button type="primary" icon="Search" @click="group_list">搜索</el-button>
-        <el-button icon="Refresh" @click="reset_search">重置</el-button>
+        <el-input v-model="searchParams.search.name__icontains" placeholder="搜索用例名称" clearable style="width:200px" @keyup.enter="doSearch" />
+        <el-button type="primary" @click="doSearch">
+          <el-icon><ele-Search /></el-icon>
+          搜索
+        </el-button>
+        <el-button @click="reset_search">
+          <el-icon><ele-Refresh /></el-icon>
+          重置
+        </el-button>
       </div>
       <div class="toolbar-right">
-        <el-button type="primary" @click="Add">新增脚本</el-button>
+        <el-button type="success" @click="Add">
+          <el-icon><ele-Plus /></el-icon>
+          新增脚本
+        </el-button>
       </div>
     </div>
 
@@ -77,13 +86,13 @@
           <el-table-column label="创建时间" width="160" align="center">
             <template #default="{ row }">{{ row.create_time ? String(row.create_time).replace('T',' ').slice(0,19) : '-' }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="200" align="center" fixed="right">
+          <el-table-column label="操作" width="210" align="center" fixed="right">
             <template #default="{ row }">
-              <span style="white-space:nowrap;display:inline-flex;gap:4px">
+              <div class="table-actions">
                 <el-button type="success" size="small" @click="run_script(row)">运行</el-button>
                 <el-button type="warning" size="small" @click="Edit(row)">编辑</el-button>
                 <el-button type="danger" size="small" @click="Delete(row)">删除</el-button>
-              </span>
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -360,7 +369,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, nextTick } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { DocumentCopy, Monitor, HomeFilled, Folder, ChromeFilled, Delete, Check, Close } from '@element-plus/icons-vue'
 import { logLineClass, parseLogLineForDisplay } from '@/utils/runMonitorLog'
@@ -406,17 +415,32 @@ const loadMenuTree = async () => {
 }
 
 const onMenuNodeClick = (data: any) => {
-  nextTick(() => {
-    selectedMenuNode.value = data
-  })
+  selectedMenuNode.value = data
 }
 
-// 根据选中节点过滤场景
+/** 收集节点下所有脚本 id（含子节点） */
+const collectScriptIds = (node: any): Set<number> => {
+  const ids = new Set<number>()
+  const walk = (n: any) => {
+    if (!n) return
+    if (Number(n.type) === 2 && n.id != null) ids.add(Number(n.id))
+    for (const c of n.children || []) walk(c)
+  }
+  walk(node)
+  return ids
+}
+
+// 根据选中模块过滤：包含该模块下脚本的用例；未选模块时显示全部
 const filteredTableData = computed(() => {
   if (!selectedMenuNode.value || selectedMenuNode.value.id == null) return table_data.value
-  const nodeId = Number(selectedMenuNode.value.id)
+  const ids = collectScriptIds(selectedMenuNode.value)
+  // 选中的是脚本节点本身
+  if (Number(selectedMenuNode.value.type) === 2) {
+    ids.add(Number(selectedMenuNode.value.id))
+  }
+  if (!ids.size) return []
   return table_data.value.filter((row: any) =>
-    (row.script || []).some((s: any) => s != null && Number(s.id) === nodeId)
+    (row.script || []).some((s: any) => s != null && ids.has(Number(s.id)))
   )
 })
 
@@ -428,11 +452,22 @@ const reset_search = () => {
     currentPage: 1,
     pageSize: 10,
   }
+  selectedMenuNode.value = null
+  group_list()
+}
+
+const doSearch = () => {
+  searchParams.value.currentPage = 1
   group_list()
 }
 
 const group_list = async () => {
-  const res: any = await web_group_list(searchParams.value)
+  const res: any = await web_group_list({
+    currentPage: searchParams.value.currentPage,
+    page: searchParams.value.currentPage,
+    pageSize: searchParams.value.pageSize,
+    search: searchParams.value.search,
+  })
   const content = res?.data?.content
   // 清洗数据，确保 script 数组里没有 null/undefined 元素
   table_data.value = (Array.isArray(content) ? content : []).map((row: any) => ({
@@ -805,6 +840,8 @@ onMounted(() => {
 <style lang="scss" scoped>
 .web-group-page { height: calc(100vh - 120px); display: flex; flex-direction: column; padding: 10px; gap: 8px; overflow: hidden; }
 .group-toolbar { display: flex; align-items: center; justify-content: space-between; background: var(--el-bg-color); border: 1px solid var(--el-border-color); border-radius: 8px; padding: 10px 14px; flex-shrink: 0; }
+.table-actions { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.table-actions :deep(.el-button + .el-button) { margin-left: 0; }
 .toolbar-left { display: flex; align-items: center; gap: 8px; }
 .toolbar-right { display: flex; align-items: center; gap: 8px; }
 .group-body { flex: 1; min-height: 0; display: flex; gap: 8px; overflow: hidden; }

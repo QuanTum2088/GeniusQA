@@ -209,16 +209,22 @@ async def get_execution_trends(
         for i in range(days):
             current_date = start_date + timedelta(days=i)
             
-            # API测试统计
+            # 接口自动化调试统计
             api_query = text("""
                 SELECT 
                     COUNT(*) as total_count,
-                    SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) as success_count
-                FROM api_test_executions 
-                WHERE DATE(creation_date) = :current_date
+                    SUM(CASE WHEN status_code >= 200 AND status_code < 400
+                              AND (error_message IS NULL OR error_message = '')
+                         THEN 1 ELSE 0 END) as success_count
+                FROM api_automation_results 
+                WHERE enabled_flag = 1
+                  AND DATE(creation_date) = :current_date
             """)
-            api_result = await db.execute(api_query, {"current_date": current_date})
-            api_data = api_result.fetchone()
+            try:
+                api_result = await db.execute(api_query, {"current_date": current_date})
+                api_data = api_result.fetchone()
+            except Exception:
+                api_data = None
             
             api_count = api_data.total_count if api_data else 0
             api_success = api_data.success_count if api_data else 0
@@ -557,10 +563,23 @@ async def get_project_activity(
         testcase_result = await db.execute(testcase_query)
         module_usage["test_cases"] = testcase_result.scalar() or 0
         
-        # API测试模块
-        api_query = text("SELECT COUNT(*) FROM api_test_executions")
-        api_result = await db.execute(api_query)
-        module_usage["api_testing"] = api_result.scalar() or 0
+        # API / 接口自动化模块（统计调试与脚本执行结果）
+        api_query = text(
+            "SELECT COUNT(*) FROM api_automation_results WHERE enabled_flag = 1"
+        )
+        try:
+            api_result = await db.execute(api_query)
+            module_usage["api_testing"] = api_result.scalar() or 0
+        except Exception:
+            # 兼容：若表结构差异则回退脚本执行汇总
+            try:
+                api_query2 = text(
+                    "SELECT COUNT(*) FROM api_automation_script_result_lists"
+                )
+                api_result2 = await db.execute(api_query2)
+                module_usage["api_testing"] = api_result2.scalar() or 0
+            except Exception:
+                module_usage["api_testing"] = 0
         
         # UI自动化模块 
         ui_query = text("SELECT COUNT(*) FROM ui_executions")

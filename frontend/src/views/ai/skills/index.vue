@@ -10,13 +10,23 @@
       <div class="toolbar-actions">
         <el-button type="success" @click="openEditDialog()">新建 Skill</el-button>
         <el-button type="primary" @click="openGitDialog">Git 导入</el-button>
-        <el-upload :show-file-list="false" accept=".zip" :before-upload="onUploadZip">
-          <el-button>上传 ZIP</el-button>
-        </el-upload>
+        <el-button @click="openUploadDialog">本地导入</el-button>
+        <el-button type="danger" plain :disabled="!selectedIds.length" @click="onBatchDelete">
+          批量删除{{ selectedIds.length ? ` (${selectedIds.length})` : '' }}
+        </el-button>
+        <el-button type="danger" :disabled="!rows.length" @click="onDeleteAll">删除全部</el-button>
       </div>
     </div>
 
     <div class="skill-filters">
+      <el-checkbox
+        v-model="selectAllPage"
+        :indeterminate="isIndeterminate"
+        :disabled="!rows.length"
+        @change="onToggleSelectAll"
+      >
+        全选本页
+      </el-checkbox>
       <el-input
         v-model="query.search"
         clearable
@@ -37,14 +47,17 @@
 
     <div v-loading="loading" class="skill-grid-wrap">
       <div v-if="!projectId" class="skill-empty">请先选择项目</div>
-      <div v-else-if="!rows.length" class="skill-empty">暂无 Skill，可新建、Git 导入或上传 ZIP</div>
+      <div v-else-if="!rows.length" class="skill-empty">暂无 Skill，可新建、Git 导入或本地导入</div>
       <div v-else class="skill-grid">
-        <article v-for="s in rows" :key="s.id" class="skill-card">
+        <article v-for="s in rows" :key="s.id" class="skill-card" :class="{ 'is-selected': selectedIds.includes(s.id) }">
           <header class="skill-card__head">
             <div class="skill-card__identity">
-              <h3 class="skill-card__name" :title="s.name">{{ s.name }}</h3>
+              <div class="skill-card__title-row">
+                <el-checkbox :model-value="selectedIds.includes(s.id)" @change="(v: boolean) => onToggleSelect(s.id, v)" />
+                <h3 class="skill-card__name" :title="s.name">{{ s.name }}</h3>
+              </div>
               <div class="skill-card__tags">
-                <el-tag size="small" type="info">{{ s.scenario_category || '未分类' }}</el-tag>
+                <el-tag size="small" type="info">场景：{{ s.scenario_category || '未分类' }}</el-tag>
                 <el-tag size="small">{{ s.source_type || '-' }}</el-tag>
               </div>
             </div>
@@ -62,50 +75,18 @@
           </p>
 
           <div class="skill-card__meta">
-            <div class="meta-row" :title="s.entry_command || ''">
-              <span class="meta-label">命令</span>
-              <span class="meta-value">{{ s.entry_command || '-' }}</span>
-            </div>
             <div class="meta-row" :title="s.allowed_tools || ''">
               <span class="meta-label">工具</span>
               <span class="meta-value">{{ s.allowed_tools || '-' }}</span>
+            </div>
+            <div class="meta-row" :title="s.skill_path || ''">
+              <span class="meta-label">目录</span>
+              <span class="meta-value">{{ s.skill_path || '-' }}</span>
             </div>
           </div>
 
           <footer class="skill-card__foot">
             <div class="foot-main">
-              <el-button type="primary" size="small" @click="onRun(s)">执行</el-button>
-              <el-dropdown
-                v-if="hasQuickActions(s) || manifestCache[s.id]?.loading"
-                trigger="click"
-                @command="(cmd) => onQuickCommand(s, cmd)"
-              >
-                <el-button size="small">快捷执行 ▾</el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <template v-if="manifestCache[s.id]?.loading">
-                      <el-dropdown-item disabled>加载中…</el-dropdown-item>
-                    </template>
-                    <template v-else>
-                      <el-dropdown-item
-                        v-for="qa in quickActionsForSkill(s)"
-                        :key="qa.key"
-                        :command="`qa:${qa.key}`"
-                      >
-                        {{ qa.title }}
-                      </el-dropdown-item>
-                      <el-dropdown-item
-                        v-for="(t, idx) in manifestCache[s.id]?.templates || []"
-                        :key="t.name"
-                        :command="`tpl:${t.name}`"
-                        :divided="idx === 0 && quickActionsForSkill(s).length > 0"
-                      >
-                        {{ templateLabel(t.name) }}
-                      </el-dropdown-item>
-                    </template>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
               <el-button link type="primary" @click="openEditDialog(s)">编辑</el-button>
               <el-button link type="primary" @click="onViewContent(s)">查看内容</el-button>
             </div>
@@ -138,9 +119,6 @@
         <el-form-item label="分类">
           <el-input v-model="gitForm.scenario_category" placeholder="如 agent-browser-skill" />
         </el-form-item>
-        <el-form-item label="执行命令">
-          <el-input v-model="gitForm.entry_command" placeholder="默认 python main.py" />
-        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="gitDialogVisible = false">取消</el-button>
@@ -148,8 +126,58 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="contentDialogVisible" title="Skill 内容" width="860px">
-      <el-input v-model="skillContent" type="textarea" :rows="26" readonly />
+    <el-dialog v-model="uploadDialogVisible" title="本地导入 Skill" width="520px" @closed="resetUploadForm">
+      <el-form label-width="90px">
+        <el-form-item label="分类" required>
+          <el-input v-model="uploadForm.scenario_category" placeholder="请选择或填写场景分类" />
+        </el-form-item>
+        <el-form-item label="ZIP 文件" required>
+          <el-upload
+            ref="uploadRef"
+            :key="uploadKey"
+            :show-file-list="true"
+            :auto-upload="false"
+            accept=".zip"
+            :limit="1"
+            :on-change="onUploadFileChange"
+            :on-remove="() => (uploadForm.file = null)"
+          >
+            <el-button>选择 ZIP</el-button>
+          </el-upload>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="uploadDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="uploadSubmitting" @click="submitUploadImport">导入</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="contentDialogVisible" :title="`Skill 目录：${contentSkillName}`" width="960px" class="content-dialog">
+      <div class="content-layout">
+        <div class="content-tree-pane">
+          <div class="pane-title">目录结构</div>
+          <el-tree
+            v-if="contentTree.length"
+            :data="contentTree"
+            node-key="path"
+            :props="{ label: 'name', children: 'children' }"
+            highlight-current
+            default-expand-all
+            @node-click="onContentTreeClick"
+          >
+            <template #default="{ data }">
+              <span class="tree-node" :class="{ 'is-file': data.type === 'file', 'is-dir': data.type === 'dir' }">
+                [{{ data.type === 'dir' ? 'dir' : 'file' }}] {{ data.name }}
+              </span>
+            </template>
+          </el-tree>
+          <div v-else class="tree-empty">无本地目录或目录为空</div>
+        </div>
+        <div class="content-file-pane">
+          <div class="pane-title">{{ contentFilePath || '文件内容' }}</div>
+          <el-input v-model="skillContent" type="textarea" :rows="24" readonly />
+        </div>
+      </div>
     </el-dialog>
 
     <el-dialog v-model="editDialogVisible" :title="editForm.id ? '编辑 Skill' : '新建 Skill'" width="620px">
@@ -177,140 +205,21 @@
         <el-form-item label="技能目录">
           <el-input v-model="editForm.skill_path" placeholder="本地技能目录路径（可选）" />
         </el-form-item>
-        <el-form-item label="执行命令">
-          <el-input v-model="editForm.entry_command" placeholder="如 python main.py / node run.js" />
-        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="editDialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="editSubmitting" @click="submitEdit">保存</el-button>
       </template>
     </el-dialog>
-
-    <el-dialog v-model="runDialogVisible" title="执行 Skill" width="760px">
-      <el-form label-width="110px">
-        <el-form-item label="目标技能">
-          <el-input :model-value="`${runTarget?.name || ''} (#${runTarget?.id || ''})`" readonly />
-        </el-form-item>
-        <el-form-item label="执行方式">
-          <el-switch v-model="runForm.asyncMode" active-text="后台任务(job)" inactive-text="同步执行" />
-        </el-form-item>
-        <el-form-item v-if="runForm.asyncMode" label="runner">
-          <el-select v-model="runForm.runnerType" style="width: 100%">
-            <el-option label="local（本机）" value="local" />
-            <el-option label="docker（推荐生产）" value="docker" />
-          </el-select>
-        </el-form-item>
-        <el-form-item v-if="runManifest.allowed_tools" label="allowed-tools">
-          <el-input :model-value="runManifest.allowed_tools" type="textarea" :rows="3" readonly />
-        </el-form-item>
-        <el-form-item v-if="(runManifest.templates || []).length" label="templates">
-          <el-table :data="runManifest.templates" size="small" max-height="180">
-            <el-table-column prop="name" label="文件名" min-width="160" show-overflow-tooltip />
-            <el-table-column prop="relative_path" label="相对路径" min-width="220" show-overflow-tooltip />
-            <el-table-column prop="size" label="大小" width="90" />
-          </el-table>
-        </el-form-item>
-        <el-form-item v-if="(runManifest.templates || []).length" label="模板选择">
-          <el-select v-model="runForm.templateName" clearable filterable placeholder="可选：选择一个模板执行" style="width: 100%">
-            <el-option v-for="t in runManifest.templates" :key="t.name" :label="t.name" :value="t.name" />
-          </el-select>
-        </el-form-item>
-        <el-form-item v-if="runForm.templateName" label="模板参数">
-          <el-input
-            v-model="runForm.templateArgsText"
-            type="textarea"
-            :rows="3"
-            placeholder='JSON 数组，例如: ["https://example.com","./output"]'
-          />
-        </el-form-item>
-        <el-form-item label="session_id">
-          <el-input v-model="runForm.session_id" placeholder="可选；填写后可复用会话上下文" />
-        </el-form-item>
-        <el-collapse v-model="runAdvancedOpen" class="run-advanced">
-          <el-collapse-item title="高级编排（JSON，可覆盖上方模板参数）" name="adv">
-            <el-input
-              v-model="runForm.argumentsText"
-              type="textarea"
-              :rows="8"
-              placeholder='例如: {"command":"npx agent-browser open https://example.com"} 会与模板合并，同名键以本 JSON 为准'
-            />
-          </el-collapse-item>
-        </el-collapse>
-      </el-form>
-      <template #footer>
-        <el-button @click="runDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="runSubmitting" @click="submitRun">开始执行</el-button>
-      </template>
-    </el-dialog>
-
-    <el-drawer v-model="resultDrawerVisible" class="result-drawer" title="执行结果详情" size="62%">
-      <div class="result-content">
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="skill">{{ runResult.skill_name || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="skill_id">{{ runResult.skill_id ?? '-' }}</el-descriptions-item>
-        <el-descriptions-item label="job_id">{{ runResult.job_id ?? '-' }}</el-descriptions-item>
-        <el-descriptions-item label="session_id">{{ runResult.session_id || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="return_code">{{ runResult.return_code ?? '-' }}</el-descriptions-item>
-        <el-descriptions-item label="状态">
-          <el-tag :type="runResult.ok ? 'success' : 'danger'">{{ runResult.ok ? '成功' : '失败' }}</el-tag>
-        </el-descriptions-item>
-      </el-descriptions>
-
-      <div class="result-block">
-        <div class="result-title">stdout</div>
-        <el-input :model-value="runResult.stdout || ''" type="textarea" :rows="10" readonly />
-      </div>
-      <div class="result-block">
-        <div class="result-title">stderr</div>
-        <el-input :model-value="runResult.stderr || ''" type="textarea" :rows="8" readonly />
-      </div>
-
-      <el-row :gutter="12" class="result-files">
-        <el-col :span="12">
-          <el-card>
-            <template #header>screenshots ({{ (runResult.screenshots || []).length }})</template>
-            <el-table :data="runResult.screenshots || []" size="small" max-height="240">
-              <el-table-column prop="name" label="文件名" min-width="140" show-overflow-tooltip />
-              <el-table-column prop="relative_path" label="相对路径" min-width="180" show-overflow-tooltip />
-              <el-table-column prop="size" label="大小" width="90" />
-              <el-table-column label="操作" width="120">
-                <template #default="{ row }">
-                  <el-button link type="primary" @click="openArtifact(row)">预览</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </el-card>
-        </el-col>
-        <el-col :span="12">
-          <el-card>
-            <template #header>artifacts ({{ (runResult.artifacts || []).length }})</template>
-            <el-table :data="runResult.artifacts || []" size="small" max-height="240">
-              <el-table-column prop="name" label="文件名" min-width="140" show-overflow-tooltip />
-              <el-table-column prop="relative_path" label="相对路径" min-width="180" show-overflow-tooltip />
-              <el-table-column prop="size" label="大小" width="90" />
-              <el-table-column label="操作" width="120">
-                <template #default="{ row }">
-                  <el-button link type="primary" @click="downloadArtifact(row)">下载</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </el-card>
-        </el-col>
-      </el-row>
-      </div>
-    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import type { UploadRawFile } from 'element-plus';
+import type { UploadFile } from 'element-plus';
 import { useProjectApi } from '/@/api/v1/projects/project';
 import { skillsApi } from '/@/api/v1/ai/skills';
-import { Session } from '/@/utils/storage';
-import { getApiBaseUrl } from '/@/utils/config';
 
 const projectApi = useProjectApi();
 
@@ -319,13 +228,22 @@ const projects = ref<Array<{ id: number; name: string }>>([]);
 const projectId = ref<number | null>(null);
 const rows = ref<any[]>([]);
 const total = ref(0);
+const selectedIds = ref<number[]>([]);
 const query = reactive({
   search: '',
   scenario_category: '',
   page: 1,
   page_size: 12,
 });
-const manifestCache = reactive<Record<number, { templates: any[]; loading: boolean; loaded: boolean }>>({});
+
+const selectAllPage = computed({
+  get: () => rows.value.length > 0 && rows.value.every((r) => selectedIds.value.includes(r.id)),
+  set: () => undefined,
+});
+const isIndeterminate = computed(() => {
+  const n = rows.value.filter((r) => selectedIds.value.includes(r.id)).length;
+  return n > 0 && n < rows.value.length;
+});
 
 const gitDialogVisible = ref(false);
 const gitSubmitting = ref(false);
@@ -333,11 +251,24 @@ const gitForm = reactive({
   repo_url: '',
   name: '',
   scenario_category: '',
-  entry_command: '',
+});
+
+const uploadDialogVisible = ref(false);
+const uploadSubmitting = ref(false);
+const uploadRef = ref<any>(null);
+const uploadKey = ref(0);
+const uploadForm = reactive<{ scenario_category: string; file: File | null }>({
+  scenario_category: '',
+  file: null,
 });
 
 const contentDialogVisible = ref(false);
+const contentSkillName = ref('');
+const contentSkillId = ref<number | null>(null);
+const contentTree = ref<any[]>([]);
+const contentFilePath = ref('');
 const skillContent = ref('');
+
 const editDialogVisible = ref(false);
 const editSubmitting = ref(false);
 const editForm = reactive<any>({
@@ -348,169 +279,13 @@ const editForm = reactive<any>({
   source_type: 'builtin',
   repo_url: '',
   skill_path: '',
-  entry_command: '',
 });
-const runDialogVisible = ref(false);
-const runSubmitting = ref(false);
-const runTarget = ref<any>(null);
-const runForm = reactive({
-  asyncMode: true,
-  runnerType: 'docker',
-  session_id: '',
-  templateName: '',
-  templateArgsText: '[]',
-  argumentsText: '{}',
-});
-const runAdvancedOpen = ref<string[]>(['adv']);
-const runManifest = reactive<any>({
-  allowed_tools: '',
-  templates: [],
-});
-const resultDrawerVisible = ref(false);
-const runResult = reactive<any>({
-  ok: false,
-  job_id: null,
-  skill_name: '',
-  skill_id: null,
-  session_id: '',
-  return_code: null,
-  stdout: '',
-  stderr: '',
-  screenshots: [],
-  artifacts: [],
-});
-
-const apiBaseUrl = getApiBaseUrl();
-
-const fetchSse = async (url: string, onEvent: (evt: { event: string; data: any }) => void, timeoutMs = 15000) => {
-  const token = Session.get('token');
-  const ctl = new AbortController();
-  const timer = window.setTimeout(() => ctl.abort('timeout'), timeoutMs);
-  const resp = await fetch(url, {
-    method: 'GET',
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}`, token: `${token}` } : {}),
-      Accept: 'text/event-stream',
-    },
-    signal: ctl.signal,
-  });
-  if (!resp.ok || !resp.body) {
-    clearTimeout(timer);
-    throw new Error(`SSE连接失败: ${resp.status}`);
-  }
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder('utf-8');
-  let buf = '';
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      clearTimeout(timer);
-      window.setTimeout(() => ctl.abort('timeout'), timeoutMs);
-      buf += decoder.decode(value, { stream: true });
-      const parts = buf.split('\n\n');
-      buf = parts.pop() || '';
-      for (const part of parts) {
-        const lines = part.split('\n').filter(Boolean);
-        let event = 'message';
-        let dataStr = '';
-        for (const line of lines) {
-          if (line.startsWith('event:')) event = line.slice(6).trim();
-          if (line.startsWith('data:')) dataStr += line.slice(5).trim();
-        }
-        let data: any = dataStr;
-        try {
-          data = dataStr ? JSON.parse(dataStr) : {};
-        } catch {
-          // keep raw
-        }
-        onEvent({ event, data });
-      }
-    }
-  } finally {
-    clearTimeout(timer);
-  }
-};
-
-const artifactUrl = (kind: 'screenshots' | 'artifacts', id: number) => {
-  if (!projectId.value) return '';
-  return `${apiBaseUrl}${skillsApi.artifactDownloadUrl(projectId.value, id)}`;
-};
-
-const openArtifact = (row: any) => {
-  // screenshots: open in new tab
-  if (!row?.id) {
-    ElMessage.warning('同步执行的截图未入库，暂不支持下载/预览接口');
-    return;
-  }
-  const url = artifactUrl('screenshots', Number(row.id));
-  if (url) window.open(url, '_blank');
-};
-
-const downloadArtifact = (row: any) => {
-  if (!row?.id) {
-    ElMessage.warning('同步执行的产物未入库，暂不支持下载接口');
-    return;
-  }
-  const url = artifactUrl('artifacts', Number(row.id));
-  if (url) window.open(url, '_blank');
-};
-
-const pollJobUntilDone = async (jobId: number) => {
-  if (!projectId.value) return;
-  for (let i = 0; i < 120; i += 1) {
-    const r: any = await skillsApi.job(projectId.value, jobId);
-    const d = r?.data || {};
-    runResult.return_code = d.return_code ?? null;
-    runResult.stderr = d.stderr || runResult.stderr;
-    runResult.stdout = d.stdout || runResult.stdout;
-    if (['succeeded', 'failed', 'cancelled'].includes(String(d.status || ''))) {
-      runResult.ok = d.status === 'succeeded';
-      const arts: any = await skillsApi.jobArtifacts(projectId.value, jobId);
-      const items = arts?.data?.items || [];
-      runResult.screenshots = items.filter((x: any) => x.kind === 'screenshots');
-      runResult.artifacts = items.filter((x: any) => x.kind === 'artifacts');
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-  }
-};
-
-const templateLabel = (fileName: string) =>
-  String(fileName || '')
-    .replace(/\.(sh|js|bash)$/i, '')
-    .replace(/[-_]/g, ' ');
 
 const loadProjects = async () => {
   const res: any = await projectApi.getList({ page: 1, page_size: 100 });
   projects.value = res?.data?.items || [];
   if (!projectId.value && projects.value.length) {
     projectId.value = projects.value[0].id;
-  }
-};
-
-const ensureManifest = async (skillId: number) => {
-  if (!projectId.value) return;
-  const cur = manifestCache[skillId];
-  if (cur?.loaded || cur?.loading) return;
-  manifestCache[skillId] = { templates: [], loading: true, loaded: false };
-  try {
-    const res: any = await skillsApi.manifest(projectId.value, skillId);
-    manifestCache[skillId] = {
-      templates: res?.data?.templates || [],
-      loading: false,
-      loaded: true,
-    };
-  } catch {
-    manifestCache[skillId] = { templates: [], loading: false, loaded: true };
-  }
-};
-
-const prefetchManifestsForRows = async () => {
-  const chunk = 8;
-  for (let i = 0; i < rows.value.length; i += chunk) {
-    const slice = rows.value.slice(i, i + chunk);
-    await Promise.all(slice.map((s: any) => ensureManifest(s.id)));
   }
 };
 
@@ -521,15 +296,16 @@ const loadSkills = async () => {
     const res: any = await skillsApi.list(projectId.value, query);
     rows.value = res?.data?.items || [];
     total.value = res?.data?.total || 0;
-    for (const k of Object.keys(manifestCache)) delete manifestCache[Number(k)];
+    const idSet = new Set(rows.value.map((r: any) => r.id));
+    selectedIds.value = selectedIds.value.filter((id) => idSet.has(id));
   } finally {
     loading.value = false;
   }
-  void prefetchManifestsForRows();
 };
 
 const onProjectChange = () => {
   query.page = 1;
+  selectedIds.value = [];
   loadSkills();
 };
 
@@ -540,11 +316,28 @@ const resetQuery = () => {
   loadSkills();
 };
 
+const onToggleSelect = (id: number, checked: boolean) => {
+  if (checked) {
+    if (!selectedIds.value.includes(id)) selectedIds.value = [...selectedIds.value, id];
+  } else {
+    selectedIds.value = selectedIds.value.filter((x) => x !== id);
+  }
+};
+
+const onToggleSelectAll = (checked: boolean | string | number) => {
+  if (checked) {
+    const pageIds = rows.value.map((r) => r.id);
+    selectedIds.value = Array.from(new Set([...selectedIds.value, ...pageIds]));
+  } else {
+    const pageIdSet = new Set(rows.value.map((r) => r.id));
+    selectedIds.value = selectedIds.value.filter((id) => !pageIdSet.has(id));
+  }
+};
+
 const openGitDialog = () => {
   gitForm.repo_url = '';
   gitForm.name = '';
   gitForm.scenario_category = '';
-  gitForm.entry_command = '';
   gitDialogVisible.value = true;
 };
 
@@ -561,24 +354,54 @@ const submitGitImport = async () => {
     ElMessage.success(`导入成功（创建 ${count} 个 skill）`);
     gitDialogVisible.value = false;
     await loadSkills();
+  } catch (e: any) {
+    ElMessage.error(e?.message || '导入失败（同名技能不允许重复导入）');
   } finally {
     gitSubmitting.value = false;
   }
 };
 
-const onUploadZip = async (file: UploadRawFile) => {
-  if (!projectId.value) {
-    ElMessage.warning('请先选择项目');
-    return false;
+const resetUploadForm = () => {
+  uploadForm.scenario_category = '';
+  uploadForm.file = null;
+  uploadKey.value += 1;
+  uploadRef.value?.clearFiles?.();
+};
+
+const openUploadDialog = () => {
+  resetUploadForm();
+  uploadDialogVisible.value = true;
+};
+
+const onUploadFileChange = (file: UploadFile) => {
+  uploadForm.file = (file.raw as File) || null;
+};
+
+const submitUploadImport = async () => {
+  if (!projectId.value) return;
+  if (!uploadForm.scenario_category.trim()) {
+    ElMessage.warning('请填写场景分类');
+    return;
   }
+  if (!uploadForm.file) {
+    ElMessage.warning('请选择 ZIP 文件');
+    return;
+  }
+  uploadSubmitting.value = true;
   try {
-    await skillsApi.importUpload(projectId.value, file as unknown as File);
-    ElMessage.success('上传导入成功');
+    const res: any = await skillsApi.importUpload(projectId.value, uploadForm.file, {
+      scenario_category: uploadForm.scenario_category.trim(),
+    });
+    const count = res?.data?.count ?? 0;
+    ElMessage.success(`导入成功（创建 ${count} 个 skill）`);
+    uploadDialogVisible.value = false;
+    resetUploadForm();
     await loadSkills();
   } catch (e: any) {
-    ElMessage.error(e?.message || '上传导入失败');
+    ElMessage.error(e?.message || '导入失败（同名技能不允许重复导入）');
+  } finally {
+    uploadSubmitting.value = false;
   }
-  return false;
 };
 
 const openEditDialog = (row?: any) => {
@@ -590,7 +413,6 @@ const openEditDialog = (row?: any) => {
     editForm.source_type = row.source_type || 'builtin';
     editForm.repo_url = row.repo_url || '';
     editForm.skill_path = row.skill_path || '';
-    editForm.entry_command = row.entry_command || '';
   } else {
     editForm.id = undefined;
     editForm.name = '';
@@ -599,7 +421,6 @@ const openEditDialog = (row?: any) => {
     editForm.source_type = 'builtin';
     editForm.repo_url = '';
     editForm.skill_path = '';
-    editForm.entry_command = '';
   }
   editDialogVisible.value = true;
 };
@@ -619,7 +440,6 @@ const submitEdit = async () => {
       source_type: editForm.source_type,
       repo_url: editForm.repo_url,
       skill_path: editForm.skill_path,
-      entry_command: editForm.entry_command,
     };
     if (editForm.id) {
       await skillsApi.update(projectId.value, editForm.id, payload);
@@ -630,6 +450,8 @@ const submitEdit = async () => {
     }
     editDialogVisible.value = false;
     await loadSkills();
+  } catch (e: any) {
+    ElMessage.error(e?.message || '保存失败（技能名称不可重复）');
   } finally {
     editSubmitting.value = false;
   }
@@ -648,226 +470,62 @@ const onToggleActive = async (row: any) => {
 
 const onDelete = async (row: any) => {
   if (!projectId.value) return;
-  await ElMessageBox.confirm(`确认删除技能 "${row.name}" 吗？`, '提示', { type: 'warning' });
+  await ElMessageBox.confirm(
+    `确认删除技能「${row.name}」？将同时删除本地对应目录，且不可恢复。`,
+    '删除确认',
+    { type: 'warning' }
+  );
   await skillsApi.remove(projectId.value, row.id);
+  selectedIds.value = selectedIds.value.filter((id) => id !== row.id);
   ElMessage.success('删除成功');
   await loadSkills();
 };
 
-const onRun = (row: any) => {
-  runTarget.value = row;
-  runForm.asyncMode = true;
-  runForm.session_id = '';
-  runForm.templateName = '';
-  runForm.templateArgsText = '[]';
-  runForm.argumentsText = '{}';
-  runAdvancedOpen.value = ['adv'];
-  runManifest.allowed_tools = row.allowed_tools || '';
-  runManifest.templates = [];
-  if (projectId.value) {
-    skillsApi.manifest(projectId.value, row.id).then((res: any) => {
-      runManifest.allowed_tools = res?.data?.allowed_tools || runManifest.allowed_tools;
-      runManifest.templates = res?.data?.templates || [];
-    }).catch(() => {});
-  }
-  runDialogVisible.value = true;
+const onBatchDelete = async () => {
+  if (!projectId.value || !selectedIds.value.length) return;
+  await ElMessageBox.confirm(
+    `确认批量删除选中的 ${selectedIds.value.length} 个技能？将同时删除本地对应目录。`,
+    '批量删除',
+    { type: 'warning' }
+  );
+  const res: any = await skillsApi.batchRemove(projectId.value, { skill_ids: selectedIds.value });
+  selectedIds.value = [];
+  ElMessage.success(res?.message || '批量删除成功');
+  await loadSkills();
 };
 
-const quickRunTemplate = async (row: any, templateName: string) => {
-  runTarget.value = row;
-  runForm.session_id = '';
-  runForm.templateName = templateName;
-  runForm.templateArgsText = defaultTemplateArgs(templateName);
-  runForm.argumentsText = '{}';
-  runAdvancedOpen.value = [];
-  runManifest.allowed_tools = row.allowed_tools || '';
-  runManifest.templates = [];
-  if (projectId.value) {
-    try {
-      const res: any = await skillsApi.manifest(projectId.value, row.id);
-      runManifest.allowed_tools = res?.data?.allowed_tools || runManifest.allowed_tools;
-      runManifest.templates = res?.data?.templates || [];
-    } catch {
-      /* ignore */
-    }
-  }
-  runDialogVisible.value = true;
-};
-
-const quickRunCommand = (row: any, command: string, title?: string) => {
-  runTarget.value = row;
-  runForm.session_id = '';
-  runForm.templateName = '';
-  runForm.templateArgsText = '[]';
-  runForm.argumentsText = JSON.stringify({ command }, null, 2);
-  runAdvancedOpen.value = ['adv'];
-  runManifest.allowed_tools = row.allowed_tools || '';
-  runManifest.templates = [];
-  if (projectId.value) {
-    skillsApi
-      .manifest(projectId.value, row.id)
-      .then((res: any) => {
-        runManifest.allowed_tools = res?.data?.allowed_tools || runManifest.allowed_tools;
-        runManifest.templates = res?.data?.templates || [];
-      })
-      .catch(() => {});
-  }
-  ElMessage.info(title ? `已填入命令：${title}` : '已填入命令');
-  runDialogVisible.value = true;
-};
-
-const defaultTemplateArgs = (templateName: string) => {
-  const n = String(templateName || '').toLowerCase();
-  if (n.includes('form-automation')) return '["https://example.com/form"]';
-  if (n.includes('authenticated-session')) return '["https://example.com/login"]';
-  if (n.includes('capture-workflow')) return '["https://example.com","./output"]';
-  return '[]';
-};
-
-const quickActionsForSkill = (row: any) => {
-  const name = String(row?.name || '').toLowerCase();
-  const allowed = String(row?.allowed_tools || '').toLowerCase();
-  const res: Array<{ key: string; title: string; command: string }> = [];
-
-  const isAgentBrowser = name.includes('agent-browser') || allowed.includes('agent-browser');
-  const isPlaywright = name.includes('playwright') || allowed.includes('playwright');
-
-  if (isAgentBrowser) {
-    res.push(
-      { key: 'ab_help', title: 'agent-browser 帮助', command: 'npx agent-browser --help' },
-      { key: 'ab_install', title: '安装 Chromium', command: 'npx agent-browser install' },
-      { key: 'ab_open_snapshot', title: '打开+快照', command: 'npx agent-browser open https://example.com && npx agent-browser snapshot -i' },
-      { key: 'ab_screenshot', title: '打开+截图', command: 'npx agent-browser open https://example.com && npx agent-browser screenshot --full' },
-    );
-  }
-
-  // Playwright skill style (node run.js "inline-code")
-  if (isPlaywright) {
-    res.push({
-      key: 'pw_example',
-      title: 'Playwright 示例截图',
-      command:
-        'node run.js "const dir = process.env.SCREENSHOT_DIR || \\"./media/screenshots\\"; const { chromium } = require(\\"playwright\\"); const browser = await chromium.launch({ headless: true }); const page = await browser.newPage(); await page.goto(\\"https://example.com\\"); await page.screenshot({ path: dir + \\"/example.png\\", fullPage: true }); console.log(\\"saved\\", dir + \\"/example.png\\"); await browser.close();"'
-    });
-  }
-
-  return res;
-};
-
-const hasQuickActions = (row: any) =>
-  quickActionsForSkill(row).length > 0 || (manifestCache[row.id]?.templates || []).length > 0;
-
-const onQuickCommand = (row: any, cmd: string) => {
-  if (!cmd) return;
-  if (cmd.startsWith('qa:')) {
-    const key = cmd.slice(3);
-    const qa = quickActionsForSkill(row).find((x) => x.key === key);
-    if (qa) quickRunCommand(row, qa.command, qa.title);
-    return;
-  }
-  if (cmd.startsWith('tpl:')) {
-    quickRunTemplate(row, cmd.slice(4));
-  }
-};
-
-const submitRun = async () => {
-  if (!projectId.value || !runTarget.value) return;
-  let base: Record<string, any> = {};
-  let override: Record<string, any> = {};
-  if (runForm.templateName) {
-    try {
-      const raw = (runForm.templateArgsText || '').trim();
-      const parsed = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(parsed)) {
-        ElMessage.error('模板参数必须是 JSON 数组');
-        return;
-      }
-      base = { template: runForm.templateName, template_args: parsed };
-    } catch {
-      ElMessage.error('模板参数必须是合法 JSON 数组');
-      return;
-    }
-  }
-  try {
-    const raw = (runForm.argumentsText || '').trim();
-    override = raw ? JSON.parse(raw) : {};
-  } catch {
-    ElMessage.error('高级编排 JSON 格式不正确');
-    return;
-  }
-  const argsObj = { ...base, ...override };
-  runSubmitting.value = true;
-  try {
-    // Async job mode (production-like)
-    if (runForm.asyncMode) {
-      const res: any = await skillsApi.executeActionAsync(projectId.value, runTarget.value.id, {
-        action_name: runForm.templateName ? `template:${runForm.templateName}` : 'command',
-        arguments: argsObj,
-        session_id: runForm.session_id || undefined,
-        runner_type: runForm.runnerType,
-      });
-      const jobId = Number(res?.data?.job_id);
-      runResult.job_id = jobId || null;
-      runResult.ok = true;
-      runResult.skill_name = runTarget.value?.name || '';
-      runResult.skill_id = runTarget.value?.id ?? null;
-      runResult.session_id = runForm.session_id || '';
-      runResult.return_code = null;
-      runResult.stdout = '';
-      runResult.stderr = '';
-      runResult.screenshots = [];
-      runResult.artifacts = [];
-      runDialogVisible.value = false;
-      resultDrawerVisible.value = true;
-      ElMessage.success(`已入队 job #${jobId}`);
-
-      const streamUrl = `${apiBaseUrl}${skillsApi.jobStreamUrl(projectId.value, jobId)}`;
-      void fetchSse(streamUrl, (evt) => {
-        if (evt.event === 'log') {
-          runResult.stdout = `${runResult.stdout || ''}${evt.data?.message || ''}\n`;
-        } else if (evt.event === 'done') {
-          const status = evt.data?.status;
-          runResult.ok = status === 'succeeded';
-          runResult.return_code = evt.data?.return_code ?? null;
-        }
-      }).catch(() => {
-        ElMessage.warning('实时日志连接超时，任务继续在后台执行，可稍后自动刷新状态');
-      });
-      void pollJobUntilDone(jobId);
-      return;
-    }
-
-    // Sync mode (dev)
-    const res: any = await skillsApi.execute(projectId.value, runTarget.value.id, {
-      arguments: argsObj,
-      session_id: runForm.session_id || undefined,
-    });
-    const data = res?.data || {};
-    runResult.job_id = null;
-    runResult.ok = !!data.ok;
-    runResult.skill_name = data.skill_name || runTarget.value?.name || '';
-    runResult.skill_id = data.skill_id ?? runTarget.value?.id ?? null;
-    runResult.session_id = data.session_id || '';
-    runResult.return_code = data.return_code ?? null;
-    runResult.stdout = data.stdout || '';
-    runResult.stderr = data.stderr || '';
-    runResult.screenshots = Array.isArray(data.screenshots) ? data.screenshots : [];
-    runResult.artifacts = Array.isArray(data.artifacts) ? data.artifacts : [];
-    const ok = !!runResult.ok;
-    const out = String(runResult.stdout || '').slice(0, 120);
-    ElMessage[ok ? 'success' : 'error'](ok ? `执行成功${out ? `: ${out}` : ''}` : '执行失败');
-    runDialogVisible.value = false;
-    resultDrawerVisible.value = true;
-  } finally {
-    runSubmitting.value = false;
-  }
+const onDeleteAll = async () => {
+  if (!projectId.value) return;
+  await ElMessageBox.confirm(
+    '确认删除当前项目下全部 Skill？将同时删除所有本地技能目录，且不可恢复。',
+    '删除全部',
+    { type: 'warning', confirmButtonText: '全部删除', cancelButtonText: '取消' }
+  );
+  const res: any = await skillsApi.batchRemove(projectId.value, { delete_all: true });
+  selectedIds.value = [];
+  ElMessage.success(res?.message || '已删除全部技能');
+  query.page = 1;
+  await loadSkills();
 };
 
 const onViewContent = async (row: any) => {
   if (!projectId.value) return;
-  const res: any = await skillsApi.content(projectId.value, row.id);
+  contentSkillId.value = row.id;
+  contentSkillName.value = row.name || '';
+  contentFilePath.value = 'SKILL.md';
+  const res: any = await skillsApi.content(projectId.value, row.id, { file_path: 'SKILL.md' });
+  contentTree.value = res?.data?.tree || [];
   skillContent.value = res?.data?.content || '';
+  contentFilePath.value = res?.data?.file_path || 'SKILL.md';
   contentDialogVisible.value = true;
+};
+
+const onContentTreeClick = async (node: any) => {
+  if (!projectId.value || !contentSkillId.value) return;
+  if (node?.type !== 'file') return;
+  contentFilePath.value = node.path;
+  const res: any = await skillsApi.content(projectId.value, contentSkillId.value, { file_path: node.path });
+  skillContent.value = res?.data?.content || '';
 };
 
 onMounted(async () => {
@@ -940,6 +598,10 @@ onMounted(async () => {
   background: var(--el-bg-color);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
+.skill-card.is-selected {
+  border-color: var(--el-color-primary-light-3);
+  box-shadow: 0 0 0 1px var(--el-color-primary-light-5);
+}
 .skill-card:hover {
   border-color: var(--el-color-primary-light-5);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
@@ -954,8 +616,15 @@ onMounted(async () => {
   min-width: 0;
   flex: 1;
 }
+.skill-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-bottom: 8px;
+}
 .skill-card__name {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 16px;
   font-weight: 600;
   line-height: 1.3;
@@ -1033,31 +702,41 @@ onMounted(async () => {
   display: flex;
   justify-content: flex-end;
 }
-.run-advanced {
-  width: 100%;
+.content-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 14px;
+  min-height: 480px;
 }
-.run-advanced :deep(.el-collapse-item__header) {
+.content-tree-pane,
+.content-file-pane {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow: auto;
+}
+.pane-title {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-regular);
+  word-break: break-all;
+}
+.tree-empty {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  padding: 12px 0;
+}
+.tree-node {
   font-size: 13px;
 }
-.result-block {
-  margin-top: 16px;
+.tree-node.is-file {
+  cursor: pointer;
 }
-.result-title {
-  margin-bottom: 8px;
-  font-weight: 600;
-}
-.result-files {
-  margin-top: 16px;
-}
-.result-content {
-  padding: 12px 18px 20px;
-}
-:deep(.result-drawer .el-drawer__header) {
-  margin-bottom: 0;
-  padding: 16px 20px 12px;
-}
-:deep(.result-drawer .el-drawer__body) {
-  padding: 0 8px 16px;
+@media (max-width: 900px) {
+  .content-layout {
+    grid-template-columns: 1fr;
+  }
 }
 @media (max-width: 768px) {
   .skill-grid {
@@ -1065,4 +744,3 @@ onMounted(async () => {
   }
 }
 </style>
-

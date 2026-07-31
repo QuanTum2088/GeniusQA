@@ -30,6 +30,7 @@ async def ensure_mcp_schema(db: AsyncSession) -> None:
         "ALTER TABLE project_mcp_config ADD COLUMN auth_type VARCHAR(30) NULL DEFAULT 'none' COMMENT '鉴权类型'",
         "ALTER TABLE project_mcp_config ADD COLUMN auth_config JSON NULL COMMENT '鉴权参数'",
         "ALTER TABLE project_mcp_config ADD COLUMN description TEXT NULL COMMENT '备注'",
+        "ALTER TABLE project_mcp_config ADD COLUMN is_connected TINYINT(1) NOT NULL DEFAULT 0 COMMENT '最近一次测试是否已连接'",
         "UPDATE project_mcp_config SET scope='user' WHERE scope IS NULL OR scope=''",
     ]
     for sql in stmts:

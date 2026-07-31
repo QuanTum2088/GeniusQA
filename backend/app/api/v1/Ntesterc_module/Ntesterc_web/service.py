@@ -174,6 +174,8 @@ class WebManagementService:
         page: int,
         page_size: int,
         user_id: int,
+        menu_id: Optional[int] = None,
+        name_icontains: Optional[str] = None,
     ) -> Dict[str, Any]:
 
         if page <= 0:
@@ -181,10 +183,20 @@ class WebManagementService:
         if page_size <= 0:
             page_size = 10
 
-        base_query = select(WebElementModel).where(
+        conditions = [
             WebElementModel.enabled_flag == 1,
             WebElementModel.created_by == user_id,
-        ).order_by(WebElementModel.id.desc())
+        ]
+        if menu_id is not None:
+            conditions.append(WebElementModel.menu_id == int(menu_id))
+        if name_icontains:
+            conditions.append(WebElementModel.name.contains(name_icontains.strip()))
+
+        base_query = (
+            select(WebElementModel)
+            .where(*conditions)
+            .order_by(WebElementModel.id.desc())
+        )
 
         total_result = await db.execute(base_query)
         all_rows = total_result.scalars().all()
@@ -1091,13 +1103,23 @@ class WebManagementService:
             WebResultListModel.enabled_flag == 1,
             WebResultListModel.created_by == user_id,
         ).order_by(WebResultListModel.id.desc())
+
+        search = body.get("search") if isinstance(body.get("search"), dict) else {}
+        task_name_kw = str(
+            body.get("task_name__icontains")
+            or search.get("task_name__icontains")
+            or search.get("task_name")
+            or ""
+        ).strip()
+        if task_name_kw:
+            q = q.where(WebResultListModel.task_name.contains(task_name_kw))
+
         res = await db.execute(q)
         all_rows = res.scalars().all()
         total = len(all_rows)
         start = (page - 1) * page_size
         end = start + page_size
         page_rows = all_rows[start:end]
-
         user_ids = [int(r.created_by) for r in page_rows if getattr(r, "created_by", None)]
         username_map = await _get_username_map(db, user_ids)
         content = []
@@ -1290,23 +1312,46 @@ class WebManagementService:
         return {"content": content, "log": log_list, "video": video, "trace": trace}
 
     @staticmethod
-    async def get_web_groups(db: AsyncSession, user_id: int) -> List[Dict[str, Any]]:
+    async def get_web_groups(
+        db: AsyncSession,
+        user_id: int,
+        *,
+        name_icontains: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 10,
+    ) -> Dict[str, Any]:
+
+        if page <= 0:
+            page = 1
+        if page_size <= 0:
+            page_size = 10
+
+        conditions = [
+            WebGroupModel.enabled_flag == 1,
+            WebGroupModel.created_by == user_id,
+        ]
+        if name_icontains:
+            conditions.append(WebGroupModel.name.contains(name_icontains.strip()))
 
         result = await db.execute(
-            select(WebGroupModel).where(
-                WebGroupModel.enabled_flag == 1,
-                WebGroupModel.created_by == user_id,
-            ).order_by(WebGroupModel.id.desc())
+            select(WebGroupModel)
+            .where(*conditions)
+            .order_by(WebGroupModel.id.desc())
         )
         rows = result.scalars().all()
+        total = len(rows)
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_rows = rows[start:end]
+
         user_ids = []
-        for r in rows:
+        for r in page_rows:
             uid = getattr(r, "updated_by", None) or getattr(r, "created_by", None)
             if uid:
                 user_ids.append(int(uid))
         username_map = await _get_username_map(db, user_ids)
         out = []
-        for r in rows:
+        for r in page_rows:
             uid = getattr(r, "updated_by", None) or getattr(r, "created_by", None)
             creation_date = getattr(r, "creation_date", None)
             updation_date = getattr(r, "updation_date", None)
@@ -1326,7 +1371,7 @@ class WebManagementService:
                 "updated_by": getattr(r, "updated_by", None),
                 "username": username_map.get(int(uid), "") if uid else "",
             })
-        return out
+        return {"content": out, "total": total, "page": page, "pageSize": page_size}
 
     @staticmethod
     async def create_web_group(db: AsyncSession, group_data: Dict[str, Any], user_id: int) -> Dict[str, Any]:

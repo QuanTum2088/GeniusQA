@@ -15,7 +15,7 @@ import zipfile
 from pathlib import Path
 from typing import Optional, List
 from fastapi import HTTPException, UploadFile
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.Ntesterc_module.Ntesterc_project.service import ProjectService
 from app.api.v1.Ntesterc_module.Ntesterc_skills.model import ProjectSkillModel
@@ -42,6 +42,151 @@ def _iso(dt) -> Optional[str]:
 
 def _safe_skill_name(name: str) -> str:
     return re.sub(r"[^a-zA-Z0-9._-]+", "_", (name or "").strip())[:120]
+
+
+async def _assert_skill_names_available(
+    project_id: int,
+    user_id: int,
+    db: AsyncSession,
+    names: List[str],
+    *,
+    exclude_id: Optional[int] = None,
+) -> None:
+    """严格校验：同项目同用户下技能名不可重复（大小写不敏感）。"""
+    cleaned: List[str] = []
+    seen: set[str] = set()
+    for raw in names:
+        name = (raw or "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="技能名称不能为空")
+        key = name.lower()
+        if key in seen:
+            raise HTTPException(status_code=400, detail=f"技能名称重复：{name}")
+        seen.add(key)
+        cleaned.append(name)
+
+    for name in cleaned:
+        stmt = select(ProjectSkillModel).where(
+            ProjectSkillModel.project_id == project_id,
+            ProjectSkillModel.user_id == user_id,
+            func.lower(ProjectSkillModel.name) == name.lower(),
+        )
+        if exclude_id is not None:
+            stmt = stmt.where(ProjectSkillModel.id != int(exclude_id))
+        existing = list((await db.execute(stmt)).scalars().all())
+        actives = [r for r in existing if int(getattr(r, "enabled_flag", 1) or 0) == 1]
+        if actives:
+            raise HTTPException(status_code=400, detail=f"技能名称已存在，不允许重复：{name}")
+        # 清理历史软删残留，避免唯一索引阻断重新导入
+        soft_ids = [int(r.id) for r in existing if int(getattr(r, "enabled_flag", 1) or 0) != 1]
+        if soft_ids:
+            await db.execute(delete(ProjectSkillModel).where(ProjectSkillModel.id.in_(soft_ids)))
+            await db.flush()
+
+
+def _is_under_skill_root(path: Path) -> bool:
+    try:
+        root = SKILL_ROOT.resolve()
+        return path.resolve() == root or root in path.resolve().parents
+    except Exception:
+        return False
+
+
+def _remove_skill_filesystem(m: ProjectSkillModel, sibling_pack_roots: set[str]) -> None:
+    """删除技能对应本地目录；共享 pack_root 时仅在无其他引用时删除包根。"""
+    skill_path = Path(str(m.skill_path or "").strip()) if m.skill_path else None
+    extra = m.extra_config if isinstance(m.extra_config, dict) else {}
+    pack_root_raw = str(extra.get("pack_root") or "").strip()
+    pack_root = Path(pack_root_raw) if pack_root_raw else None
+
+    if pack_root and pack_root_raw in sibling_pack_roots:
+        # 仍有其他技能引用同一 pack，只删本技能子目录（若独立）
+        if skill_path and skill_path.exists() and _is_under_skill_root(skill_path):
+            try:
+                if skill_path.resolve() != pack_root.resolve() and pack_root.resolve() in skill_path.resolve().parents:
+                    shutil.rmtree(skill_path, ignore_errors=True)
+            except Exception:
+                shutil.rmtree(skill_path, ignore_errors=True)
+        return
+
+    # 无共享引用：优先删 pack_root，否则删 skill_path
+    target = None
+    if pack_root and pack_root.exists() and _is_under_skill_root(pack_root):
+        target = pack_root
+    elif skill_path and skill_path.exists() and _is_under_skill_root(skill_path):
+        target = skill_path
+    if target is not None:
+        shutil.rmtree(target, ignore_errors=True)
+
+
+def _build_dir_tree(base: Path, *, max_depth: int = 6, max_entries: int = 800) -> List[dict]:
+    """构建目录树，供前端展示。"""
+    if not base.exists():
+        return []
+    count = 0
+
+    def walk(cur: Path, depth: int) -> List[dict]:
+        nonlocal count
+        if depth > max_depth or count >= max_entries:
+            return []
+        nodes: List[dict] = []
+        try:
+            entries = sorted(cur.iterdir(), key=lambda p: (p.is_file(), p.name.lower()))
+        except Exception:
+            return []
+        for p in entries:
+            if count >= max_entries:
+                break
+            # 跳过常见噪声目录
+            if p.name in {".git", "__pycache__", "node_modules", ".venv", "venv"}:
+                continue
+            count += 1
+            rel = str(p.relative_to(base)).replace("\\", "/")
+            if p.is_dir():
+                nodes.append({
+                    "name": p.name,
+                    "path": rel,
+                    "type": "dir",
+                    "children": walk(p, depth + 1),
+                })
+            else:
+                try:
+                    size = p.stat().st_size
+                except Exception:
+                    size = 0
+                nodes.append({
+                    "name": p.name,
+                    "path": rel,
+                    "type": "file",
+                    "size": size,
+                })
+        return nodes
+
+    return walk(base, 0)
+
+
+def _read_skill_file(skill_dir: Path, relative: str, *, max_bytes: int = 512_000) -> str:
+    rel = (relative or "").replace("\\", "/").lstrip("/")
+    if not rel or ".." in rel.split("/"):
+        raise HTTPException(status_code=400, detail="非法文件路径")
+    target = (skill_dir / rel).resolve()
+    if not _is_under_skill_root(target) and skill_dir.resolve() not in target.parents and target != skill_dir.resolve():
+        # must stay under skill_dir
+        try:
+            target.relative_to(skill_dir.resolve())
+        except Exception:
+            raise HTTPException(status_code=400, detail="文件不在技能目录内")
+    try:
+        target.relative_to(skill_dir.resolve())
+    except Exception:
+        raise HTTPException(status_code=400, detail="文件不在技能目录内")
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在")
+    data = target.read_bytes()[:max_bytes]
+    try:
+        return data.decode("utf-8")
+    except Exception:
+        return data.decode("utf-8", errors="replace")
 
 
 def _parse_skill_description(skill_dir: Path) -> str:
@@ -276,7 +421,8 @@ async def list_skills(
     if search:
         q = q.where(ProjectSkillModel.name.contains(search))
     if scenario_category:
-        q = q.where(ProjectSkillModel.scenario_category == scenario_category)
+       
+        q = q.where(ProjectSkillModel.scenario_category.contains(scenario_category.strip()))
     if is_active is not None:
         q = q.where(ProjectSkillModel.is_active == is_active)
 
@@ -304,21 +450,33 @@ async def list_skills(
     return page_response(items, total, page, page_size, "查询成功")
 
 
+async def _remaining_pack_roots(
+    project_id: int,
+    user_id: int,
+    db: AsyncSession,
+    exclude_ids: List[int],
+) -> set[str]:
+    stmt = select(ProjectSkillModel).where(
+        ProjectSkillModel.project_id == project_id,
+        ProjectSkillModel.user_id == user_id,
+        ProjectSkillModel.enabled_flag == 1,
+    )
+    if exclude_ids:
+        stmt = stmt.where(ProjectSkillModel.id.notin_([int(x) for x in exclude_ids]))
+    rows = (await db.execute(stmt)).scalars().all()
+    roots: set[str] = set()
+    for r in rows:
+        extra = r.extra_config if isinstance(r.extra_config, dict) else {}
+        pr = str(extra.get("pack_root") or "").strip()
+        if pr:
+            roots.add(pr)
+    return roots
+
+
 async def create_skill(project_id: int, user_id: int, db: AsyncSession, data: dict) -> dict:
     await _check_role(project_id, user_id, ["owner", "admin", "developer"], db)
     name = (data.get("name") or "").strip()
-    if not name:
-        raise HTTPException(status_code=400, detail="技能名称不能为空")
-    dup = await db.execute(
-        select(ProjectSkillModel.id).where(
-            ProjectSkillModel.project_id == project_id,
-            ProjectSkillModel.user_id == user_id,
-            ProjectSkillModel.name == name,
-            ProjectSkillModel.enabled_flag == 1,
-        )
-    )
-    if dup.scalar():
-        raise HTTPException(status_code=400, detail="技能名称已存在")
+    await _assert_skill_names_available(project_id, user_id, db, [name])
     m = ProjectSkillModel(
         project_id=project_id,
         user_id=user_id,
@@ -353,17 +511,7 @@ async def update_skill(project_id: int, user_id: int, skill_id: int, db: AsyncSe
         raise HTTPException(status_code=404, detail="技能不存在")
     if data.get("name"):
         new_name = str(data["name"]).strip()
-        dup = await db.execute(
-            select(ProjectSkillModel.id).where(
-                ProjectSkillModel.project_id == project_id,
-                ProjectSkillModel.user_id == user_id,
-                ProjectSkillModel.name == new_name,
-                ProjectSkillModel.id != skill_id,
-                ProjectSkillModel.enabled_flag == 1,
-            )
-        )
-        if dup.scalar():
-            raise HTTPException(status_code=400, detail="技能名称已存在")
+        await _assert_skill_names_available(project_id, user_id, db, [new_name], exclude_id=skill_id)
         m.name = new_name
     for f in ("description", "scenario_category", "repo_url", "skill_path", "entry_command"):
         if f in data:
@@ -381,20 +529,63 @@ async def update_skill(project_id: int, user_id: int, skill_id: int, db: AsyncSe
 
 
 async def delete_skill(project_id: int, user_id: int, skill_id: int, db: AsyncSession) -> dict:
+    return await batch_delete_skills(project_id, user_id, db, skill_ids=[skill_id])
+
+
+async def batch_delete_skills(
+    project_id: int,
+    user_id: int,
+    db: AsyncSession,
+    *,
+    skill_ids: Optional[List[int]] = None,
+    delete_all: bool = False,
+) -> dict:
+    """删除本地技能目录。"""
     await _check_role(project_id, user_id, ["owner", "admin"], db)
     stmt = select(ProjectSkillModel).where(
-        ProjectSkillModel.id == skill_id,
         ProjectSkillModel.project_id == project_id,
         ProjectSkillModel.user_id == user_id,
         ProjectSkillModel.enabled_flag == 1,
     )
-    m = (await db.execute(stmt)).scalar_one_or_none()
-    if not m:
-        raise HTTPException(status_code=404, detail="技能不存在")
-    m.enabled_flag = 0
-    m.updated_by = user_id
+    if delete_all:
+        pass
+    else:
+        ids = [int(x) for x in (skill_ids or []) if x is not None]
+        if not ids:
+            raise HTTPException(status_code=400, detail="请选择要删除的技能")
+        stmt = stmt.where(ProjectSkillModel.id.in_(ids))
+    rows = list((await db.execute(stmt)).scalars().all())
+    if not rows:
+        raise HTTPException(status_code=404, detail="未找到可删除的技能")
+
+    delete_ids = [int(r.id) for r in rows]
+    remaining_packs = await _remaining_pack_roots(project_id, user_id, db, delete_ids)
+
+    snapshots = list(rows)
+
+
+    job_ids = list(
+        (
+            await db.execute(
+                select(SkillExecutionJobModel.id).where(SkillExecutionJobModel.skill_id.in_(delete_ids))
+            )
+        ).scalars().all()
+    )
+    if job_ids:
+        await db.execute(delete(SkillExecutionEventModel).where(SkillExecutionEventModel.job_id.in_(job_ids)))
+        await db.execute(delete(SkillExecutionArtifactModel).where(SkillExecutionArtifactModel.job_id.in_(job_ids)))
+        await db.execute(delete(SkillExecutionJobModel).where(SkillExecutionJobModel.id.in_(job_ids)))
+
+    await db.execute(
+        delete(ProjectSkillModel).where(ProjectSkillModel.id.in_(delete_ids))
+    )
     await db.commit()
-    return success_response(message="删除成功")
+    for m in snapshots:
+        _remove_skill_filesystem(m, remaining_packs)
+    return success_response(
+        data={"deleted": delete_ids, "count": len(delete_ids)},
+        message=f"已删除 {len(delete_ids)} 个技能及相关本地目录",
+    )
 
 
 async def import_skill_from_git(project_id: int, user_id: int, db: AsyncSession, data: dict) -> dict:
@@ -425,54 +616,60 @@ async def import_skill_from_git(project_id: int, user_id: int, db: AsyncSession,
         "is_active": True,
     }
 
-    # If repo is a skill pack (multi-SKILL.md layout), create one record per SKILL.md under /skills
-    pack = _scan_skill_pack(dst)
-    if pack:
-        created_ids: List[int] = []
-        for item in pack:
-            skill_name = _safe_skill_name(item["name"])
-            extra = {
-                "allowed_tools": item.get("allowed_tools") or "",
-                "pack_root": str(dst),
-            }
-            res = await create_skill(
-                project_id,
-                user_id,
-                db,
-                {
-                    "name": skill_name,
-                    "description": item.get("description"),
-                    "scenario_category": payload.get("scenario_category") or skill_name,
-                    "source_type": payload["source_type"],
-                    "repo_url": repo_url,
-                    "skill_path": str(item["skill_dir"]),
-                    # entry_command left empty: prefer SKILL.md allowed-tools / templates
-                    "entry_command": str(data.get("entry_command") or "").strip() or None,
-                    "is_active": True,
-                    "extra_config": extra,
-                },
-            )
-            created_ids.append(int(((res or {}).get("data") or {}).get("id") or 0))
-        return success_response(data={"created": created_ids, "count": len(created_ids)}, message="导入成功")
+    try:
+        # If repo is a skill pack (multi-SKILL.md layout), create one record per SKILL.md under /skills
+        pack = _scan_skill_pack(dst)
+        if pack:
+            names = [_safe_skill_name(item["name"]) for item in pack]
+            await _assert_skill_names_available(project_id, user_id, db, names)
+            created_ids: List[int] = []
+            for item in pack:
+                skill_name = _safe_skill_name(item["name"])
+                extra = {
+                    "allowed_tools": item.get("allowed_tools") or "",
+                    "pack_root": str(dst),
+                }
+                res = await create_skill(
+                    project_id,
+                    user_id,
+                    db,
+                    {
+                        "name": skill_name,
+                        "description": item.get("description"),
+                        "scenario_category": payload.get("scenario_category") or skill_name,
+                        "source_type": payload["source_type"],
+                        "repo_url": repo_url,
+                        "skill_path": str(item["skill_dir"]),
+                        "entry_command": str(data.get("entry_command") or "").strip() or None,
+                        "is_active": True,
+                        "extra_config": extra,
+                    },
+                )
+                created_ids.append(int(((res or {}).get("data") or {}).get("id") or 0))
+            return success_response(data={"created": created_ids, "count": len(created_ids)}, message="导入成功")
 
-    # Fallback: treat repo root as a single skill
-    res = await create_skill(
-        project_id,
-        user_id,
-        db,
-        {
-            "name": name,
-            "description": str(data.get("description") or _parse_skill_description(dst)),
-            "scenario_category": payload.get("scenario_category"),
-            "source_type": payload["source_type"],
-            "repo_url": repo_url,
-            "skill_path": str(dst),
-            "entry_command": str(data.get("entry_command") or "").strip() or None,
-            "is_active": True,
-            "extra_config": data.get("extra_config") if isinstance(data.get("extra_config"), dict) else {},
-        },
-    )
-    return success_response(data={"created": [((res or {}).get("data") or {}).get("id")], "count": 1}, message="导入成功")
+        await _assert_skill_names_available(project_id, user_id, db, [name])
+        # Fallback: treat repo root as a single skill
+        res = await create_skill(
+            project_id,
+            user_id,
+            db,
+            {
+                "name": name,
+                "description": str(data.get("description") or _parse_skill_description(dst)),
+                "scenario_category": payload.get("scenario_category"),
+                "source_type": payload["source_type"],
+                "repo_url": repo_url,
+                "skill_path": str(dst),
+                "entry_command": str(data.get("entry_command") or "").strip() or None,
+                "is_active": True,
+                "extra_config": data.get("extra_config") if isinstance(data.get("extra_config"), dict) else {},
+            },
+        )
+        return success_response(data={"created": [((res or {}).get("data") or {}).get("id")], "count": 1}, message="导入成功")
+    except Exception:
+        shutil.rmtree(dst, ignore_errors=True)
+        raise
 
 
 async def import_skill_from_upload(
@@ -507,51 +704,65 @@ async def import_skill_from_upload(
             zip_path.unlink(missing_ok=True)
         except Exception:
             pass
-    payload = {
-        "name": name,
-        "description": _parse_skill_description(dst),
-        "scenario_category": scenario_category,
-        "source_type": "upload",
-        "repo_url": None,
-        "skill_path": str(dst),
-        "entry_command": (entry_command or "").strip() or None,
-        "is_active": True,
-        "extra_config": {},
-    }
 
-    pack = _scan_skill_pack(dst)
-    if pack:
-        created_ids: List[int] = []
-        for item in pack:
-            skill_name = _safe_skill_name(item["name"])
-            extra = {
-                "allowed_tools": item.get("allowed_tools") or "",
-                "pack_root": str(dst),
-            }
-            res = await create_skill(
-                project_id,
-                user_id,
-                db,
-                {
-                    "name": skill_name,
-                    "description": item.get("description"),
-                    "scenario_category": scenario_category or skill_name,
-                    "source_type": "upload",
-                    "repo_url": None,
-                    "skill_path": str(item["skill_dir"]),
-                    "entry_command": (entry_command or "").strip() or None,
-                    "is_active": True,
-                    "extra_config": extra,
-                },
-            )
-            created_ids.append(int(((res or {}).get("data") or {}).get("id") or 0))
-        return success_response(data={"created": created_ids, "count": len(created_ids)}, message="导入成功")
+    try:
+        pack = _scan_skill_pack(dst)
+        if pack:
+            names = [_safe_skill_name(item["name"]) for item in pack]
+            await _assert_skill_names_available(project_id, user_id, db, names)
+            created_ids: List[int] = []
+            for item in pack:
+                skill_name = _safe_skill_name(item["name"])
+                extra = {
+                    "allowed_tools": item.get("allowed_tools") or "",
+                    "pack_root": str(dst),
+                }
+                res = await create_skill(
+                    project_id,
+                    user_id,
+                    db,
+                    {
+                        "name": skill_name,
+                        "description": item.get("description"),
+                        "scenario_category": scenario_category or skill_name,
+                        "source_type": "upload",
+                        "repo_url": None,
+                        "skill_path": str(item["skill_dir"]),
+                        "entry_command": (entry_command or "").strip() or None,
+                        "is_active": True,
+                        "extra_config": extra,
+                    },
+                )
+                created_ids.append(int(((res or {}).get("data") or {}).get("id") or 0))
+            return success_response(data={"created": created_ids, "count": len(created_ids)}, message="导入成功")
 
-    res = await create_skill(project_id, user_id, db, payload)
-    return success_response(data={"created": [((res or {}).get("data") or {}).get("id")], "count": 1}, message="导入成功")
+        await _assert_skill_names_available(project_id, user_id, db, [name])
+        payload = {
+            "name": name,
+            "description": _parse_skill_description(dst),
+            "scenario_category": scenario_category,
+            "source_type": "upload",
+            "repo_url": None,
+            "skill_path": str(dst),
+            "entry_command": (entry_command or "").strip() or None,
+            "is_active": True,
+            "extra_config": {},
+        }
+        res = await create_skill(project_id, user_id, db, payload)
+        return success_response(data={"created": [((res or {}).get("data") or {}).get("id")], "count": 1}, message="导入成功")
+    except Exception:
+        shutil.rmtree(dst, ignore_errors=True)
+        raise
 
 
-async def get_skill_content(project_id: int, user_id: int, skill_id: int, db: AsyncSession) -> dict:
+async def get_skill_content(
+    project_id: int,
+    user_id: int,
+    skill_id: int,
+    db: AsyncSession,
+    *,
+    file_path: Optional[str] = None,
+) -> dict:
     await _check_member(project_id, user_id, db)
     stmt = select(ProjectSkillModel).where(
         ProjectSkillModel.id == skill_id,
@@ -562,12 +773,39 @@ async def get_skill_content(project_id: int, user_id: int, skill_id: int, db: As
     m = (await db.execute(stmt)).scalar_one_or_none()
     if not m:
         raise HTTPException(status_code=404, detail="技能不存在")
-    if not m.skill_path:
-        return success_response(data={"skill_id": skill_id, "content": ""}, message="查询成功")
-    md = Path(m.skill_path) / "SKILL.md"
-    text = md.read_text(encoding="utf-8", errors="ignore") if md.exists() else ""
-    return success_response(data={"skill_id": skill_id, "content": text}, message="查询成功")
+    skill_dir = Path(str(m.skill_path or "").strip()) if m.skill_path else None
+    if not skill_dir or not skill_dir.exists():
+        return success_response(
+            data={
+                "skill_id": skill_id,
+                "skill_path": m.skill_path,
+                "tree": [],
+                "content": "",
+                "file_path": None,
+            },
+            message="技能目录不存在",
+        )
 
+    tree = _build_dir_tree(skill_dir)
+    rel = (file_path or "").strip() or "SKILL.md"
+    content = ""
+    try:
+        content = _read_skill_file(skill_dir, rel)
+    except HTTPException:
+        if rel == "SKILL.md":
+            content = ""
+        else:
+            raise
+    return success_response(
+        data={
+            "skill_id": skill_id,
+            "skill_path": str(skill_dir),
+            "tree": tree,
+            "content": content,
+            "file_path": rel,
+        },
+        message="查询成功",
+    )
 
 async def run_skill_tool(
     project_id: int,

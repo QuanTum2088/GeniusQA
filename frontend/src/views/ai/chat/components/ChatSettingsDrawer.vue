@@ -67,25 +67,6 @@
 			</section>
 
 			<section class="settings-section">
-				<div class="section-header row">
-					<div>
-						<span class="section-title">Skill</span>
-						<span class="section-desc">启用 Skill 能力</span>
-					</div>
-					<el-switch v-model="useSkill" />
-				</div>
-				<el-select
-					v-model="selectedSkillId"
-					placeholder="Skill 配置"
-					clearable
-					style="width: 100%"
-					:disabled="!useSkill"
-				>
-					<el-option v-for="s in skillConfigs" :key="s.id" :label="s.name" :value="s.id" />
-				</el-select>
-			</section>
-
-			<section class="settings-section">
 				<div class="section-header">
 					<span class="section-title">调用模式</span>
 					<span class="section-desc">智能由模型决策；直连指定工具执行</span>
@@ -94,27 +75,6 @@
 					<el-radio-button label="smart">智能</el-radio-button>
 					<el-radio-button label="direct">直连</el-radio-button>
 				</el-radio-group>
-
-				<template v-if="toolMode === 'direct' && useSkill">
-					<div class="direct-fields">
-						<div class="field-label">Skill 动作</div>
-						<el-select v-model="directSkillAction" placeholder="Skill 动作" style="width: 100%">
-							<el-option
-								v-for="a in directSkillActions"
-								:key="a.value"
-								:label="a.label"
-								:value="a.value"
-							/>
-						</el-select>
-						<div class="field-label">动作参数（JSON）</div>
-						<el-input
-							v-model="directSkillArgsText"
-							type="textarea"
-							:rows="4"
-							placeholder='如 {"url":"https://example.com"}'
-						/>
-					</div>
-				</template>
 			</section>
 
 			<!-- 后续新配置项按 section 追加即可 -->
@@ -129,8 +89,6 @@
 </template>
 
 <script setup lang="ts">
-import { watch } from 'vue'
-
 defineOptions({ name: 'ChatSettingsDrawer' })
 
 export interface ChatSettingsOption {
@@ -138,17 +96,10 @@ export interface ChatSettingsOption {
 	name: string
 }
 
-export interface ChatSettingsActionOption {
-	label: string
-	value: string
-}
-
 defineProps<{
 	projects: Array<{ id: number; name: string }>
 	knowledgeBases: ChatSettingsOption[]
 	mcpConfigs: ChatSettingsOption[]
-	skillConfigs: ChatSettingsOption[]
-	directSkillActions: ChatSettingsActionOption[]
 }>()
 
 const emit = defineEmits<{
@@ -161,23 +112,7 @@ const useKnowledgeBase = defineModel<boolean>('useKnowledgeBase', { default: fal
 const selectedKnowledgeBaseId = defineModel<number | null>('selectedKnowledgeBaseId', { default: null })
 const useMcp = defineModel<boolean>('useMcp', { default: false })
 const selectedMcpConfigId = defineModel<number | null>('selectedMcpConfigId', { default: null })
-const useSkill = defineModel<boolean>('useSkill', { default: false })
-const selectedSkillId = defineModel<number | null>('selectedSkillId', { default: null })
 const toolMode = defineModel<'smart' | 'direct'>('toolMode', { default: 'smart' })
-const directSkillAction = defineModel<string>('directSkillAction', { default: 'agent_browser_open_snapshot' })
-const directSkillArgsText = defineModel<string>('directSkillArgsText', { default: '{}' })
-
-watch(useKnowledgeBase, (enabled) => {
-	if (!enabled) selectedKnowledgeBaseId.value = null
-})
-
-watch(useMcp, (enabled) => {
-	if (!enabled) selectedMcpConfigId.value = null
-})
-
-watch(useSkill, (enabled) => {
-	if (!enabled) selectedSkillId.value = null
-})
 </script>
 
 <style scoped lang="scss">
@@ -208,10 +143,10 @@ watch(useSkill, (enabled) => {
 
 .section-title {
 	display: block;
-	font-size: 14px;
+	font-size: 15px;
 	font-weight: 600;
 	color: var(--el-text-color-primary);
-	line-height: 1.4;
+	line-height: 1.3;
 }
 
 .section-desc {
@@ -234,28 +169,8 @@ watch(useSkill, (enabled) => {
 	}
 }
 
-.direct-fields {
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-	margin-top: 14px;
-}
-
-.field-label {
-	font-size: 12px;
-	color: var(--el-text-color-regular);
-}
-
 .drawer-footer {
 	display: flex;
 	justify-content: flex-end;
-}
-</style>
-
-
-<style lang="scss">
-.el-drawer.chat-settings-drawer .el-drawer__footer {
-	padding: 16px 20px 24px;
-	border-top: 1px solid var(--el-border-color-lighter);
 }
 </style>

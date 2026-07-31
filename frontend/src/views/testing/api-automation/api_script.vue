@@ -263,7 +263,6 @@
 				:api-data="buildDetailApiData(detail)"
 				:env_list="env_list"
 				:tree_list="[]"
-				:params_list="[]"
 				:local_db_list="[]"
 			/>
 		</el-drawer>

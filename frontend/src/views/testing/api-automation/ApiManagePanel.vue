@@ -3,29 +3,8 @@
 		<!-- 顶部工具栏 -->
 		<div class="manage-toolbar">
 			<div class="toolbar-row">
-				<div class="toolbar-doc">
-					<el-select v-model="doc_source_type" style="width:110px;flex-shrink:0" @change="persistSource">
-						<el-option label="Swagger" value="swagger" />
-						<el-option label="Apifox" value="apifox" />
-					</el-select>
-					<el-input
-						v-model="doc_source_url"
-						placeholder="输入文档 URL"
-						clearable
-						style="flex:1;min-width:180px"
-						@change="persistSource"
-						@blur="persistSource"
-					/>
-					<el-input
-						v-if="doc_source_type === 'apifox'"
-						v-model="doc_source_cookies"
-						placeholder="Apifox Cookies（必填）"
-						clearable
-						style="flex:1;min-width:160px"
-					/>
-					<el-button type="primary" size="small" :loading="pulling" @click="pullDoc" style="flex-shrink:0">拉取并解析</el-button>
-				</div>
 				<div class="toolbar-tools">
+					<el-button type="primary" size="small" @click="openImportDialog">导入接口</el-button>
 					<el-popover placement="bottom" :width="900" trigger="click">
 						<template #reference>
 							<el-button size="small" type="info">直连数据库</el-button>
@@ -38,9 +17,12 @@
 						</template>
 						<ApiVarPopover />
 					</el-popover>
+					<el-button size="small" type="warning" @click="commonParamsRef?.open()">全局参数</el-button>
 				</div>
 			</div>
 		</div>
+
+		<ApiCommonParamsDialog ref="commonParamsRef" :service-id="serviceId" />
 
 		<!-- 主体：左侧接口树 + 右侧详情 -->
 		<div class="manage-body">
@@ -118,7 +100,6 @@
 										:env-id="envId"
 										:env_list="envList"
 										:tree_list="treeData"
-										:params_list="paramsList"
 										:service-id="serviceId"
 										:embedded="true"
 										@caseSaved="loadTree"
@@ -126,7 +107,7 @@
 									/>
 									<!-- 接口文档 -->
 									<div v-if="tab.innerTab==='doc'" class="inner-panel-wrap">
-										<ApiDocPanel :api-data="tab.data" />
+										<ApiDocPanel :api-data="tab.data" :api-id="Number(tab.data?.api_id || 0)" />
 									</div>
 									<!-- 调试记录 -->
 									<div v-if="tab.innerTab==='history'" class="inner-panel-wrap">
@@ -143,6 +124,58 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- 导入接口弹窗 -->
+		<el-dialog v-model="importDialogVisible" title="导入接口" width="560px" destroy-on-close @closed="onImportDialogClosed">
+			<el-tabs v-model="importTab">
+				<el-tab-pane label="URL 导入" name="url">
+					<el-form label-width="100px">
+						<el-form-item label="文档类型" required>
+							<el-select v-model="doc_source_type" style="width:100%">
+								<el-option label="Swagger" value="swagger" />
+								<el-option label="Apifox" value="apifox" />
+							</el-select>
+						</el-form-item>
+						<el-form-item label="文档 URL" required>
+							<el-input v-model="doc_source_url" placeholder="输入文档 URL" clearable />
+						</el-form-item>
+						<el-form-item v-if="doc_source_type === 'apifox'" label="Cookies" required>
+							<el-input v-model="doc_source_cookies" placeholder="Apifox Cookies（必填）" clearable />
+						</el-form-item>
+					</el-form>
+				</el-tab-pane>
+				<el-tab-pane label="文件导入" name="file">
+					<el-form label-width="100px">
+						<el-form-item label="文档类型" required>
+							<el-select v-model="file_source_type" style="width:100%">
+								<el-option label="Swagger" value="swagger" />
+								<el-option label="Apifox" value="apifox" />
+							</el-select>
+						</el-form-item>
+						<el-form-item label="文档文件" required>
+							<el-upload
+								ref="uploadRef"
+								:auto-upload="false"
+								:limit="1"
+								accept=".json"
+								:on-change="onImportFileChange"
+								:on-remove="onImportFileRemove"
+								:on-exceed="onImportFileExceed"
+							>
+								<el-button size="small">选择 JSON 文件</el-button>
+								<template #tip>
+									<div class="el-upload__tip">支持 OpenAPI / Swagger JSON，以及 Apifox「导出项目」JSON；YAML 请先转为 JSON</div>
+								</template>
+							</el-upload>
+						</el-form-item>
+					</el-form>
+				</el-tab-pane>
+			</el-tabs>
+			<template #footer>
+				<el-button @click="importDialogVisible = false">取消</el-button>
+				<el-button type="primary" :loading="pulling" @click="confirmImport">导入</el-button>
+			</template>
+		</el-dialog>
 
 		<!-- 新增目录/接口弹窗 -->
 		<el-dialog v-model="menuDialogVisible" :title="menuDialogTitle" width="400px" destroy-on-close>
@@ -162,16 +195,18 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import type { UploadFile, UploadInstance, UploadProps, UploadRawFile } from 'element-plus';
 import { ArrowDown, FolderOpened, Link, MoreFilled, Document } from '@element-plus/icons-vue';
 import ApiDetail from './api_detail.vue';
 import ApiDbPopover from './components/ApiDbPopover.vue';
 import ApiVarPopover from './components/ApiVarPopover.vue';
+import ApiCommonParamsDialog from './components/ApiCommonParamsDialog.vue';
 import ApiDocPanel from './components/ApiDocPanel.vue';
 import ApiHistoryPanel from './components/ApiHistoryPanel.vue';
 import ApiMockPanel from './components/ApiMockPanel.vue';
 import {
 	api_tree, api_info, add_menu, del_menu, edit_menu, copy_menu,
-	pull_api_doc, params_select, edit_api_service,
+	pull_api_doc, edit_api_service,
 } from '/@/api/v1/testing/apiAutomation';
 
 const props = defineProps<{
@@ -186,6 +221,8 @@ const emit = defineEmits<{
 	(e: 'update-source', payload: { source_type?: string; source_addr?: string }): void;
 }>();
 
+const commonParamsRef = ref<InstanceType<typeof ApiCommonParamsDialog> | null>(null);
+
 function normalizeSourceType(raw?: string) {
 	const t = String(raw || '').trim().toLowerCase();
 	if (t === 'apifox') return 'apifox';
@@ -196,13 +233,13 @@ function normalizeSourceType(raw?: string) {
 function applySourceFromProps() {
 	doc_source_type.value = normalizeSourceType(props.sourceType);
 	doc_source_url.value = (props.sourceAddr || '').trim();
+	file_source_type.value = normalizeSourceType(props.sourceType);
 }
 
 // ---- 接口树 ----
 const treeRef = ref<any>(null);
 const treeData = ref<any[]>([]);
 const treeFilter = ref('');
-const paramsList = ref<any[]>([]);
 
 watch(treeFilter, (v) => treeRef.value?.filter(v));
 const filterNode = (val: string, data: any) => !val || data.name?.includes(val);
@@ -214,13 +251,6 @@ const loadTree = async () => {
 	} catch { treeData.value = []; }
 };
 
-const loadParams = async () => {
-	try {
-		const r: any = await params_select({});
-		paramsList.value = r?.data || [];
-	} catch { paramsList.value = []; }
-};
-
 // ---- 接口 Tab ----
 const apiTabs = ref<any[]>([]);
 const activeTab = ref('');
@@ -229,9 +259,15 @@ const onNodeClick = async (data: any) => {
 	if (data.type !== 2 && data.type !== 3) return;
 	const existing = apiTabs.value.find((t) => t.id === data.id);
 	if (existing) { activeTab.value = existing.name; return; }
+	const apiId = Number(data.api_id || 0);
 	try {
-		const r: any = await api_info(data);
-		data.api_info = r.data;
+		if (apiId) {
+			const r: any = await api_info({ api_id: apiId });
+			const info = r?.data || {};
+			// 保证后续保存文档/Mock 能拿到接口表 id
+			data.api_info = { ...info, id: info.id ?? apiId };
+			if (!data.api_id) data.api_id = info.id ?? apiId;
+		}
 	} catch {}
 	const name = `api-${data.id}`;
 	apiTabs.value.push({ id: data.id, name, title: data.name, data, innerTab: 'debug' });
@@ -255,12 +291,16 @@ const METHOD_MAP: Record<number, { label: string; color: string }> = {
 const methodLabel = (m: number) => METHOD_MAP[m]?.label || 'GET';
 const methodColor = (m: number) => METHOD_MAP[m]?.color || '#409EFF';
 
-// ---- 拉取文档 ----
+// ---- 导入接口 ----
+const importDialogVisible = ref(false);
+const importTab = ref<'url' | 'file'>('url');
 const doc_source_type = ref('swagger');
 const doc_source_url = ref('');
 const doc_source_cookies = ref('');
+const file_source_type = ref('swagger');
+const importFileContent = ref<Record<string, any> | null>(null);
+const uploadRef = ref<UploadInstance>();
 const pulling = ref(false);
-let persistTimer: ReturnType<typeof setTimeout> | null = null;
 
 applySourceFromProps();
 
@@ -269,43 +309,143 @@ watch(
 	() => applySourceFromProps(),
 );
 
-const saveSourceNow = async () => {
-	const source_type = normalizeSourceType(doc_source_type.value);
-	const source_addr = doc_source_url.value.trim();
-	doc_source_type.value = source_type;
+const openImportDialog = () => {
+	applySourceFromProps();
+	importTab.value = 'url';
+	doc_source_cookies.value = '';
+	importFileContent.value = null;
+	uploadRef.value?.clearFiles();
+	importDialogVisible.value = true;
+};
+
+const onImportDialogClosed = () => {
+	importFileContent.value = null;
+	uploadRef.value?.clearFiles();
+};
+
+const readFileAsText = (file: UploadRawFile) =>
+	new Promise<string>((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => resolve(String(reader.result || ''));
+		reader.onerror = () => reject(new Error('文件读取失败'));
+		reader.readAsText(file);
+	});
+
+const onImportFileChange: UploadProps['onChange'] = async (uploadFile: UploadFile) => {
+	importFileContent.value = null;
+	const raw = uploadFile.raw;
+	if (!raw) return;
+
+	const lower = (raw.name || '').toLowerCase();
+	if (lower.endsWith('.yaml') || lower.endsWith('.yml')) {
+		ElMessage.warning('暂不支持 YAML，请先转为 JSON 再导入');
+		uploadRef.value?.clearFiles();
+		return;
+	}
+
+	try {
+		const text = await readFileAsText(raw);
+		const parsed = JSON.parse(text);
+		if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+			throw new Error('文档内容必须是 JSON 对象');
+		}
+		importFileContent.value = parsed as Record<string, any>;
+	} catch (e: any) {
+		importFileContent.value = null;
+		uploadRef.value?.clearFiles();
+		ElMessage.error(e?.message?.includes('JSON') || e instanceof SyntaxError ? 'JSON 解析失败，请检查文件格式' : (e?.message || '文件解析失败'));
+	}
+};
+
+const onImportFileRemove = () => {
+	importFileContent.value = null;
+};
+
+const onImportFileExceed: UploadProps['onExceed'] = (files) => {
+	uploadRef.value?.clearFiles();
+	const file = files[0] as UploadRawFile;
+	uploadRef.value?.handleStart(file);
+	onImportFileChange({ name: file.name, raw: file, status: 'ready', uid: file.uid } as UploadFile);
+};
+
+const saveSourceNow = async (source_type: string, source_addr: string) => {
+	const normalized = normalizeSourceType(source_type);
 	await edit_api_service({
 		id: props.serviceId,
-		source_type,
+		source_type: normalized,
 		source_addr: source_addr || undefined,
 	} as any);
-	emit('update-source', { source_type, source_addr });
+	emit('update-source', { source_type: normalized, source_addr });
 };
 
-const persistSource = () => {
-	if (persistTimer) clearTimeout(persistTimer);
-	persistTimer = setTimeout(() => {
-		saveSourceNow().catch(() => {});
-	}, 300);
+const confirmImport = async () => {
+	if (importTab.value === 'url') {
+		await importByUrl();
+	} else {
+		await importByFile();
+	}
 };
 
-const pullDoc = async () => {
-	if (!doc_source_url.value.trim()) { ElMessage.warning('请输入文档地址'); return; }
+const importByUrl = async () => {
+	if (!doc_source_url.value.trim()) {
+		ElMessage.warning('请输入文档地址');
+		return;
+	}
 	if (doc_source_type.value === 'apifox' && !doc_source_cookies.value.trim()) {
-		ElMessage.warning('Apifox 需要填写 Cookies'); return;
+		ElMessage.warning('Apifox 需要填写 Cookies');
+		return;
 	}
 	pulling.value = true;
 	try {
-		try { await saveSourceNow(); } catch { /* 保存失败不阻断拉取 */ }
+		const source_type = normalizeSourceType(doc_source_type.value);
+		const doc_url = doc_source_url.value.trim();
+		try {
+			await saveSourceNow(source_type, doc_url);
+		} catch { /* 保存失败不阻断拉取 */ }
 		await pull_api_doc({
 			api_service_id: props.serviceId,
-			source_type: doc_source_type.value,
-			doc_url: doc_source_url.value.trim(),
-			...(doc_source_type.value === 'apifox' ? { cookies: doc_source_cookies.value.trim() } : {}),
+			source_type: source_type as 'swagger' | 'apifox',
+			doc_url,
+			...(source_type === 'apifox' ? { cookies: doc_source_cookies.value.trim() } : {}),
 		});
-		ElMessage.success('拉取成功');
+		ElMessage.success('导入成功');
+		importDialogVisible.value = false;
 		await loadTree();
-	} catch (e: any) { ElMessage.error(e?.message || '拉取失败'); }
-	finally { pulling.value = false; }
+	} catch (e: any) {
+		ElMessage.error(e?.message || '导入失败');
+	} finally {
+		pulling.value = false;
+	}
+};
+
+const importByFile = async () => {
+	if (!importFileContent.value) {
+		ElMessage.warning('请选择要导入的 JSON 文件');
+		return;
+	}
+	pulling.value = true;
+	try {
+		const source_type = normalizeSourceType(file_source_type.value);
+		try {
+			await edit_api_service({
+				id: props.serviceId,
+				source_type,
+			} as any);
+			emit('update-source', { source_type });
+		} catch { /* 保存失败不阻断导入 */ }
+		await pull_api_doc({
+			api_service_id: props.serviceId,
+			source_type: source_type as 'swagger' | 'apifox',
+			doc_content: importFileContent.value,
+		});
+		ElMessage.success('导入成功');
+		importDialogVisible.value = false;
+		await loadTree();
+	} catch (e: any) {
+		ElMessage.error(e?.message || '导入失败');
+	} finally {
+		pulling.value = false;
+	}
 };
 
 // ---- 菜单操作 ----
@@ -373,14 +513,13 @@ const deleteNode = async (data: any) => {
 	}
 };
 
-onMounted(() => { loadTree(); loadParams(); });
+onMounted(() => { loadTree(); });
 </script>
 
 <style scoped>
 .manage-panel { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
 .manage-toolbar { padding: 8px 12px; background: var(--el-bg-color); border-bottom: 1px solid var(--el-border-color); flex-shrink: 0; }
 .toolbar-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.toolbar-doc { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
 .toolbar-tools { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .manage-body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
 .tree-panel { width: 260px; flex-shrink: 0; border-right: 1px solid var(--el-border-color); display: flex; flex-direction: column; overflow: hidden; background: var(--el-bg-color); }

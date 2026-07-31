@@ -30,6 +30,7 @@ class ApiServiceModel(Base):
     manager = Column(BigInteger, comment='负责人用户ID')
     business_id = Column(BigInteger, comment='业务线ID')
     sort = Column(Integer, default=0, comment='排序权重')
+    common_params = Column(JSON, comment='全局参数：header/cookie/query/body')
 
 
 class ApiEnvironmentModel(Base):

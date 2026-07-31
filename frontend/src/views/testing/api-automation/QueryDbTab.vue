@@ -13,6 +13,14 @@
         >
           <el-option v-for="db in dbList" :key="db.id" :label="db.name" :value="db.id" />
         </el-select>
+        <el-input
+          v-if="selectedDbId"
+          v-model="treeFilter"
+          placeholder="搜索库 / 表名"
+          clearable
+          size="small"
+          class="qdb-tree-search"
+        />
       </div>
       <div v-if="selectedDbId" class="qdb-left__tree">
         <el-tree
@@ -23,6 +31,7 @@
           :load="loadNode"
           node-key="name"
           highlight-current
+          :filter-node-method="filterNode"
           @node-click="onNodeClick"
         >
           <template #default="{ node, data }">
@@ -95,6 +104,8 @@
                 :key="col"
                 :prop="col"
                 :label="col"
+                align="center"
+                header-align="center"
                 show-overflow-tooltip
                 min-width="120"
               />
@@ -108,7 +119,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation'
 import { onDbListChanged } from './composables/dbListSync'
@@ -129,12 +140,22 @@ const dbList = ref<any[]>([])
 const selectedDbId = ref<number | null>(null)
 const treeData = ref<any[]>([])
 const treeRef = ref<any>(null)
+const treeFilter = ref('')
 const sql = ref('')
 const executing = ref(false)
 const resultTabs = ref<ResultTab[]>([])
 const activeTab = ref('')
 let tabCounter = 0
 let offDbListSync: (() => void) | null = null
+
+watch(treeFilter, (v) => {
+  treeRef.value?.filter(v)
+})
+
+const filterNode = (value: string, data: any) => {
+  if (!value) return true
+  return String(data?.name || '').toLowerCase().includes(String(value).toLowerCase())
+}
 
 async function loadDbList() {
   try {
@@ -150,6 +171,7 @@ async function loadDbList() {
 
 function onDbChange(val: number | null) {
   treeData.value = []
+  treeFilter.value = ''
   if (!val) return
   // Tree will lazy-load on expand; seed with root call
   loadRootDatabases()
@@ -264,6 +286,13 @@ defineExpose({ reloadDbList: loadDbList })
 .qdb-left__header {
   padding: 10px 10px 6px;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qdb-tree-search {
+  width: 100%;
 }
 
 .qdb-left__tree {

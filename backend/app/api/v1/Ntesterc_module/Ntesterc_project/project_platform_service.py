@@ -76,7 +76,7 @@ async def _get_project(project_id: int, db: AsyncSession) -> ProjectModel:
 
 def _mcp_to_dict(c: ProjectMCPConfigModel) -> dict:
     auth_config = c.auth_config or {}
-    # 脱敏
+    
     masked = dict(auth_config) if isinstance(auth_config, dict) else {}
     for key in ("token", "api_key"):
         val = masked.get(key)
@@ -97,6 +97,8 @@ def _mcp_to_dict(c: ProjectMCPConfigModel) -> dict:
         "auth_config": masked,
         "description": getattr(c, "description", None) or "",
         "is_enabled": c.is_enabled,
+        "is_connected": bool(getattr(c, "is_connected", False)),
+        "connection_status": "connected" if bool(getattr(c, "is_connected", False)) else "disconnected",
         "created_at": _iso(c.creation_date),
         "updated_at": _iso(c.updation_date),
     }
@@ -112,7 +114,7 @@ def _normalize_transport(raw: Optional[str]) -> str:
 
 
 def _visibility_clause(project_id: int, user_id: int):
-    """当前项目可见：local(me+project) | project(project) | user(me)。"""
+    """当前项目可见"""
     return or_(
         (
             (ProjectMCPConfigModel.scope == "local")
@@ -127,7 +129,7 @@ def _visibility_clause(project_id: int, user_id: int):
             (ProjectMCPConfigModel.scope == "user")
             & (ProjectMCPConfigModel.user_id == user_id)
         ),
-        # 兼容旧数据：无 scope 字段时视作用户级
+        
         (
             or_(ProjectMCPConfigModel.scope.is_(None), ProjectMCPConfigModel.scope == "")
             & (ProjectMCPConfigModel.user_id == user_id)
@@ -234,7 +236,7 @@ async def create_mcp_config(project_id: int, user_id: int, db: AsyncSession, dat
 
     bind_project_id = None if scope == "user" else project_id
 
-    # 重名校验（同作用域可见范围内）
+    
     exists_q = select(ProjectMCPConfigModel.id).where(
         ProjectMCPConfigModel.enabled_flag == 1,
         ProjectMCPConfigModel.name == name,
@@ -303,13 +305,13 @@ async def update_mcp_config(project_id: int, user_id: int, config_id: int, db: A
         raise HTTPException(status_code=403, detail="无权修改他人的私有/全局 MCP 配置")
 
     project = await _get_project(project_id, db)
-    # 切换作用域到 local/project 时强制校验工作目录；纯字段更新尽量不阻断
+    
     if "scope" in data and scope in ("local", "project"):
         workspace = await _require_workspace(project, scope)
     else:
         workspace = await _workspace_or_none(project)
         if scope in ("local", "project") and not workspace:
-            # 仍尝试同步，失败仅警告
+            
             pass
 
     if data.get("name"):
@@ -332,7 +334,7 @@ async def update_mcp_config(project_id: int, user_id: int, config_id: int, db: A
     if data.get("auth_type") is not None:
         c.auth_type = data.get("auth_type") or "none"
     if data.get("auth_config") is not None:
-        # 若回传脱敏值则保留原值
+        
         incoming = data["auth_config"] if isinstance(data["auth_config"], dict) else {}
         merged = dict(c.auth_config or {})
         for k, v in incoming.items():
@@ -344,14 +346,18 @@ async def update_mcp_config(project_id: int, user_id: int, config_id: int, db: A
         c.description = data.get("description")
     if data.get("is_enabled") is not None:
         c.is_enabled = data["is_enabled"]
+    
+    conn_keys = ("transport", "url", "headers", "command", "args", "env", "auth_type", "auth_config")
+    if any(k in data for k in conn_keys):
+        c.is_connected = False
     c.updated_by = user_id
     await db.commit()
     await db.refresh(c)
 
-    # 若作用域变更，先从旧位置删除
+    
     if old_scope != scope or old_name != c.name:
         try:
-            # 构造临时对象删除旧文件项
+            
             class _Old:
                 pass
             o = _Old()
@@ -404,20 +410,35 @@ async def delete_mcp_config(project_id: int, user_id: int, config_id: int, db: A
 
 async def test_mcp_config(project_id: int, user_id: int, config_id: int, db: AsyncSession) -> dict:
     await _check_member(project_id, user_id, db)
+    c = await _get_mcp_config_visible(project_id, user_id, config_id, db)
     try:
         tools = await mcp_list_tools(project_id, user_id, config_id, db)
-        if tools.get("code") == 200:
+        ok = tools.get("code") == 200
+        c.is_connected = bool(ok)
+        c.updated_by = user_id
+        await db.commit()
+        if ok:
             return success_response(
-                data={"ok": True, "tools": (tools.get("data") or {}).get("tools") or []},
+                data={
+                    "ok": True,
+                    "is_connected": True,
+                    "connection_status": "connected",
+                    "tools": (tools.get("data") or {}).get("tools") or [],
+                },
                 message="连接成功",
             )
         return success_response(
-            data={"ok": False},
+            data={"ok": False, "is_connected": False, "connection_status": "disconnected"},
             message=tools.get("message") or "连接失败",
         )
     except Exception as e:
-        return success_response(data={"ok": False}, message=f"连接失败: {e}")
-
+        c.is_connected = False
+        c.updated_by = user_id
+        await db.commit()
+        return success_response(
+            data={"ok": False, "is_connected": False, "connection_status": "disconnected"},
+            message=f"连接失败: {e}",
+        )
 
 async def _get_mcp_config_visible(
     project_id: int, user_id: int, config_id: int, db: AsyncSession

@@ -91,16 +91,27 @@ def run_sandbox(
     }
     if extra_globals:
         exec_globals.update(extra_globals)
+    # 若未显式注入 pm，用 ntest + request/response 构造薄兼容层
+    if "pm" not in exec_globals:
+        exec_globals["pm"] = build_pm_shim(
+            ntest,
+            request=exec_globals.get("request"),
+            response=exec_globals.get("response"),
+        )
 
     try:
         with contextlib.redirect_stdout(captured):
             exec(compile(code, "<script>", "exec"), exec_globals)  # noqa: S102
         output = captured.getvalue()
-        exported = getattr(ntest, "exported_vars", {}) or {}
+        exported = dict(getattr(ntest, "exported_vars", {}) or {})
+        # 允许脚本直接改 request 对象并回写
+        req_obj = exec_globals.get("request")
+        if isinstance(req_obj, dict):
+            exported["__request__"] = req_obj
         return ScriptRunResult(
             success=True,
             output=output,
-            vars=dict(exported),
+            vars=exported,
             mode="sandbox",
             logs=[f"脚本输出: {output[:300]}" if output else "脚本执行完成（沙盒）"],
         )
@@ -112,6 +123,84 @@ def run_sandbox(
             mode="sandbox",
             logs=[f"沙盒执行失败: {traceback.format_exc()[:300]}"],
         )
+
+
+class SimpleNtest:
+    """前后置脚本用的轻量 ntest（不依赖 VariableContext）。"""
+
+    def __init__(self, session_vars: Optional[Dict[str, Any]] = None, env_vars: Optional[Dict[str, Any]] = None):
+        self._vars = dict(session_vars or {})
+        self._env = dict(env_vars or {})
+        self.exported_vars: Dict[str, Any] = {}
+
+    def get(self, key, default=None):
+        if key in self._vars:
+            return self._vars[key]
+        return self._env.get(key, default)
+
+    def set(self, key, value):
+        self.exported_vars[key] = value
+        self._vars[key] = value
+
+    def env(self, key, default=None):
+        return self._env.get(key, default)
+
+
+def build_pm_shim(ntest: Any, request: Any = None, response: Any = None) -> Any:
+    """Apifox/Postman 风格薄兼容：pm.environment / pm.variables / pm.request / pm.response / pm.test。"""
+
+    class _Env:
+        def get(self, key, default=None):
+            return ntest.env(key, default) if hasattr(ntest, "env") else ntest.get(key, default)
+
+        def set(self, key, value):
+            ntest.set(key, value)
+
+    class _Vars:
+        def get(self, key, default=None):
+            return ntest.get(key, default)
+
+        def set(self, key, value):
+            ntest.set(key, value)
+
+    class _Resp:
+        def __init__(self, res):
+            self._res = res if isinstance(res, dict) else {}
+
+        @property
+        def code(self):
+            return self._res.get("code")
+
+        @property
+        def headers(self):
+            return self._res.get("header") or self._res.get("headers") or {}
+
+        def json(self):
+            return self._res.get("body")
+
+        def text(self):
+            body = self._res.get("body")
+            if isinstance(body, str):
+                return body
+            try:
+                return json.dumps(body, ensure_ascii=False)
+            except Exception:
+                return str(body)
+
+    class _Pm:
+        def __init__(self):
+            self.environment = _Env()
+            self.variables = _Vars()
+            self.request = request if isinstance(request, dict) else {}
+            self.response = _Resp(response) if response is not None else None
+
+        def test(self, name, fn):
+            try:
+                fn()
+            except Exception as e:
+                raise AssertionError(f"pm.test({name!r}) failed: {e}") from e
+
+    return _Pm()
 
 
 def _python_bin() -> str:
@@ -135,12 +224,20 @@ def _native_timeout() -> int:
 
 
 def _build_native_python_wrapper(user_code: str) -> str:
-    # 注入 ntest，并用 marker 回传 exported vars；__name__ 非 __main__ 避免跑 demo 块
+    # 注入 ntest / request / response / pm，并用 marker 回传 exported vars
     return f'''# -*- coding: utf-8 -*-
 import json, os, sys
 __name__ = "<ntest_script>"
 _vars = json.loads(os.environ.get("NTEST_VARS", "{{}}") or "{{}}")
 _env = json.loads(os.environ.get("NTEST_ENV", "{{}}") or "{{}}")
+try:
+    request = json.loads(os.environ.get("NTEST_REQUEST", "{{}}") or "{{}}")
+except Exception:
+    request = {{}}
+try:
+    response = json.loads(os.environ.get("NTEST_RESPONSE", "null") or "null")
+except Exception:
+    response = None
 _exported = {{}}
 
 class _Ntest:
@@ -156,6 +253,52 @@ class _Ntest:
 
 ntest = _Ntest()
 
+class _PmEnv:
+    def get(self, key, default=None):
+        return ntest.env(key, default)
+    def set(self, key, value):
+        ntest.set(key, value)
+
+class _PmVars:
+    def get(self, key, default=None):
+        return ntest.get(key, default)
+    def set(self, key, value):
+        ntest.set(key, value)
+
+class _PmResp:
+    def __init__(self, res):
+        self._res = res if isinstance(res, dict) else {{}}
+    @property
+    def code(self):
+        return self._res.get("code")
+    @property
+    def headers(self):
+        return self._res.get("header") or self._res.get("headers") or {{}}
+    def json(self):
+        return self._res.get("body")
+    def text(self):
+        body = self._res.get("body")
+        if isinstance(body, str):
+            return body
+        try:
+            return json.dumps(body, ensure_ascii=False)
+        except Exception:
+            return str(body)
+
+class _Pm:
+    def __init__(self):
+        self.environment = _PmEnv()
+        self.variables = _PmVars()
+        self.request = request
+        self.response = _PmResp(response) if response is not None else None
+    def test(self, name, fn):
+        try:
+            fn()
+        except Exception as e:
+            raise AssertionError("pm.test(%r) failed: %s" % (name, e)) from e
+
+pm = _Pm()
+
 try:
 { _indent(user_code, 4) }
 except Exception as e:
@@ -164,6 +307,8 @@ except Exception as e:
     print("{_RESULT_MARKER}" + json.dumps({{"ok": False, "vars": _exported, "error": str(e)}}, ensure_ascii=False))
     raise SystemExit(1)
 
+if isinstance(request, dict):
+    _exported["__request__"] = request
 print("{_RESULT_MARKER}" + json.dumps({{"ok": True, "vars": _exported}}, ensure_ascii=False, default=str))
 '''
 
@@ -198,6 +343,8 @@ def run_native_python(
     *,
     session_vars: Optional[Dict[str, Any]] = None,
     env_vars: Optional[Dict[str, Any]] = None,
+    request_ctx: Optional[Dict[str, Any]] = None,
+    response_ctx: Optional[Dict[str, Any]] = None,
     timeout: Optional[int] = None,
 ) -> ScriptRunResult:
     py = _python_bin()
@@ -206,6 +353,8 @@ def run_native_python(
     env = os.environ.copy()
     env["NTEST_VARS"] = json.dumps(session_vars or {}, ensure_ascii=False, default=str)
     env["NTEST_ENV"] = json.dumps(env_vars or {}, ensure_ascii=False, default=str)
+    env["NTEST_REQUEST"] = json.dumps(request_ctx or {}, ensure_ascii=False, default=str)
+    env["NTEST_RESPONSE"] = json.dumps(response_ctx, ensure_ascii=False, default=str) if response_ctx is not None else "null"
     env["PYTHONIOENCODING"] = "utf-8"
 
     tmp_path = None
@@ -280,6 +429,8 @@ def run_native_js(
     *,
     session_vars: Optional[Dict[str, Any]] = None,
     env_vars: Optional[Dict[str, Any]] = None,
+    request_ctx: Optional[Dict[str, Any]] = None,
+    response_ctx: Optional[Dict[str, Any]] = None,
     timeout: Optional[int] = None,
 ) -> ScriptRunResult:
     node = _node_bin()
@@ -288,6 +439,8 @@ def run_native_js(
     env = os.environ.copy()
     env["NTEST_VARS"] = json.dumps(session_vars or {}, ensure_ascii=False, default=str)
     env["NTEST_ENV"] = json.dumps(env_vars or {}, ensure_ascii=False, default=str)
+    env["NTEST_REQUEST"] = json.dumps(request_ctx or {}, ensure_ascii=False, default=str)
+    env["NTEST_RESPONSE"] = json.dumps(response_ctx, ensure_ascii=False, default=str) if response_ctx is not None else "null"
 
     tmp_path = None
     try:
@@ -357,11 +510,15 @@ def run_native_js(
 
 
 def _build_native_js_wrapper(user_code: str) -> str:
-    # CommonJS 包装，注入 global.ntest，并用 marker 回传变量
+    # CommonJS 包装，注入 global.ntest / request / response / pm，并用 marker 回传变量
     marker = _RESULT_MARKER
     return f"""'use strict';
 const _vars = JSON.parse(process.env.NTEST_VARS || '{{}}');
 const _env = JSON.parse(process.env.NTEST_ENV || '{{}}');
+let _request = {{}};
+try {{ _request = JSON.parse(process.env.NTEST_REQUEST || '{{}}'); }} catch (_) {{ _request = {{}}; }}
+let _response = null;
+try {{ _response = JSON.parse(process.env.NTEST_RESPONSE || 'null'); }} catch (_) {{ _response = null; }}
 const _exported = {{}};
 global.ntest = {{
   get(key, defVal) {{
@@ -378,9 +535,40 @@ global.ntest = {{
     return defVal;
   }},
 }};
+global.request = _request;
+global.response = _response;
+global.pm = {{
+  environment: {{
+    get: (k, d) => global.ntest.env(k, d),
+    set: (k, v) => global.ntest.set(k, v),
+  }},
+  variables: {{
+    get: (k, d) => global.ntest.get(k, d),
+    set: (k, v) => global.ntest.set(k, v),
+  }},
+  request: global.request,
+  response: _response ? {{
+    code: _response.code,
+    headers: _response.header || _response.headers || {{}},
+    json: () => _response.body,
+    text: () => {{
+      const b = _response.body;
+      if (typeof b === 'string') return b;
+      try {{ return JSON.stringify(b); }} catch (_) {{ return String(b); }}
+    }},
+  }} : undefined,
+  test: (name, fn) => {{
+    try {{ fn(); }} catch (e) {{
+      throw new Error('pm.test(' + JSON.stringify(name) + ') failed: ' + (e && e.message ? e.message : e));
+    }}
+  }},
+}};
 
 try {{
 { _indent(user_code, 2) }
+  if (global.request && typeof global.request === 'object') {{
+    _exported.__request__ = global.request;
+  }}
   console.log('{marker}' + JSON.stringify({{ ok: true, vars: _exported }}));
 }} catch (e) {{
   console.error(e && e.stack ? e.stack : String(e));
@@ -405,13 +593,29 @@ def run_native(
     language: str = "python",
     session_vars: Optional[Dict[str, Any]] = None,
     env_vars: Optional[Dict[str, Any]] = None,
+    request_ctx: Optional[Dict[str, Any]] = None,
+    response_ctx: Optional[Dict[str, Any]] = None,
     timeout: Optional[int] = None,
 ) -> ScriptRunResult:
     lang = normalize_language(language)
     if lang == "javascript":
-        return run_native_js(code, session_vars=session_vars, env_vars=env_vars, timeout=timeout)
+        return run_native_js(
+            code,
+            session_vars=session_vars,
+            env_vars=env_vars,
+            request_ctx=request_ctx,
+            response_ctx=response_ctx,
+            timeout=timeout,
+        )
     if lang == "python":
-        return run_native_python(code, session_vars=session_vars, env_vars=env_vars, timeout=timeout)
+        return run_native_python(
+            code,
+            session_vars=session_vars,
+            env_vars=env_vars,
+            request_ctx=request_ctx,
+            response_ctx=response_ctx,
+            timeout=timeout,
+        )
     return ScriptRunResult(
         success=False,
         error=f"暂不支持语言: {language}（当前支持 python / javascript）",
@@ -427,15 +631,20 @@ async def run_script_async(
     session_vars: Optional[Dict[str, Any]] = None,
     env_vars: Optional[Dict[str, Any]] = None,
     language: str = "python",
+    request_ctx: Optional[Dict[str, Any]] = None,
+    response_ctx: Optional[Dict[str, Any]] = None,
+    extra_globals: Optional[Dict[str, Any]] = None,
 ) -> ScriptRunResult:
     lang = normalize_language(language)
-    # JS 仅支持原生执行
+
     if lang == "javascript":
         return await asyncio.to_thread(
             run_native_js,
             code,
             session_vars=session_vars,
             env_vars=env_vars,
+            request_ctx=request_ctx,
+            response_ctx=response_ctx,
         )
     resolved = resolve_exec_mode(mode)
     if resolved == "native":
@@ -444,10 +653,17 @@ async def run_script_async(
             code,
             session_vars=session_vars,
             env_vars=env_vars,
+            request_ctx=request_ctx,
+            response_ctx=response_ctx,
         )
     if ntest is None:
-        return ScriptRunResult(success=False, error="沙盒模式缺少 ntest 上下文", mode="sandbox")
-    return await asyncio.to_thread(run_sandbox, code, ntest=ntest)
+        ntest = SimpleNtest(session_vars=session_vars, env_vars=env_vars)
+    extras = dict(extra_globals or {})
+    if request_ctx is not None and "request" not in extras:
+        extras["request"] = request_ctx
+    if response_ctx is not None and "response" not in extras:
+        extras["response"] = response_ctx
+    return await asyncio.to_thread(run_sandbox, code, ntest=ntest, extra_globals=extras or None)
 
 
 # ── 代码生成：pytest / unittest 运行 ──────────────────────────────────

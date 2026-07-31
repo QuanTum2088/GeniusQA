@@ -98,8 +98,19 @@
             <!-- type 4: 自定义脚本 -->
             <template v-else-if="item.type === 4">
               <div class="op-code-wrap">
-                <div class="op-code-lang">Python</div>
-                <textarea v-model="item.code" class="op-code-editor" placeholder="# Python 代码" spellcheck="false" />
+                <div class="op-code-toolbar">
+                  <el-select :model-value="item.language || 'python'" size="small" style="width:120px" @update:model-value="(v: string) => item.language = v">
+                    <el-option label="Python" value="python" />
+                    <el-option label="JavaScript" value="javascript" />
+                  </el-select>
+                  <span class="op-code-hint">可用 ntest / pm / request{{ (item.language || 'python') === 'javascript' ? '（需本机 Node）' : '' }}</span>
+                </div>
+                <textarea
+                  v-model="item.code"
+                  class="op-code-editor"
+                  :placeholder="(item.language || 'python') === 'javascript' ? '// JavaScript：pm.environment.set / ntest.set / request' : '# Python：ntest.set / pm.environment.set / request'"
+                  spellcheck="false"
+                />
               </div>
             </template>
 
@@ -231,8 +242,19 @@
             <!-- type 5: 自定义脚本 -->
             <template v-else-if="item.type === 5">
               <div class="op-code-wrap">
-                <div class="op-code-lang">Python</div>
-                <textarea v-model="item.code" class="op-code-editor" placeholder="# Python 代码" spellcheck="false" />
+                <div class="op-code-toolbar">
+                  <el-select :model-value="item.language || 'python'" size="small" style="width:120px" @update:model-value="(v: string) => item.language = v">
+                    <el-option label="Python" value="python" />
+                    <el-option label="JavaScript" value="javascript" />
+                  </el-select>
+                  <span class="op-code-hint">可用 ntest / pm / request / response{{ (item.language || 'python') === 'javascript' ? '（需本机 Node）' : '' }}</span>
+                </div>
+                <textarea
+                  v-model="item.code"
+                  class="op-code-editor"
+                  :placeholder="(item.language || 'python') === 'javascript' ? '// JavaScript：pm.response.json() / ntest.set' : '# Python：pm.response.json() / ntest.set'"
+                  spellcheck="false"
+                />
               </div>
             </template>
 
@@ -357,8 +379,21 @@
                 <el-input v-model="item.custom_name" placeholder="断言名称（可选）" size="small" style="width:240px" />
               </div>
               <div class="op-code-wrap">
-                <div class="op-code-lang">Python</div>
-                <textarea v-model="item.custom_script" class="op-code-editor" placeholder="# 断言脚本" spellcheck="false" />
+                <div class="op-code-toolbar">
+                  <el-select :model-value="item.language || 'python'" size="small" style="width:120px" @update:model-value="(v: string) => item.language = v">
+                    <el-option label="Python" value="python" />
+                    <el-option label="JavaScript" value="javascript" />
+                  </el-select>
+                  <span class="op-code-hint">可用 ntest / pm / request / response{{ (item.language || 'python') === 'javascript' ? '（需本机 Node）' : '' }}；失败请 throw / assert</span>
+                </div>
+                <textarea
+                  v-model="item.custom_script"
+                  class="op-code-editor"
+                  :placeholder="(item.language || 'python') === 'javascript'
+                    ? '// JavaScript：pm.response.json() / ntest.get'
+                    : '# Python：assert / pm.response.json() / response / status_code'"
+                  spellcheck="false"
+                />
               </div>
             </template>
           </template>
@@ -517,7 +552,7 @@ const defaultItem = (type: number): any => {
     if (type === 1) return { ...base, title: '', env_id: null, api_id: null }
     if (type === 2) return { ...base, name: '', env_type: null, value: '' }
     if (type === 3) return { ...base, wait_time: 1 }
-    if (type === 4) return { ...base, code: '' }
+    if (type === 4) return { ...base, code: '', language: 'python' }
     if (type === 5) return { ...base, db_id: null, db_name: '', result_var: '', sql: '' }
     if (type === 6) return { ...base, func_id: null, func_name: '', result_var: '', func_params: '' }
   }
@@ -526,7 +561,7 @@ const defaultItem = (type: number): any => {
     if (type === 2) return { ...base, wait_time: 1 }
     if (type === 3) return { ...base, assert_name: '', rules: [] }
     if (type === 4) return { ...base, db_id: null, db_name: '', result_var: '', sql: '' }
-    if (type === 5) return { ...base, code: '' }
+    if (type === 5) return { ...base, code: '', language: 'python' }
     if (type === 6) return { ...base, func_id: null, func_name: '', result_var: '', func_params: '' }
     if (type === 7) return { ...base, import_title: '', env_id: null, api_id: null }
   }
@@ -534,7 +569,7 @@ const defaultItem = (type: number): any => {
     if (type === 1) return { ...base, assert_name: '', rules: [] }
     if (type === 2) return { ...base, ops_db_table: '', ops_db_where: '' }
     if (type === 4) return { ...base, local_db: null, local_db_table: '', local_db_where: '', local_db_assert: [] }
-    if (type === 5) return { ...base, custom_name: '', custom_script: '' }
+    if (type === 5) return { ...base, custom_name: '', custom_script: '', language: 'python' }
   }
   return base
 }
@@ -716,6 +751,19 @@ const addItem = (type: number) => {
   font-weight: 700;
   padding: 2px 8px;
   letter-spacing: 0.5px;
+}
+
+.op-code-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #2a2a3e;
+  padding: 4px 8px;
+}
+
+.op-code-hint {
+  font-size: 11px;
+  color: #94a3b8;
 }
 
 .op-code-editor {

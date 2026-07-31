@@ -131,6 +131,7 @@
 import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation';
+import { Local } from '/@/utils/storage';
 import ApiManagePanel from './ApiManagePanel.vue';
 import ApiResultList from './api_result_list.vue';
 import ApiCodegen from './api_codegen.vue';
@@ -150,7 +151,7 @@ const ApiCaseManagement = defineAsyncComponent({
 const PrecisionTestTab = defineAsyncComponent({
 	loader: () => import('/@/views/testing/precision-test/PrecisionTestTab.vue'),
 	errorComponent: {
-		template: '<div style="padding: 20px; color: #909399;">精准测试组件加载中，请稍后...</div>',
+		template: '<div style="padding: 20px; color: #909399;">覆盖率测试组件加载中，请稍后...</div>',
 	},
 	delay: 200,
 	timeout: 5000,
@@ -171,11 +172,60 @@ const activeTab = ref<'manage' | 'case' | 'script' | 'querydb' | 'precision' | '
 const selectedEnvId = ref<number | null>(null);
 const queryDbRef = ref<InstanceType<typeof QueryDbTab> | null>(null);
 
+const envStorageKey = (serviceId: number) => `api_automation:last_env_id:${serviceId}`;
+
+const readLastEnvId = (serviceId: number): number | null => {
+	try {
+		const raw = Local.get(envStorageKey(serviceId));
+		const n = Number(raw);
+		return Number.isFinite(n) && n > 0 ? n : null;
+	} catch {
+		return null;
+	}
+};
+
+const writeLastEnvId = (serviceId: number, envId: number | null) => {
+	const key = envStorageKey(serviceId);
+	if (envId == null || Number(envId) <= 0) {
+		Local.remove(key);
+		return;
+	}
+	Local.set(key, Number(envId));
+};
+
+const restoreSelectedEnv = () => {
+	const lastId = readLastEnvId(currentServiceId.value);
+	if (lastId == null) {
+		selectedEnvId.value = null;
+		return;
+	}
+	
+	if (!envList.value.length) {
+		selectedEnvId.value = lastId;
+		return;
+	}
+	const exists = envList.value.some((e) => Number(e.id) === lastId);
+	selectedEnvId.value = exists ? lastId : null;
+	if (!exists) writeLastEnvId(currentServiceId.value, null);
+};
+
 watch(activeTab, (tab) => {
 	if (tab === 'querydb') queryDbRef.value?.reloadDbList?.();
 });
 
+watch(selectedEnvId, (id) => {
+	writeLastEnvId(currentServiceId.value, id);
+});
+
 const currentServiceId = ref<number>(props.serviceId);
+
+watch(
+	() => props.serviceId,
+	(id) => {
+		currentServiceId.value = id;
+		restoreSelectedEnv();
+	}
+);
 
 const {
 	api_env,
@@ -208,6 +258,7 @@ const loadEnvList = async () => {
 		const res: any = await api_env();
 		const raw = res?.data;
 		envList.value = Array.isArray(raw) ? raw : (Array.isArray(raw?.content) ? raw.content : []);
+		restoreSelectedEnv();
 	} catch {
 		envList.value = [];
 	} finally {
@@ -279,6 +330,9 @@ const deleteEnv = async (row: any) => {
 		});
 		await del_env({ id: row.id });
 		ElMessage.success('删除成功');
+		if (Number(selectedEnvId.value) === Number(row.id)) {
+			selectedEnvId.value = null;
+		}
 		await loadEnvList();
 	} catch (e: any) {
 		if (e === 'cancel' || e === 'close') return;

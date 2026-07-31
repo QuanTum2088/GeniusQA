@@ -202,7 +202,7 @@ const emit = defineEmits<{ (e: 'view-result', resultId: string): void }>();
 const {
   api_suite_list, add_api_suite, edit_api_suite, del_api_suite, api_suite_sort,
   api_case_list, add_api_case, edit_api_case, del_api_case, run_api_case,
-  api_env, api_params_list,
+  api_env,
 } = useApiAutomationApi();
 
 // ---- 用例集树 ----
@@ -398,7 +398,6 @@ const runDialogVisible = ref(false);
 const running = ref(false);
 const runForm = ref<any>({ env_id: null });
 const envList = ref<any[]>([]);
-const paramsList = ref<any[]>([]);
 const runResult = ref<{ total: number; pass: number; fail: number; resultId: string } | null>(null);
 
 const loadEnvList = async () => {

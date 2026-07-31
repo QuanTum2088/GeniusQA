@@ -57,15 +57,12 @@ export {
 // 测试模块
 export { useDataFactoryApi } from './testing/dataFactory';
 export { useModuleApi } from './testing/modules';
-export { useOperationsApi } from './testing/operations';
 export { useTestcaseApi } from './testing/testcases';
-export { useApiTestingApi } from './testing/apiTesting';
 export { useApiAutomationApi } from './testing/apiAutomation';
 export { useUiAutomationApi } from './testing/uiAutomation';
 export { useTaskSchedulerApi } from './testing/taskScheduler';
 export { usePerformanceApi } from './testing/performance';
 export { useMitmproxyApi } from './testing/mitmproxy';
-export { useSslCertificateApi } from './testing/sslCertificate';
 export { usePrecisionTestApi } from './testing/precisionTest';
 export { useCloudDeviceApi } from './testing/cloudDevice';
 export { useCloudDeviceCompatApi } from './testing/cloudDeviceCompat';

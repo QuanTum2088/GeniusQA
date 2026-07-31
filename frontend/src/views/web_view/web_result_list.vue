@@ -8,12 +8,18 @@
             placeholder="请输入名称"
             clearable
             style="width: 220px"
-            @keyup.enter="result_list"
+            @keyup.enter="doSearch"
           />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" icon="Search" @click="result_list">搜索</el-button>
-          <el-button icon="Refresh" @click="reset_search">重置</el-button>
+          <el-button type="primary" @click="doSearch">
+            <el-icon><ele-Search /></el-icon>
+            搜索
+          </el-button>
+          <el-button @click="reset_search">
+            <el-icon><ele-Refresh /></el-icon>
+            重置
+          </el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -71,32 +77,28 @@
           <template #default="{ row }">{{ formatTime(row.end_time) }}</template>
         </el-table-column>
 
-        <el-table-column label="操作" width="320" align="center" fixed="right">
+        <el-table-column label="操作" width="340" align="center" fixed="right">
           <template #default="{ row }">
             <span class="action-cell">
               <el-button type="success" size="small" @click="viewDetail(row)">详情</el-button>
-
               <el-button
                 v-if="statusMeta(row.status).isRunning"
                 type="danger"
                 size="small"
                 @click="stop_run(row.result_id)"
               >停止</el-button>
-
               <el-button
                 v-if="statusMeta(row.status).canViewReport"
                 type="primary"
                 size="small"
                 @click="view_report(row.result_id)"
               >查看报告</el-button>
-
               <el-button
                 v-if="statusMeta(row.status).canRerun"
                 type="info"
                 size="small"
                 @click="rerun(row)"
               >重跑</el-button>
-
               <el-button
                 v-else
                 type="info"
@@ -104,7 +106,6 @@
                 disabled
                 title="执行中请先停止"
               >重跑</el-button>
-
               <el-button type="danger" size="small" @click="del_run(row)">删除</el-button>
             </span>
           </template>
@@ -226,6 +227,11 @@ const reset_search = async () => {
   await result_list()
 }
 
+const doSearch = async () => {
+  searchParams.value.currentPage = 1
+  await result_list()
+}
+
 const view_report = (result_id: string) => {
   window.open(`${window.location.origin}/web/report?result_id=${encodeURIComponent(result_id)}`)
 }
@@ -286,6 +292,7 @@ onMounted(() => { result_list() })
 <style scoped lang="scss">
 .result-list-container { padding: 10px; }
 .action-cell { white-space: nowrap; }
+.action-cell :deep(.el-button + .el-button) { margin-left: 6px; }
 .detail-summary-cards { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin: 4px 0 20px; }
 .summary-card { background: linear-gradient(135deg,var(--el-fill-color-light),var(--el-bg-color)); border: 1px solid var(--el-border-color-lighter); border-radius: 12px; padding: 20px 12px; text-align: center; transition: all .2s; }
 .summary-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.08); }
