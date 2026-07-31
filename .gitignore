@@ -108,6 +108,8 @@ start-minio.vbs
 start-playwright-mcp.cmd
 start-playwright.vbs
 silent-run.vbs
+install-persistent-services.bat
+uninstall-services.bat
 
 # Backup scripts generated locally
 start-source.bat
