@@ -111,6 +111,14 @@ silent-run.vbs
 install-persistent-services.bat
 uninstall-services.bat
 
+# Local startup / service scripts (keep locally, never commit)
+backend/run_portable.py
+backend/portable_env.py
+backend/run-as-service.bat
+backend/run-as-service.ps1
+backend/run_win.bat
+frontend/start-dev.js
+
 # Backup scripts generated locally
 start-source.bat
 start-source.cmd
@@ -153,3 +161,12 @@ uploads/skills/
 
 # ==================== Agent TODO files (session-local) ====================
 *_TODO.md
+
+# Debug / reproduce / test scripts (local only, never commit)
+backend/reproduce_*.py
+backend/test_*.py
+backend/scripts/portable_env.py
+backend/scripts/run_portable.py
+
+# Dependency lock files (generated, environment-specific)
+requirements-full*.txt
