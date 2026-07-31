@@ -93,12 +93,12 @@
 					<el-table-column label="所属用例集" width="130" show-overflow-tooltip>
 						<template #default="{ row }">{{ suiteName(row.suite_id) }}</template>
 					</el-table-column>
-					<el-table-column label="操作" width="140" align="center" fixed="right">
+					<el-table-column label="操作" width="180" align="center" fixed="right">
 						<template #default="{ row }">
-							<span style="white-space:nowrap;display:inline-flex;gap:4px">
+							<div class="case-ops">
 								<el-button type="warning" size="small" @click="openEditCaseDialog(row)">编辑</el-button>
 								<el-button type="danger" size="small" @click="deleteCase(row)">删除</el-button>
-							</span>
+							</div>
 						</template>
 					</el-table-column>
 				</el-table>
@@ -284,7 +284,6 @@
 				:api-data="buildDetailApiData(detail)"
 				:env_list="env_list"
 				:tree_list="[]"
-				:params_list="[]"
 				:local_db_list="[]"
 			/>
 		</el-drawer>
@@ -296,7 +295,7 @@ import { computed, onMounted, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormRules } from 'element-plus';
 import { DocumentCopy, Monitor, Folder } from '@element-plus/icons-vue';
-import { Session } from '/@/utils/storage';
+import { Session, Local } from '/@/utils/storage';
 import { logLineClass, parseLogLineForDisplay } from '@/utils/runMonitorLog';
 import ApiDetail from './api_detail.vue';
 import StepEditor from './components/step-editor/StepEditor.vue';
@@ -314,6 +313,25 @@ const {
 	get_api_script_log,
 	get_api_script_result,
 } = useApiAutomationApi();
+
+const LAST_SERVICE_KEY = 'api_automation:last_case_service_id';
+
+const readLastServiceId = (): number | null => {
+	try {
+		const n = Number(Local.get(LAST_SERVICE_KEY));
+		return Number.isFinite(n) && n > 0 ? n : null;
+	} catch {
+		return null;
+	}
+};
+
+const writeLastServiceId = (id: number | null) => {
+	if (id == null || Number(id) <= 0) {
+		Local.remove(LAST_SERVICE_KEY);
+		return;
+	}
+	Local.set(LAST_SERVICE_KEY, Number(id));
+};
 
 // ---- 服务 & 用例集 ----
 const serviceList = ref<any[]>([]);
@@ -356,9 +374,18 @@ const loadServices = async () => {
 		const raw = res?.data;
 		serviceList.value = Array.isArray(raw?.content) ? raw.content : (Array.isArray(raw) ? raw : []);
 	} catch { serviceList.value = []; }
+
+	const last = readLastServiceId();
+	if (last && serviceList.value.some((s) => Number(s.id) === last)) {
+		selectedServiceId.value = last;
+		await onServiceChange(last);
+	} else if (last) {
+		writeLastServiceId(null);
+	}
 };
 
 const onServiceChange = async (id: number | null) => {
+	writeLastServiceId(id);
 	selectedSuiteId.value = null;
 	allCases.value = [];
 	suiteList.value = [];
@@ -673,6 +700,17 @@ onMounted(() => { loadServices(); });
 .case-type-tab { padding: 3px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; border: 1px solid var(--el-border-color); color: var(--el-text-color-regular); background: var(--el-bg-color); transition: all .15s; user-select: none; }
 .case-type-tab:hover { border-color: #409eff; color: #409eff; }
 .case-type-tab.active { background: #409eff; border-color: #409eff; color: #fff; font-weight: 500; }
+.case-ops {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: nowrap;
+	gap: 6px;
+	white-space: nowrap;
+}
+.case-ops :deep(.el-button + .el-button) {
+	margin-left: 0;
+}
 </style>
 
 <style lang="scss">

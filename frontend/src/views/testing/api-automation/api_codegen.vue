@@ -262,6 +262,7 @@ import {
 } from '@element-plus/icons-vue';
 import MonacoEditor from '/@/components/monaco/index.vue';
 import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation';
+import { Local } from '/@/utils/storage';
 
 // 临时图标占位（项目中无 Python 图标时用文字代替）
 const Python = Setting;
@@ -465,7 +466,19 @@ function downloadCode() {
 
 // ── 运行 ──────────────────────────────────────────────────────────────
 const canRun = computed(() => ['pytest', 'unittest'].includes(form.value.framework) && !!generatedCode.value);
-const execMode = ref<'sandbox' | 'native'>('sandbox');
+const EXEC_MODE_STORAGE_KEY = 'api_automation:last_exec_mode';
+const readLastExecMode = (): 'sandbox' | 'native' => {
+  try {
+    const v = String(Local.get(EXEC_MODE_STORAGE_KEY) || '').toLowerCase();
+    return v === 'native' ? 'native' : 'sandbox';
+  } catch {
+    return 'sandbox';
+  }
+};
+const execMode = ref<'sandbox' | 'native'>(readLastExecMode());
+watch(execMode, (mode) => {
+  Local.set(EXEC_MODE_STORAGE_KEY, mode);
+});
 const running = ref(false);
 const runOutput = ref('');
 const runSuccess = ref(false);

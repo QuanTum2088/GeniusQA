@@ -103,11 +103,21 @@ async def get_element_list(
         body = await body_to_json(request)
         page = int(body.get("page") or 1)
         page_size = int(body.get("pageSize") or 10)
+        menu_id = body.get("menu_id")
+        name_kw = body.get("name__icontains") or body.get("name") or ""
+        if isinstance(body.get("search"), dict):
+            search = body["search"]
+            if menu_id is None:
+                menu_id = search.get("menu_id")
+            if not name_kw:
+                name_kw = search.get("name__icontains") or search.get("name") or ""
         data = await WebManagementService.get_element_list(
             db,
             page=page,
             page_size=page_size,
             user_id=current_user_id,
+            menu_id=int(menu_id) if menu_id not in (None, "", 0, "0") else None,
+            name_icontains=str(name_kw or "").strip() or None,
         )
         return success_response(data, message="请求成功")
     except Exception as e:
@@ -501,14 +511,31 @@ async def get_web_result_detail(
 
 @router.post("/web/web_group_list")
 async def get_web_group_list(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    """获取Web脚本集列表"""
+    """获取Web脚本集列表（支持名称模糊搜索与分页）"""
     try:
-        data = await WebManagementService.get_web_groups(db, current_user_id)
-        data = data if isinstance(data, list) else []
-        return success_response({"content": data, "total": len(data)}, message="请求成功")
+        body = await body_to_json(request)
+        page = int(body.get("page") or body.get("currentPage") or 1)
+        page_size = int(body.get("pageSize") or 10)
+        name_kw = ""
+        search = body.get("search") if isinstance(body.get("search"), dict) else {}
+        name_kw = str(
+            body.get("name__icontains")
+            or search.get("name__icontains")
+            or search.get("name")
+            or ""
+        ).strip()
+        data = await WebManagementService.get_web_groups(
+            db,
+            current_user_id,
+            name_icontains=name_kw or None,
+            page=page,
+            page_size=page_size,
+        )
+        return success_response(data, message="请求成功")
     except Exception as e:
         return error_response(f"接口请求异常，原因是：{str(e)}")
 

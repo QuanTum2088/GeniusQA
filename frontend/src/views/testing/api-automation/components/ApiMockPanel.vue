@@ -107,7 +107,7 @@
 									:placeholder="c.location === 'body' ? '字段名或 JSONPath，如 $.city' : '参数名'"
 									style="flex:1"
 								/>
-								<el-select v-model="c.operator" style="width:110px">
+								<el-select v-model="c.operator" style="width:120px">
 									<el-option v-for="op in operatorOptions" :key="op.value" :label="op.label" :value="op.value" />
 								</el-select>
 								<el-input
@@ -185,6 +185,10 @@ const locationOptions = [
 const operatorOptions = [
 	{ label: '等于', value: 'eq' },
 	{ label: '不等于', value: 'neq' },
+	{ label: '大于', value: 'gt' },
+	{ label: '大于等于', value: 'gte' },
+	{ label: '小于', value: 'lt' },
+	{ label: '小于等于', value: 'lte' },
 	{ label: '包含', value: 'contains' },
 	{ label: '不包含', value: 'not_contains' },
 	{ label: '正则', value: 'regex' },
@@ -208,7 +212,16 @@ type MockExpect = {
 };
 
 const info = computed(() => props.apiData?.api_info || props.apiData || {});
-const apiId = computed(() => Number(info.value.id || info.value.api_id || 0));
+const apiId = computed(() =>
+	Number(
+		props.apiData?.api_id
+		?? props.apiData?.api_info?.id
+		?? props.apiData?.api_info?.api_id
+		?? info.value.id
+		?? info.value.api_id
+		?? 0
+	)
+);
 
 /** 去掉 {{var}} / ${var}，并规范为以 / 开头的路径 */
 const normalizePath = (raw: string) => {

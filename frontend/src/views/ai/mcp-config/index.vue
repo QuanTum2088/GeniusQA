@@ -57,10 +57,17 @@
 					</template>
 				</el-table-column>
 				<el-table-column prop="transport" label="协议" width="130" />
-				<el-table-column label="连接" min-width="220" show-overflow-tooltip>
+				<el-table-column label="地址" min-width="220" show-overflow-tooltip>
 					<template #default="{ row }">
 						<span v-if="row.transport === 'stdio'">{{ row.command }} {{ (row.args || []).join(' ') }}</span>
 						<span v-else>{{ row.url }}</span>
+					</template>
+				</el-table-column>
+				<el-table-column label="连接状态" width="110">
+					<template #default="{ row }">
+						<el-tag size="small" :type="row.is_connected ? 'success' : 'info'">
+							{{ row.is_connected ? '已连接' : '未连接' }}
+						</el-tag>
 					</template>
 				</el-table-column>
 				<el-table-column label="鉴权" width="100">
@@ -491,10 +498,15 @@ async function testRow(row: any) {
 	try {
 		const res: any = await projectPlatformApi.mcp.test(projectId.value, row.id);
 		if (res?.code === 200) {
-			if (res.data?.ok) ElMessage.success(res.message || '连接成功');
+			const ok = !!res.data?.ok;
+			row.is_connected = ok;
+			row.connection_status = ok ? 'connected' : 'disconnected';
+			if (ok) ElMessage.success(res.message || '连接成功');
 			else ElMessage.error(res.message || '连接失败');
 		}
 	} catch (e: any) {
+		row.is_connected = false;
+		row.connection_status = 'disconnected';
 		ElMessage.error(e?.message || '测试失败');
 	}
 }

@@ -482,7 +482,7 @@ import { useWebManagementApi } from '/@/api/v1/testing/webManagement';
 
 const taskSchedulerApi = useTaskSchedulerApi();
 const notificationConfigApi = useNotificationConfigApi();
-const { get_api_script_list, api_env, params_select, api_service, api_suite_list } = useApiAutomationApi();
+const { get_api_script_list, api_env, api_service, api_suite_list } = useApiAutomationApi();
 const { web_group_select } = useWebManagementApi();
 import { formatDateTime } from '/@/utils/formatTime';
 
@@ -520,7 +520,6 @@ const form = reactive<{
     api_script_list: number[];
     browser: number[];
     env_id: number | null;
-    params_id: number | null;
     [key: string]: any;
   };
   time: {
@@ -548,7 +547,6 @@ const form = reactive<{
     api_service_id: null,
     browser: [],
     env_id: null,
-    params_id: null,
   },
   time: {
     type: 1,
@@ -581,7 +579,6 @@ const apiScriptList = ref<any[]>([]);
 const apiServiceList = ref<any[]>([]);
 const schedulerSuiteOptions = ref<any[]>([]);
 const envList = ref<any[]>([]);
-const paramsList = ref<any[]>([]);
 const noticeList = ref<any[]>([]);
 const weekList = ref<any[]>([
   { name: '周一', value: 'mon' },
@@ -642,15 +639,6 @@ const loadApiEnv = async () => {
     envList.value = res.data || [];
   } catch {
     envList.value = [];
-  }
-};
-
-const loadApiParams = async () => {
-  try {
-    const res = await params_select({});
-    paramsList.value = res.data || [];
-  } catch {
-    paramsList.value = [];
   }
 };
 
@@ -760,7 +748,6 @@ const resetForm = () => {
     api_service_id: null,
     browser: [],
     env_id: null,
-    params_id: null,
   };
   form.time = {
     type: 1,

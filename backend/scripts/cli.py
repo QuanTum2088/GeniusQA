@@ -382,7 +382,6 @@ try:
     from app.api.v1.Ntesterc_module.Ntesterc_intel import model as ai_intelligence_model
     from app.api.v1.Ntesterc_module.Ntesterc_project import model as projects_model
     from app.api.v1.Ntesterc_module.Ntesterc_testcases import model as testcases_model
-    from app.api.v1.Ntesterc_module.Ntesterc_api_testing import model as api_testing_model
     from app.api.v1.Ntesterc_module.Ntesterc_api import model as api_automation_model
     from app.api.v1.Ntesterc_module.Ntesterc_ui import model as ui_automation_model
     from app.api.v1.Ntesterc_module.Ntesterc_app import model as app_management_model

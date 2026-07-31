@@ -63,6 +63,24 @@ async def delete_skill(
     return await S.delete_skill(project_id, current_user_id, skill_id, db)
 
 
+@router.post("/projects/{project_id}/batch-delete", summary="批量删除 Skill（硬删+清理本地目录）")
+async def batch_delete_skills(
+    project_id: int,
+    data: Dict[str, Any] = Body({}),
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    skill_ids = data.get("skill_ids") if isinstance(data.get("skill_ids"), list) else None
+    delete_all = bool(data.get("delete_all"))
+    return await S.batch_delete_skills(
+        project_id,
+        current_user_id,
+        db,
+        skill_ids=skill_ids,
+        delete_all=delete_all,
+    )
+
+
 @router.post("/projects/{project_id}/import/git", summary="从Git仓库导入 Skill")
 async def import_skill_git(
     project_id: int,
@@ -85,14 +103,15 @@ async def import_skill_upload(
     return await S.import_skill_from_upload(project_id, current_user_id, db, file, scenario_category, entry_command)
 
 
-@router.get("/projects/{project_id}/{skill_id}/content", summary="读取 Skill 内容")
+@router.get("/projects/{project_id}/{skill_id}/content", summary="读取 Skill 目录结构与文件内容")
 async def get_skill_content(
     project_id: int,
     skill_id: int,
+    file_path: Optional[str] = Query(None, description="相对技能目录的文件路径，默认 SKILL.md"),
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
-    return await S.get_skill_content(project_id, current_user_id, skill_id, db)
+    return await S.get_skill_content(project_id, current_user_id, skill_id, db, file_path=file_path)
 
 
 @router.get("/projects/{project_id}/{skill_id}/manifest", summary="读取 Skill 清单（工具/模板）")

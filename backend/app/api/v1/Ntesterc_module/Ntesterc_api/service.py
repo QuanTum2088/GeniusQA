@@ -29,14 +29,11 @@ from .model import (
     ApiEnvironmentModel,
     ApiVariableModel,
     ApiDatabaseModel,
-    ApiParamsModel,
     ApiResultModel,
     ApiEditModel,
     ApiScriptModel,
     ApiScriptResultListModel,
     ApiScriptResultModel,
-    ApiCodeModel,
-    ApiFunctionModel,
     ApiUpdateModel,
 )
 
@@ -89,7 +86,7 @@ class ApiAutomationService:
     
     @staticmethod
     def _normalize_var_name(name: Any) -> str:
-        """统一变量名：去掉首尾空白与 {{ }}，便于配置项写 base_url 或 {{base_url}} 都能命中。"""
+        """统一变量名"""
         n = str(name or "").strip()
         if n.startswith("{{") and n.endswith("}}"):
             n = n[2:-2].strip()
@@ -126,7 +123,7 @@ class ApiAutomationService:
         for k in keys:
             var = "{{" + k + "}}"
             val = await ApiAutomationService._complete_var(db, env_id, k)
-            # 未命中时不要替换成空串（否则 URL 会变成相对路径，掩盖真实原因）
+            
             if val is None or val == "":
                 continue
             s = s.replace(var, str(val))
@@ -161,7 +158,238 @@ class ApiAutomationService:
                     res[key] = i.get("value")
         return res
 
-    
+    @staticmethod
+    def _set_header_ci(headers: Dict[str, Any], name: str, value: str) -> None:
+        """按大小写不敏感方式设置 Header，避免重复键。"""
+        target = None
+        for k in list(headers.keys()):
+            if str(k).lower() == name.lower():
+                target = k
+                break
+        if target is not None and target != name:
+            headers.pop(target, None)
+        headers[name] = value
+
+    @staticmethod
+    async def _resolve_oauth2_token(db: AsyncSession, env_id: int, req: Dict[str, Any]) -> str:
+        """OAuth 2.0：支持直接填 Access Token，或 Client Credentials / Password 换取。"""
+        grant = str(req.get("auth_oauth_grant") or "access_token").strip().lower()
+        prefix_ready = str(req.get("auth_oauth_access_token") or req.get("auth_token") or "").strip()
+        if grant in ("access_token", "token", ""):
+            token = await ApiAutomationService.handle_var(db, env_id, prefix_ready)
+            return str(token or "").strip()
+
+        token_url = str(
+            await ApiAutomationService.handle_var(db, env_id, req.get("auth_oauth_token_url") or "")
+        ).strip()
+        client_id = str(
+            await ApiAutomationService.handle_var(db, env_id, req.get("auth_oauth_client_id") or "")
+        ).strip()
+        client_secret = str(
+            await ApiAutomationService.handle_var(db, env_id, req.get("auth_oauth_client_secret") or "")
+        ).strip()
+        scope = str(
+            await ApiAutomationService.handle_var(db, env_id, req.get("auth_oauth_scope") or "")
+        ).strip()
+        if not token_url:
+            raise ValueError("OAuth 2.0 缺少 Token URL")
+        if not client_id:
+            raise ValueError("OAuth 2.0 缺少 Client ID")
+
+        data: Dict[str, Any] = {}
+        auth = None
+        client_auth = str(req.get("auth_oauth_client_auth") or "basic").strip().lower()
+        if grant in ("client_credentials", "client"):
+            data["grant_type"] = "client_credentials"
+            if scope:
+                data["scope"] = scope
+        elif grant in ("password", "password_credentials"):
+            data["grant_type"] = "password"
+            data["username"] = str(
+                await ApiAutomationService.handle_var(db, env_id, req.get("auth_username") or "")
+            ).strip()
+            data["password"] = str(
+                await ApiAutomationService.handle_var(db, env_id, req.get("auth_password") or "")
+            ).strip()
+            if scope:
+                data["scope"] = scope
+            if not data["username"]:
+                raise ValueError("OAuth 2.0 Password 模式缺少用户名")
+        else:
+            raise ValueError(f"不支持的 OAuth 2.0 Grant Type：{grant}")
+
+        if client_auth == "body":
+            data["client_id"] = client_id
+            data["client_secret"] = client_secret
+        else:
+            from requests.auth import HTTPBasicAuth
+
+            auth = HTTPBasicAuth(client_id, client_secret)
+
+        resp = requests.post(token_url, data=data, auth=auth, timeout=30)
+        try:
+            payload = resp.json()
+        except Exception:
+            payload = {}
+        if resp.status_code >= 400:
+            raise ValueError(
+                f"OAuth 2.0 获取 Token 失败 HTTP {resp.status_code}: "
+                f"{payload or (resp.text or '')[:300]}"
+            )
+        token = str(payload.get("access_token") or "").strip()
+        if not token:
+            raise ValueError(f"OAuth 2.0 响应中无 access_token：{payload}")
+        return token
+
+    @staticmethod
+    async def _build_jwt_bearer_token(db: AsyncSession, env_id: int, req: Dict[str, Any]) -> str:
+        """JWT Bearer：可直接填 Token，或按密钥/Payload 现场签发。"""
+        mode = str(req.get("auth_jwt_mode") or "token").strip().lower()
+        if mode != "generate":
+            token = await ApiAutomationService.handle_var(db, env_id, req.get("auth_token") or "")
+            return str(token or "").strip()
+
+        import jwt as pyjwt
+
+        alg = str(req.get("auth_jwt_alg") or "HS256").strip() or "HS256"
+        secret = str(
+            await ApiAutomationService.handle_var(db, env_id, req.get("auth_jwt_secret") or "")
+        )
+        if not secret:
+            raise ValueError("JWT Bearer 生成模式缺少 Secret / Private Key")
+
+        raw_payload = req.get("auth_jwt_payload") or "{}"
+        raw_headers = req.get("auth_jwt_headers") or "{}"
+        raw_payload = await ApiAutomationService.handle_var(db, env_id, raw_payload)
+        raw_headers = await ApiAutomationService.handle_var(db, env_id, raw_headers)
+
+        def _as_dict(v: Any, label: str) -> Dict[str, Any]:
+            if isinstance(v, dict):
+                return v
+            text = str(v or "").strip() or "{}"
+            try:
+                obj = json.loads(text)
+            except Exception as e:
+                raise ValueError(f"JWT Bearer {label} 不是合法 JSON：{e}") from e
+            if not isinstance(obj, dict):
+                raise ValueError(f"JWT Bearer {label} 必须是 JSON 对象")
+            return obj
+
+        payload = _as_dict(raw_payload, "Payload")
+        headers = _as_dict(raw_headers, "Header")
+        token = pyjwt.encode(payload, secret, algorithm=alg, headers=headers or None)
+        return token if isinstance(token, str) else token.decode("utf-8")
+
+    @staticmethod
+    async def apply_request_auth(
+        db: AsyncSession,
+        env_id: int,
+        req: Dict[str, Any],
+        headers: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Dict[str, Any], Dict[str, Any], Any]:
+        """
+        将 Auth / Cookies 应用到请求。
+        返回 (headers, params, requests_auth)；requests_auth 仅 Digest 时非空。
+        """
+        headers = dict(headers or {})
+        params = dict(params or {})
+        requests_auth = None
+
+        # Cookies
+        cookie_parts: List[str] = []
+        for c in (req.get("cookies") or []):
+            if not isinstance(c, dict) or c.get("status") is False:
+                continue
+            name = str(c.get("name") or c.get("key") or "").strip()
+            if not name:
+                continue
+            val = await ApiAutomationService.handle_var(db, env_id, c.get("value") or "")
+            cookie_parts.append(f"{name}={val}")
+        if cookie_parts:
+            existing = ""
+            for k, v in list(headers.items()):
+                if str(k).lower() == "cookie":
+                    existing = str(v or "")
+                    break
+            merged = "; ".join([p for p in [existing.strip().rstrip(";"), *cookie_parts] if p])
+            ApiAutomationService._set_header_ci(headers, "Cookie", merged)
+
+        auth_type = str(req.get("auth_type") or "none").strip().lower()
+        if auth_type in ("", "none", "noauth"):
+            return headers, params, None
+
+        prefix = str(
+            await ApiAutomationService.handle_var(
+                db, env_id, req.get("auth_prefix") if req.get("auth_prefix") is not None else "Bearer"
+            )
+        ).strip()
+
+        if auth_type in ("bearer", "bearer_token"):
+            token = str(
+                await ApiAutomationService.handle_var(db, env_id, req.get("auth_token") or "")
+            ).strip()
+            if token:
+                value = f"{prefix} {token}".strip() if prefix else token
+                ApiAutomationService._set_header_ci(headers, "Authorization", value)
+
+        elif auth_type in ("jwt", "jwt_bearer"):
+            token = await ApiAutomationService._build_jwt_bearer_token(db, env_id, req)
+            if token:
+                value = f"{prefix} {token}".strip() if prefix else token
+                ApiAutomationService._set_header_ci(headers, "Authorization", value)
+
+        elif auth_type in ("basic", "basic_auth"):
+            import base64
+
+            username = str(
+                await ApiAutomationService.handle_var(db, env_id, req.get("auth_username") or "")
+            )
+            password = str(
+                await ApiAutomationService.handle_var(db, env_id, req.get("auth_password") or "")
+            )
+            raw = f"{username}:{password}".encode("utf-8")
+            ApiAutomationService._set_header_ci(
+                headers, "Authorization", "Basic " + base64.b64encode(raw).decode("ascii")
+            )
+
+        elif auth_type in ("digest", "digest_auth"):
+            from requests.auth import HTTPDigestAuth
+
+            username = str(
+                await ApiAutomationService.handle_var(db, env_id, req.get("auth_username") or "")
+            )
+            password = str(
+                await ApiAutomationService.handle_var(db, env_id, req.get("auth_password") or "")
+            )
+            requests_auth = HTTPDigestAuth(username, password)
+
+        elif auth_type in ("apikey", "api_key", "api-key"):
+            key = str(
+                await ApiAutomationService.handle_var(db, env_id, req.get("auth_key") or "")
+            ).strip()
+            value = str(
+                await ApiAutomationService.handle_var(db, env_id, req.get("auth_value") or "")
+            )
+            if key:
+                dest = str(req.get("auth_in") or "header").strip().lower()
+                if dest in ("query", "params", "param"):
+                    params[key] = value
+                else:
+                    ApiAutomationService._set_header_ci(headers, key, value)
+
+        elif auth_type in ("oauth2", "oauth_2", "oauth 2.0"):
+            token = await ApiAutomationService._resolve_oauth2_token(db, env_id, req)
+            if token:
+                value = f"{prefix} {token}".strip() if prefix else token
+                ApiAutomationService._set_header_ci(headers, "Authorization", value)
+
+        else:
+            
+            pass
+
+        return headers, params, requests_auth
+
     @staticmethod
     def _jsonpath_value(
         res_type: int,
@@ -248,7 +476,7 @@ class ApiAutomationService:
     def _clear_api_script_cancel(result_id: str) -> None:
         with ApiAutomationService._api_script_cancel_lock:
             ApiAutomationService._api_script_cancel_ids.discard(str(result_id))
-        # 清理步骤上下文缓存
+        
         if hasattr(ApiAutomationService, '_step_ctx_cache'):
             keys = [k for k in ApiAutomationService._step_ctx_cache if k.startswith(str(result_id))]
             for k in keys:
@@ -256,9 +484,7 @@ class ApiAutomationService:
 
     @staticmethod
     async def _load_env_vars(db: AsyncSession, env_id: int) -> Dict[str, Any]:
-        """加载环境配置/变量为字典，供 VariableContext 使用。
-
-        key 统一去掉 {{ }}，使 URL 中 {{base_url}} 与配置项 base_url / {{base_url}} 均可命中。
+        """加载环境配置/变量为字典。
         """
         if not env_id:
             return {}
@@ -311,6 +537,7 @@ class ApiAutomationService:
    
     @staticmethod
     async def get_services(db: AsyncSession, project_id: Optional[int], user_id: int) -> Dict[str, Any]:
+        await ApiAutomationService._ensure_service_common_params_column(db)
         stmt = select(ApiServiceModel).where(ApiServiceModel.enabled_flag == 1, ApiServiceModel.created_by == user_id)
         if project_id:
             stmt = stmt.where(ApiServiceModel.api_project_id == int(project_id))
@@ -338,9 +565,10 @@ class ApiAutomationService:
 
     @staticmethod
     async def get_services_paged(db: AsyncSession, body: Dict[str, Any], user_id: int) -> Dict[str, Any]:
+        await ApiAutomationService._ensure_service_common_params_column(db)
         page, page_size = ApiAutomationService._extract_page(body)
         search = body.get("search") or {}
-        # 支持顶层直传或 search 子对象传入
+       
         name_like = ApiAutomationService._extract_contains(search, "name__contains", "name__icontains", "name") \
                     or ApiAutomationService._extract_contains(body, "name")
         project_id = body.get("project_id") or body.get("api_project_id") or search.get("api_project_id")
@@ -393,12 +621,210 @@ class ApiAutomationService:
         for field in ("name", "api_project_id", "img", "description", "source_type", "source_addr", "manager", "business_id"):
             if field in body and body[field] is not None:
                 values[field] = body[field]
+        if "common_params" in body and body["common_params"] is not None:
+            await ApiAutomationService._ensure_service_common_params_column(db)
+            values["common_params"] = body["common_params"]
         await db.execute(
             update(ApiServiceModel)
             .where(ApiServiceModel.id == int(service_id), ApiServiceModel.enabled_flag == 1, ApiServiceModel.created_by == user_id)
             .values(**values)
         )
         await db.commit()
+
+    @staticmethod
+    async def _ensure_service_common_params_column(db: AsyncSession) -> None:
+        """兼容旧库"""
+        try:
+            await db.execute(text(
+                "ALTER TABLE api_automation_services ADD COLUMN common_params JSON NULL"
+            ))
+            await db.commit()
+        except Exception:
+            await db.rollback()
+
+    @staticmethod
+    def _empty_common_params() -> Dict[str, List[Dict[str, Any]]]:
+        return {"header": [], "cookie": [], "query": [], "body": []}
+
+    @staticmethod
+    def _normalize_common_params(raw: Any) -> Dict[str, List[Dict[str, Any]]]:
+        base = ApiAutomationService._empty_common_params()
+        if not isinstance(raw, dict):
+            return base
+        for src, dst in (("header", "header"), ("cookie", "cookie"), ("cookies", "cookie"), ("query", "query"), ("params", "query"), ("body", "body")):
+            items = raw.get(src)
+            if not isinstance(items, list):
+                continue
+            out: List[Dict[str, Any]] = []
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                key = str(it.get("key") or it.get("name") or "").strip()
+                if not key:
+                    continue
+                row: Dict[str, Any] = {
+                    "key": key,
+                    "value": "" if it.get("value") is None else str(it.get("value")),
+                    "status": False if it.get("status") is False else True,
+                }
+                if dst == "cookie" and it.get("domain") is not None:
+                    row["domain"] = str(it.get("domain") or "")
+                out.append(row)
+            base[dst] = out
+        return base
+
+    @staticmethod
+    async def get_common_params(db: AsyncSession, api_service_id: int, user_id: int) -> Dict[str, Any]:
+        await ApiAutomationService._ensure_service_common_params_column(db)
+        svc = (
+            await db.execute(
+                select(ApiServiceModel).where(
+                    ApiServiceModel.id == int(api_service_id),
+                    ApiServiceModel.enabled_flag == 1,
+                    ApiServiceModel.created_by == user_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if not svc:
+            raise ValueError("服务不存在或无权限")
+        return ApiAutomationService._normalize_common_params(getattr(svc, "common_params", None))
+
+    @staticmethod
+    async def save_common_params(db: AsyncSession, api_service_id: int, common_params: Any, user_id: int) -> None:
+        await ApiAutomationService._ensure_service_common_params_column(db)
+        normalized = ApiAutomationService._normalize_common_params(common_params)
+        result = await db.execute(
+            update(ApiServiceModel)
+            .where(
+                ApiServiceModel.id == int(api_service_id),
+                ApiServiceModel.enabled_flag == 1,
+                ApiServiceModel.created_by == user_id,
+            )
+            .values(common_params=normalized, updated_by=user_id)
+        )
+        if not result.rowcount:
+            raise ValueError("服务不存在或无权限")
+        await db.commit()
+
+    @staticmethod
+    async def _load_common_params_by_api(db: AsyncSession, api_id: Optional[int] = None, api_service_id: Optional[int] = None) -> Dict[str, List[Dict[str, Any]]]:
+        """按接口或服务加载全局参数"""
+        await ApiAutomationService._ensure_service_common_params_column(db)
+        sid = int(api_service_id or 0)
+        if not sid and api_id:
+            api_row = (
+                await db.execute(
+                    select(ApiModel).where(ApiModel.id == int(api_id), ApiModel.enabled_flag == 1)
+                )
+            ).scalar_one_or_none()
+            if api_row:
+                sid = int(api_row.api_service_id or 0)
+        if not sid:
+            return ApiAutomationService._empty_common_params()
+        svc = (
+            await db.execute(
+                select(ApiServiceModel).where(
+                    ApiServiceModel.id == sid,
+                    ApiServiceModel.enabled_flag == 1,
+                )
+            )
+        ).scalar_one_or_none()
+        if not svc:
+            return ApiAutomationService._empty_common_params()
+        return ApiAutomationService._normalize_common_params(getattr(svc, "common_params", None))
+
+    @staticmethod
+    def _kv_item_key(item: Dict[str, Any], *, cookie: bool = False) -> str:
+        if cookie:
+            return str(item.get("name") or item.get("key") or "").strip()
+        return str(item.get("key") or item.get("name") or "").strip()
+
+    @staticmethod
+    def _merge_kv_lists(common_list: Any, request_list: Any, *, cookie: bool = False) -> List[Dict[str, Any]]:
+        """全局参数在前，同名以请求侧为准（请求侧存在该 key 即覆盖，不论是否勾选）。"""
+        req_items = [x for x in (request_list or []) if isinstance(x, dict)]
+        req_keys = set()
+        for it in req_items:
+            k = ApiAutomationService._kv_item_key(it, cookie=cookie)
+            if k:
+                req_keys.add(k.lower())
+        merged: List[Dict[str, Any]] = []
+        for it in (common_list or []):
+            if not isinstance(it, dict) or it.get("status") is False:
+                continue
+            k = ApiAutomationService._kv_item_key(it, cookie=cookie)
+            if not k or k.lower() in req_keys:
+                continue
+            if cookie:
+                merged.append({
+                    "name": k,
+                    "value": "" if it.get("value") is None else str(it.get("value")),
+                    "status": True,
+                    "domain": str(it.get("domain") or ""),
+                })
+            else:
+                merged.append({
+                    "key": k,
+                    "value": "" if it.get("value") is None else str(it.get("value")),
+                    "status": True,
+                })
+        merged.extend(req_items)
+        return merged
+
+    @staticmethod
+    def _common_body_dict(common: Dict[str, Any]) -> Dict[str, Any]:
+        out: Dict[str, Any] = {}
+        for it in (common.get("body") or []):
+            if not isinstance(it, dict) or it.get("status") is False:
+                continue
+            k = str(it.get("key") or "").strip()
+            if k:
+                out[k] = it.get("value")
+        return out
+
+    @staticmethod
+    def apply_common_params_to_req(req: Dict[str, Any], common: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """将服务级全局参数合并进请求"""
+        if not isinstance(req, dict):
+            req = {}
+        else:
+            req = dict(req)
+        common = ApiAutomationService._normalize_common_params(common)
+        if not any(common.get(k) for k in ("header", "cookie", "query", "body")):
+            return req
+
+        req["header"] = ApiAutomationService._merge_kv_lists(common.get("header"), req.get("header"))
+        req["params"] = ApiAutomationService._merge_kv_lists(common.get("query"), req.get("params"))
+        req["cookies"] = ApiAutomationService._merge_kv_lists(common.get("cookie"), req.get("cookies"), cookie=True)
+
+        body_dict = ApiAutomationService._common_body_dict(common)
+        if body_dict:
+            body_type = int(req.get("body_type") or 2)
+            if body_type == 3:
+                form_kv = [{"key": k, "value": v, "status": True} for k, v in body_dict.items()]
+                req["form_data"] = ApiAutomationService._merge_kv_lists(form_kv, req.get("form_data"))
+            elif body_type == 4:
+                form_kv = [{"key": k, "value": v, "status": True} for k, v in body_dict.items()]
+                req["form_urlencoded"] = ApiAutomationService._merge_kv_lists(form_kv, req.get("form_urlencoded"))
+            elif body_type in (0, 2):
+                raw_body = req.get("body")
+                parsed: Any = raw_body
+                if isinstance(raw_body, str):
+                    text_body = raw_body.strip()
+                    if not text_body:
+                        parsed = {}
+                    else:
+                        try:
+                            parsed = json.loads(text_body)
+                        except Exception:
+                            parsed = None
+                if isinstance(parsed, dict):
+                    merged_body = {**body_dict, **parsed}
+                    
+                    req["body"] = json.dumps(merged_body, ensure_ascii=False) if isinstance(raw_body, str) else merged_body
+                elif parsed is None and not raw_body:
+                    req["body"] = body_dict
+        return req
 
     @staticmethod
     async def delete_service(db: AsyncSession, service_id: int, user_id: int) -> None:
@@ -408,233 +834,6 @@ class ApiAutomationService:
             .values(enabled_flag=0, updated_by=user_id)
         )
         await db.commit()
-
-    
-    @staticmethod
-    async def get_params_list(db: AsyncSession, user_id: int) -> Dict[str, Any]:
-        stmt = (
-            select(ApiParamsModel)
-            .where(ApiParamsModel.enabled_flag == 1, ApiParamsModel.created_by == user_id)
-            .order_by(ApiParamsModel.id.desc())
-        )
-        rows = (await db.execute(stmt)).scalars().all()
-        data: List[Dict[str, Any]] = []
-        for r in rows:
-            d = r.__dict__.copy()
-            d.pop("_sa_instance_state", None)
-            data.append(d)
-        return {"content": data, "total": len(data)}
-
-    @staticmethod
-    async def add_params(db: AsyncSession, body: Dict[str, Any], user_id: int) -> None:
-        row = ApiParamsModel(
-            name=str(body["name"]),
-            value=body.get("value") or {},
-            created_by=user_id,
-            updated_by=user_id,
-        )
-        db.add(row)
-        await db.commit()
-
-    @staticmethod
-    async def edit_params(db: AsyncSession, params_id: int, body: Dict[str, Any], user_id: int) -> None:
-        await db.execute(
-            update(ApiParamsModel)
-            .where(ApiParamsModel.id == int(params_id), ApiParamsModel.enabled_flag == 1, ApiParamsModel.created_by == user_id)
-            .values(name=body.get("name"), value=body.get("value"), updated_by=user_id)
-        )
-        await db.commit()
-
-    @staticmethod
-    async def delete_params(db: AsyncSession, params_id: int, user_id: int) -> None:
-        await db.execute(
-            update(ApiParamsModel)
-            .where(ApiParamsModel.id == int(params_id), ApiParamsModel.enabled_flag == 1, ApiParamsModel.created_by == user_id)
-            .values(enabled_flag=0, updated_by=user_id)
-        )
-        await db.commit()
-
-    @staticmethod
-    async def get_functions(db: AsyncSession, user_id: int) -> Dict[str, Any]:
-        stmt = (
-            select(ApiFunctionModel)
-            .where(ApiFunctionModel.enabled_flag == 1, ApiFunctionModel.created_by == user_id)
-            .order_by(ApiFunctionModel.id.desc())
-        )
-        rows = (await db.execute(stmt)).scalars().all()
-        data: List[Dict[str, Any]] = []
-        for r in rows:
-            d = r.__dict__.copy()
-            d.pop("_sa_instance_state", None)
-            data.append(d)
-        return {"content": data, "total": len(data)}
-
-    @staticmethod
-    async def add_function(db: AsyncSession, body: Dict[str, Any], user_id: int) -> None:
-        row = ApiFunctionModel(
-            name=str(body["name"]),
-            description=str(body.get("description") or ""),
-            code=body.get("code") or "",
-            created_by=user_id,
-            updated_by=user_id,
-        )
-        db.add(row)
-        await db.commit()
-
-    @staticmethod
-    async def edit_function(db: AsyncSession, function_id: int, body: Dict[str, Any], user_id: int) -> None:
-        values: Dict[str, Any] = {"updated_by": user_id}
-        for field in ("name", "description", "code"):
-            if field in body:
-                values[field] = body[field]
-        await db.execute(
-            update(ApiFunctionModel)
-            .where(ApiFunctionModel.id == int(function_id), ApiFunctionModel.enabled_flag == 1, ApiFunctionModel.created_by == user_id)
-            .values(**values)
-        )
-        await db.commit()
-
-    @staticmethod
-    async def delete_function(db: AsyncSession, function_id: int, user_id: int) -> None:
-        await db.execute(
-            update(ApiFunctionModel)
-            .where(ApiFunctionModel.id == int(function_id), ApiFunctionModel.enabled_flag == 1, ApiFunctionModel.created_by == user_id)
-            .values(enabled_flag=0, updated_by=user_id)
-        )
-        await db.commit()
-
-    @staticmethod
-    async def get_codes(db: AsyncSession) -> List[Dict[str, Any]]:
-        stmt = select(ApiCodeModel).where(ApiCodeModel.enabled_flag == 1).order_by(ApiCodeModel.id.desc())
-        rows = (await db.execute(stmt)).scalars().all()
-        data: List[Dict[str, Any]] = []
-        for r in rows:
-            d = r.__dict__.copy()
-            d.pop("_sa_instance_state", None)
-            data.append(d)
-        return data
-
-    @staticmethod
-    async def get_codes_paged(db: AsyncSession, body: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        page, page_size = ApiAutomationService._extract_page(body)
-        search = body.get("search") or {}
-        name_like = ApiAutomationService._extract_contains(search, "name__contains", "name__icontains", "name")
-        code_like = ApiAutomationService._extract_contains(search, "code__contains", "code__icontains", "code")
-        stmt = select(ApiCodeModel).where(ApiCodeModel.enabled_flag == 1, ApiCodeModel.created_by == user_id)
-        if name_like and code_like:
-            stmt = stmt.where(or_(ApiCodeModel.name.like(f"%{name_like}%"), ApiCodeModel.code.like(f"%{code_like}%")))
-        elif name_like:
-            stmt = stmt.where(ApiCodeModel.name.like(f"%{name_like}%"))
-        elif code_like:
-            stmt = stmt.where(ApiCodeModel.code.like(f"%{code_like}%"))
-        stmt = stmt.order_by(ApiCodeModel.id.desc())
-        rows = (await db.execute(stmt)).scalars().all()
-        total = len(rows)
-        start = (page - 1) * page_size
-        end = start + page_size
-        page_rows = rows[start:end]
-        content: List[Dict[str, Any]] = []
-        for r in page_rows:
-            d = r.__dict__.copy()
-            d.pop("_sa_instance_state", None)
-            content.append(d)
-        return {"content": content, "total": total, "page": page, "pageSize": page_size}
-
-    @staticmethod
-    async def add_code(db: AsyncSession, body: Dict[str, Any], user_id: int) -> None:
-        row = ApiCodeModel(
-            code=str(body["code"]),
-            name=str(body["name"]),
-            description=str(body.get("description") or ""),
-            created_by=user_id,
-            updated_by=user_id,
-        )
-        db.add(row)
-        await db.commit()
-
-    @staticmethod
-    async def edit_code(db: AsyncSession, code_id: int, body: Dict[str, Any], user_id: int) -> None:
-        await db.execute(
-            update(ApiCodeModel)
-            .where(ApiCodeModel.id == int(code_id), ApiCodeModel.enabled_flag == 1, ApiCodeModel.created_by == user_id)
-            .values(code=body.get("code"), name=body.get("name"), description=body.get("description"), updated_by=user_id)
-        )
-        await db.commit()
-
-    @staticmethod
-    async def delete_code(db: AsyncSession, code_id: int, user_id: int) -> None:
-        await db.execute(
-            update(ApiCodeModel)
-            .where(ApiCodeModel.id == int(code_id), ApiCodeModel.enabled_flag == 1, ApiCodeModel.created_by == user_id)
-            .values(enabled_flag=0, updated_by=user_id)
-        )
-        await db.commit()
-
-    @staticmethod
-    async def get_functions_paged(db: AsyncSession, body: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        page, page_size = ApiAutomationService._extract_page(body)
-        search = body.get("search") or {}
-        name_like = ApiAutomationService._extract_contains(search, "name__contains", "name__icontains", "name")
-        stmt = select(ApiFunctionModel).where(ApiFunctionModel.enabled_flag == 1, ApiFunctionModel.created_by == user_id)
-        if name_like:
-            stmt = stmt.where(ApiFunctionModel.name.like(f"%{name_like}%"))
-        stmt = stmt.order_by(ApiFunctionModel.id.desc())
-        rows = (await db.execute(stmt)).scalars().all()
-        total = len(rows)
-        start = (page - 1) * page_size
-        end = start + page_size
-        page_rows = rows[start:end]
-        content: List[Dict[str, Any]] = []
-        for r in page_rows:
-            d = r.__dict__.copy()
-            d.pop("_sa_instance_state", None)
-            content.append(d)
-        return {"content": content, "total": total, "page": page, "pageSize": page_size}
-
-    @staticmethod
-    async def get_params_list_paged(db: AsyncSession, body: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        page, page_size = ApiAutomationService._extract_page(body)
-        search = body.get("search") or {}
-        name_like = ApiAutomationService._extract_contains(search, "name__contains", "name__icontains", "name")
-        stmt = select(ApiParamsModel).where(ApiParamsModel.enabled_flag == 1, ApiParamsModel.created_by == user_id)
-        if name_like:
-            stmt = stmt.where(ApiParamsModel.name.like(f"%{name_like}%"))
-        stmt = stmt.order_by(ApiParamsModel.id.desc())
-        rows = (await db.execute(stmt)).scalars().all()
-        total = len(rows)
-        start = (page - 1) * page_size
-        end = start + page_size
-        page_rows = rows[start:end]
-        content: List[Dict[str, Any]] = []
-        for r in page_rows:
-            d = r.__dict__.copy()
-            d.pop("_sa_instance_state", None)
-            content.append(d)
-        return {"content": content, "total": total, "page": page, "pageSize": page_size}
-
-    @staticmethod
-    async def params_select(db: AsyncSession, user_id: int) -> List[Dict[str, Any]]:
-        stmt = select(ApiParamsModel).where(ApiParamsModel.enabled_flag == 1, ApiParamsModel.created_by == user_id).order_by(ApiParamsModel.id.desc())
-        rows = (await db.execute(stmt)).scalars().all()
-        data: List[Dict[str, Any]] = []
-        for r in rows:
-            data.append({"id": r.id, "name": r.name, "value": r.value})
-        return data
-
-    @staticmethod
-    async def get_updates(db: AsyncSession, api_service_id: Optional[int], user_id: int) -> Dict[str, Any]:
-        stmt = select(ApiUpdateModel).where(ApiUpdateModel.enabled_flag == 1)
-        if api_service_id:
-            stmt = stmt.where(ApiUpdateModel.api_service_id == int(api_service_id))
-       
-        stmt = stmt.where(ApiUpdateModel.created_by == user_id).order_by(ApiUpdateModel.id.desc())
-        rows = (await db.execute(stmt)).scalars().all()
-        data: List[Dict[str, Any]] = []
-        for r in rows:
-            d = r.__dict__.copy()
-            d.pop("_sa_instance_state", None)
-            data.append(d)
-        return {"content": data, "total": len(data)}
 
     @staticmethod
     async def api_tree_list(db: AsyncSession, user_id: int) -> List[Dict[str, Any]]:
@@ -828,7 +1027,7 @@ class ApiAutomationService:
 
     @staticmethod
     async def get_databases_paged(db: AsyncSession, body: Dict[str, Any], user_id: int) -> Dict[str, Any]:
-        """直连数据库列表"""
+        """直连数据库"""
         body = body or {}
         page, page_size = ApiAutomationService._extract_page(body)
         has_paging = any(k in body for k in ("page", "currentPage", "pageSize", "page_size"))
@@ -886,14 +1085,14 @@ class ApiAutomationService:
             "config": cfg,
             "updated_by": user_id,
         }
-        # 同步展开 config 字段到独立列
+        
         if cfg:
             values["db_type"] = data.get("db_type") or cfg.get("db_type") or "mysql"
             values["host"] = cfg.get("host") or ""
             values["port"] = int(cfg.get("port") or 3306)
             values["database_name"] = cfg.get("database") or ""
             values["username"] = cfg.get("user") or cfg.get("username") or ""
-            # 密码留空则不修改
+            
             new_pwd = cfg.get("password")
             if new_pwd:
                 values["password"] = new_pwd
@@ -1085,6 +1284,476 @@ class ApiAutomationService:
         return rows
 
     @staticmethod
+    def _is_apifox_project_export(doc: Any) -> bool:
+        if not isinstance(doc, dict):
+            return False
+        if doc.get("apifoxProject"):
+            return True
+        schema = doc.get("$schema")
+        if isinstance(schema, dict) and str(schema.get("type") or "").lower() == "project":
+            return True
+        if isinstance(doc.get("apiCollection"), list) and doc.get("apiCollection"):
+            return True
+        return False
+
+    @staticmethod
+    def _normalize_doc_path(path: str) -> str:
+        """
+        规范化导入得到的请求地址：
+        """
+        path = str(path or "/").strip()
+        if path.startswith("http://") or path.startswith("https://"):
+            from urllib.parse import urlparse, urlunparse
+
+            parsed = urlparse(path)
+            clean_path = parsed.path or "/"
+            while "//" in clean_path:
+                clean_path = clean_path.replace("//", "/")
+            return urlunparse((parsed.scheme, parsed.netloc, clean_path, "", parsed.query, ""))
+        if not path.startswith("/"):
+            path = "/" + path
+        while "//" in path:
+            path = path.replace("//", "/")
+        return path or "/"
+
+    @staticmethod
+    def _extract_api_path_key(url: str) -> str:
+        """
+        提取用于去重比对的路径键
+        """
+        from urllib.parse import urlparse
+
+        s = str(url or "").strip()
+        if not s:
+            return "/"
+        if re.match(r"^https?://", s, flags=re.IGNORECASE):
+            parsed = urlparse(s)
+            s = parsed.path or "/"
+        else:
+            
+            while True:
+                m = re.match(r"^\{\{[^{}]+\}\}", s)
+                if not m:
+                    break
+                s = s[m.end() :]
+        s = (s or "").strip() or "/"
+        if not s.startswith("/"):
+            s = "/" + s
+        while "//" in s:
+            s = s.replace("//", "/")
+        if len(s) > 1 and s.endswith("/"):
+            s = s.rstrip("/")
+        return s or "/"
+
+    @staticmethod
+    def _is_same_api_path(url_a: str, url_b: str) -> bool:
+        """判断两条 URL"""
+        a = ApiAutomationService._extract_api_path_key(url_a)
+        b = ApiAutomationService._extract_api_path_key(url_b)
+        if a == b:
+            return True
+
+        def _suffix_match(longer: str, shorter: str) -> bool:
+            if not shorter or shorter == "/":
+                return False
+            if not longer.endswith(shorter):
+                return False
+            
+            if shorter.startswith("/"):
+                return True
+            return len(longer) == len(shorter) or longer[-len(shorter) - 1] == "/"
+
+        if len(a) >= len(b) and _suffix_match(a, b):
+            return True
+        if len(b) >= len(a) and _suffix_match(b, a):
+            return True
+        return False
+
+    @staticmethod
+    def _prefer_existing_url(existing_url: str, incoming_url: str) -> str:
+        """去重"""
+        existing_url = str(existing_url or "").strip()
+        incoming_url = str(incoming_url or "").strip() or "/"
+        if existing_url and ApiAutomationService._is_same_api_path(existing_url, incoming_url):
+            return existing_url
+        return incoming_url
+
+    @staticmethod
+    def _find_api_by_path_and_method(
+        candidates: List[Any],
+        path: str,
+        method: int,
+    ) -> Optional[Any]:
+        """
+        按路径键查找
+        """
+        exact: List[Any] = []
+        fuzzy: List[Tuple[int, Any]] = []
+        path_key = ApiAutomationService._extract_api_path_key(path)
+        for row in candidates or []:
+            row_req = row.req if isinstance(getattr(row, "req", None), dict) else {}
+            row_method = int(row_req.get("method") or 2)
+            if row_method != int(method):
+                continue
+            row_url = str(getattr(row, "url", None) or row_req.get("url") or "")
+            if not ApiAutomationService._is_same_api_path(row_url, path):
+                continue
+            row_key = ApiAutomationService._extract_api_path_key(row_url)
+            if row_key == path_key:
+                exact.append(row)
+            else:
+                fuzzy.append((len(row_key), row))
+        if exact:
+            for row in exact:
+                if str(getattr(row, "url", None) or "") == path:
+                    return row
+            return exact[0]
+        if fuzzy:
+            fuzzy.sort(key=lambda x: x[0], reverse=True)
+            return fuzzy[0][1]
+        return None
+
+    @staticmethod
+    def _build_req_from_apifox_api(
+        api: Dict[str, Any],
+        header_defaults: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, Any]:
+        header_defaults = header_defaults or {}
+        method_name = str(api.get("method") or "POST").lower()
+        path = ApiAutomationService._normalize_doc_path(str(api.get("path") or api.get("url") or "/"))
+
+        params_obj = api.get("parameters") if isinstance(api.get("parameters"), dict) else {}
+        path_params = ApiAutomationService._extract_apifox_param_rows(params_obj.get("path") or [])
+        query_params = ApiAutomationService._extract_apifox_param_rows(params_obj.get("query") or [])
+        header_params = ApiAutomationService._extract_apifox_param_rows(params_obj.get("header") or [])
+
+        if not header_params:
+            common_headers = ((api.get("commonParameters") or {}).get("header") or []) if isinstance(api.get("commonParameters"), dict) else []
+            for h in common_headers:
+                if not isinstance(h, dict):
+                    continue
+                name = str(h.get("name") or "").strip()
+                if not name:
+                    continue
+                header_params.append({
+                    "key": name,
+                    "value": str(header_defaults.get(name) or ""),
+                    "status": True,
+                })
+
+        request_body = api.get("requestBody") if isinstance(api.get("requestBody"), dict) else {}
+        req_type = str(request_body.get("type") or "").lower()
+        body_type = 1
+        body: Any = {}
+        form_data: List[Dict[str, Any]] = []
+        form_urlencoded: List[Dict[str, Any]] = []
+
+        if req_type in ("application/json", "json"):
+            body_type = 2
+            body = request_body.get("jsonSchema") or request_body.get("example") or {}
+            examples = request_body.get("examples") or []
+            if (not body or body == {}) and examples and isinstance(examples[0], dict):
+                raw = examples[0].get("value")
+                if isinstance(raw, str) and raw.strip():
+                    try:
+                        body = json.loads(raw)
+                    except Exception:
+                        body = raw
+                        body_type = 1
+                elif raw is not None:
+                    body = raw
+        elif req_type in ("multipart/form-data",):
+            body_type = 3
+            for p in request_body.get("parameters") or []:
+                if isinstance(p, dict) and p.get("name"):
+                    form_data.append({
+                        "key": str(p.get("name")),
+                        "value": "" if p.get("example") is None else str(p.get("example")),
+                        "status": bool(p.get("enable", True)),
+                        "data_type": str(p.get("type") or ""),
+                        "remark": str(p.get("description") or ""),
+                    })
+        elif req_type in ("application/x-www-form-urlencoded", "x-www-form-urlencoded"):
+            body_type = 4
+            for p in request_body.get("parameters") or []:
+                if isinstance(p, dict) and p.get("name"):
+                    form_urlencoded.append({
+                        "key": str(p.get("name")),
+                        "value": "" if p.get("example") is None else str(p.get("example")),
+                        "status": bool(p.get("enable", True)),
+                    })
+        elif req_type in ("text/plain", "raw", "text"):
+            examples = request_body.get("examples") or []
+            raw_val: Any = None
+            if examples and isinstance(examples[0], dict):
+                raw_val = examples[0].get("value")
+            if isinstance(raw_val, str) and raw_val.strip():
+                try:
+                    body = json.loads(raw_val)
+                    body_type = 2
+                except Exception:
+                    body = raw_val
+                    body_type = 1
+            elif raw_val is not None:
+                body = raw_val
+                body_type = 1
+            else:
+                body = request_body.get("jsonSchema") or {}
+                body_type = 2 if body else 1
+        elif req_type in ("none", "", "null"):
+            body_type = 1
+            body = {}
+
+        return {
+            "params_id": None,
+            "body": body,
+            "after": [],
+            "assert": [],
+            "before": [],
+            "config": {"retry": 0, "req_timeout": 5, "res_timeout": 5},
+            "header": header_params or [{"key": None, "value": None, "status": True}],
+            "method": ApiAutomationService._doc_method_to_int(method_name),
+            "params": (path_params + query_params) or [{"key": None, "value": None, "status": True}],
+            "body_type": body_type,
+            "file_path": [],
+            "form_data": form_data or [],
+            "form_urlencoded": form_urlencoded or [],
+            "url": path,
+        }
+
+    @staticmethod
+    async def _import_apifox_project_export(
+        db: AsyncSession,
+        doc_json: Dict[str, Any],
+        api_service_id: int,
+        user_id: int,
+    ) -> Dict[str, int]:
+        """导入 Apifox 客户端"""
+        collections = doc_json.get("apiCollection") or []
+        if not isinstance(collections, list) or not collections:
+            raise ValueError("Apifox 项目导出中未找到 apiCollection")
+
+        header_defaults: Dict[str, str] = {}
+        common = doc_json.get("commonParameters")
+        if isinstance(common, dict):
+            params = common.get("parameters") if isinstance(common.get("parameters"), dict) else {}
+            for h in (params.get("header") or []):
+                if isinstance(h, dict) and h.get("name"):
+                    header_defaults[str(h["name"])] = str(h.get("defaultValue") or "")
+
+        imported_count = 0
+        updated_count = 0
+        folder_count = 0
+        existing_apis = list(
+            (
+                await db.execute(
+                    select(ApiModel).where(
+                        ApiModel.enabled_flag == 1,
+                        ApiModel.created_by == user_id,
+                        ApiModel.api_service_id == api_service_id,
+                    )
+                )
+            ).scalars().all()
+        )
+
+        async def get_or_create_folder(name: str, pid: int) -> int:
+            nonlocal folder_count
+            key_name = (name or "").strip() or "默认分组"
+            row = (
+                await db.execute(
+                    select(ApiMenuModel).where(
+                        ApiMenuModel.enabled_flag == 1,
+                        ApiMenuModel.created_by == user_id,
+                        ApiMenuModel.api_service_id == api_service_id,
+                        ApiMenuModel.type == 1,
+                        ApiMenuModel.pid == pid,
+                        ApiMenuModel.name == key_name,
+                    )
+                )
+            ).scalar_one_or_none()
+            if row:
+                return int(row.id)
+            menu = ApiMenuModel(
+                name=key_name,
+                type=1,
+                pid=pid,
+                api_service_id=api_service_id,
+                status=1,
+                api_id=None,
+                created_by=user_id,
+                updated_by=user_id,
+            )
+            db.add(menu)
+            await db.flush()
+            folder_count += 1
+            return int(menu.id)
+
+        async def upsert_api(
+            api_name: str,
+            api_obj: Dict[str, Any],
+            folder_id: int,
+            inherited_pre: Optional[List[Any]] = None,
+            inherited_post: Optional[List[Any]] = None,
+        ) -> None:
+            nonlocal imported_count, updated_count
+            req = ApiAutomationService._build_req_from_apifox_api(api_obj, header_defaults)
+            pre = ApiAutomationService._resolve_apifox_processors(
+                api_obj.get("preProcessors"), inherited_pre
+            )
+            post = ApiAutomationService._resolve_apifox_processors(
+                api_obj.get("postProcessors"), inherited_post
+            )
+            req["before"] = ApiAutomationService._map_apifox_processors(pre, phase="before")
+            req["after"] = ApiAutomationService._map_apifox_processors(post, phase="after")
+            path = str(req.get("url") or "/")
+            api_desc = str(api_obj.get("description") or "")
+            display_name = str(api_name or api_obj.get("name") or f"{str(api_obj.get('method') or 'POST').upper()} {path}")
+
+            target_method = int(req.get("method") or 2)
+            target_api = ApiAutomationService._find_api_by_path_and_method(
+                existing_apis, path, target_method
+            )
+
+            if target_api:
+                keep_url = ApiAutomationService._prefer_existing_url(
+                    str(target_api.url or (target_api.req or {}).get("url") or ""),
+                    path,
+                )
+                req["url"] = keep_url
+                
+                old_req = target_api.req if isinstance(target_api.req, dict) else {}
+                if old_req.get("assert"):
+                    req["assert"] = old_req.get("assert")
+                if old_req.get("config"):
+                    req["config"] = old_req.get("config")
+                await db.execute(
+                    update(ApiModel)
+                    .where(ApiModel.id == target_api.id, ApiModel.enabled_flag == 1)
+                    .values(
+                        url=keep_url,
+                        req=req,
+                        document=api_obj,
+                        name=display_name,
+                        description=api_desc,
+                        updated_by=user_id,
+                    )
+                )
+                api_id = int(target_api.id)
+                updated_count += 1
+            else:
+                api_row = ApiModel(
+                    api_service_id=api_service_id,
+                    url=path,
+                    req=req,
+                    document=api_obj,
+                    name=display_name,
+                    description=api_desc,
+                    created_by=user_id,
+                    updated_by=user_id,
+                )
+                db.add(api_row)
+                await db.flush()
+                api_id = int(api_row.id)
+                existing_apis.append(api_row)
+                imported_count += 1
+
+            leaf = (
+                await db.execute(
+                    select(ApiMenuModel).where(
+                        ApiMenuModel.enabled_flag == 1,
+                        ApiMenuModel.created_by == user_id,
+                        ApiMenuModel.api_service_id == api_service_id,
+                        ApiMenuModel.type == 2,
+                        ApiMenuModel.api_id == api_id,
+                    )
+                )
+            ).scalar_one_or_none()
+
+            if leaf:
+                await db.execute(
+                    update(ApiMenuModel)
+                    .where(ApiMenuModel.id == leaf.id, ApiMenuModel.enabled_flag == 1)
+                    .values(name=display_name, pid=folder_id, status=1, updated_by=user_id)
+                )
+            else:
+                db.add(
+                    ApiMenuModel(
+                        name=display_name,
+                        type=2,
+                        pid=folder_id,
+                        api_service_id=api_service_id,
+                        api_id=api_id,
+                        status=1,
+                        created_by=user_id,
+                        updated_by=user_id,
+                    )
+                )
+
+        async def walk_items(
+            items: Any,
+            parent_folder_id: int,
+            inherited_pre: Optional[List[Any]] = None,
+            inherited_post: Optional[List[Any]] = None,
+        ) -> None:
+            if not isinstance(items, list):
+                return
+            inherited_pre = list(inherited_pre or [])
+            inherited_post = list(inherited_post or [])
+            for node in items:
+                if not isinstance(node, dict):
+                    continue
+                api_obj = node.get("api")
+                if isinstance(api_obj, dict) and (api_obj.get("path") or api_obj.get("url") or api_obj.get("method")):
+                    await upsert_api(
+                        str(node.get("name") or ""),
+                        api_obj,
+                        parent_folder_id,
+                        inherited_pre=inherited_pre,
+                        inherited_post=inherited_post,
+                    )
+                    continue
+                # 目录节点
+                child_items = node.get("items")
+                if isinstance(child_items, list):
+                    folder_name = str(node.get("name") or "默认分组")
+                    next_pre = ApiAutomationService._resolve_apifox_processors(
+                        node.get("preProcessors"), inherited_pre
+                    )
+                    next_post = ApiAutomationService._resolve_apifox_processors(
+                        node.get("postProcessors"), inherited_post
+                    )
+                    
+                    if folder_name.strip() in ("根目录", "Root", "root") and parent_folder_id == 0:
+                        await walk_items(child_items, 0, next_pre, next_post)
+                    else:
+                        folder_id = await get_or_create_folder(folder_name, parent_folder_id)
+                        await walk_items(child_items, folder_id, next_pre, next_post)
+
+        for coll in collections:
+            if not isinstance(coll, dict):
+                continue
+            name = str(coll.get("name") or "根目录")
+            items = coll.get("items") or []
+            coll_pre = ApiAutomationService._resolve_apifox_processors(coll.get("preProcessors"), [])
+            coll_post = ApiAutomationService._resolve_apifox_processors(coll.get("postProcessors"), [])
+            if name.strip() in ("根目录", "Root", "root"):
+                await walk_items(items, 0, coll_pre, coll_post)
+            else:
+                folder_id = await get_or_create_folder(name, 0)
+                await walk_items(items, folder_id, coll_pre, coll_post)
+
+        if imported_count + updated_count <= 0:
+            raise ValueError("Apifox 项目导出已识别，但未解析到可导入的 HTTP 接口（apiCollection.items[].api）")
+
+        await db.execute(
+            update(ApiServiceModel)
+            .where(ApiServiceModel.id == api_service_id, ApiServiceModel.enabled_flag == 1)
+            .values(last_pull_status=1)
+        )
+        await db.commit()
+        return {"imported": imported_count, "updated": updated_count, "folders": folder_count}
+
+    @staticmethod
     async def _pull_apifox_project_and_import(
         db: AsyncSession,
         api_service_id: int,
@@ -1182,6 +1851,17 @@ class ApiAutomationService:
         imported_count = 0
         updated_count = 0
         folder_names = set()
+        existing_apis = list(
+            (
+                await db.execute(
+                    select(ApiModel).where(
+                        ApiModel.enabled_flag == 1,
+                        ApiModel.created_by == user_id,
+                        ApiModel.api_service_id == api_service_id,
+                    )
+                )
+            ).scalars().all()
+        )
 
         for module_data in module_nodes or []:
             if not isinstance(module_data, dict):
@@ -1199,9 +1879,9 @@ class ApiAutomationService:
                 detail = detail or {}
 
                 method_name = str(api_brief.get("method") or "POST").lower()
-                path = str(api_brief.get("path") or api_brief.get("url") or "/")
-                if not path.startswith("/"):
-                    path = "/" + path
+                path = ApiAutomationService._normalize_doc_path(
+                    str(api_brief.get("path") or api_brief.get("url") or "/")
+                )
                 api_name = str(api_brief.get("name") or f"{method_name.upper()} {path}")
                 api_desc = str(detail.get("description") or api_brief.get("description") or "")
 
@@ -1249,30 +1929,37 @@ class ApiAutomationService:
                     "url": path,
                 }
 
-                same_path_rows = (
-                    await db.execute(
-                        select(ApiModel).where(
-                            ApiModel.enabled_flag == 1,
-                            ApiModel.created_by == user_id,
-                            ApiModel.api_service_id == api_service_id,
-                            ApiModel.url == path,
-                        )
-                    )
-                ).scalars().all()
-
-                target_api = None
                 target_method = int(req.get("method") or 2)
-                for row in same_path_rows:
-                    row_method = int((row.req or {}).get("method") or 2)
-                    if row_method == target_method:
-                        target_api = row
-                        break
+                target_api = ApiAutomationService._find_api_by_path_and_method(
+                    existing_apis, path, target_method
+                )
 
                 if target_api:
+                    keep_url = ApiAutomationService._prefer_existing_url(
+                        str(target_api.url or (target_api.req or {}).get("url") or ""),
+                        path,
+                    )
+                    req["url"] = keep_url
+                    old_req = target_api.req if isinstance(target_api.req, dict) else {}
+                    if old_req.get("assert"):
+                        req["assert"] = old_req.get("assert")
+                    if old_req.get("before"):
+                        req["before"] = old_req.get("before")
+                    if old_req.get("after"):
+                        req["after"] = old_req.get("after")
+                    if old_req.get("config"):
+                        req["config"] = old_req.get("config")
                     await db.execute(
                         update(ApiModel)
                         .where(ApiModel.id == target_api.id, ApiModel.enabled_flag == 1)
-                        .values(req=req, document=detail or api_brief, name=api_name, description=api_desc, updated_by=user_id)
+                        .values(
+                            url=keep_url,
+                            req=req,
+                            document=detail or api_brief,
+                            name=api_name,
+                            description=api_desc,
+                            updated_by=user_id,
+                        )
                     )
                     api_id = int(target_api.id)
                     updated_count += 1
@@ -1290,6 +1977,7 @@ class ApiAutomationService:
                     db.add(api_row)
                     await db.flush()
                     api_id = int(api_row.id)
+                    existing_apis.append(api_row)
                     imported_count += 1
 
                 leaf = (
@@ -1502,6 +2190,19 @@ class ApiAutomationService:
             except Exception as e:
                 raise ValueError(f"拉取文档失败: {str(e)}")
 
+        
+        if ApiAutomationService._is_apifox_project_export(doc_json):
+            stats = await ApiAutomationService._import_apifox_project_export(
+                db, doc_json, api_service_id, user_id
+            )
+            return {
+                "source_type": source_type or "apifox",
+                "imported": int(stats.get("imported") or 0),
+                "updated": int(stats.get("updated") or 0),
+                "folders": int(stats.get("folders") or 0),
+                "mode": "apifox_project_export",
+            }
+
         # 兼容多种文档结构：
         paths: Dict[str, Any] = {}
         candidates = [
@@ -1531,11 +2232,11 @@ class ApiAutomationService:
                     "folders": int(stats.get("folders") or 0),
                     "mode": "apifox_apis",
                 }
-            # 兜底：返回结构摘要，便于定位导出格式变化
+            
             top_keys = list(doc_json.keys()) if isinstance(doc_json, dict) else []
             data_keys = list((doc_json.get("data") or {}).keys()) if isinstance(doc_json, dict) and isinstance(doc_json.get("data"), dict) else []
             raise ValueError(
-                "文档中未找到可解析接口（paths/apis），请确认 URL、Cookies 或导出文件格式；"
+                "文档中未找到可解析接口（paths/apis/apiCollection），请确认 URL、Cookies 或导出文件格式；"
                 f"top_keys={top_keys[:20]}, data_keys={data_keys[:20]}"
             )
 
@@ -1578,16 +2279,22 @@ class ApiAutomationService:
         imported_count = 0
         updated_count = 0
         folder_names = set()
+        existing_apis = list(
+            (
+                await db.execute(
+                    select(ApiModel).where(
+                        ApiModel.enabled_flag == 1,
+                        ApiModel.created_by == user_id,
+                        ApiModel.api_service_id == api_service_id,
+                    )
+                )
+            ).scalars().all()
+        )
 
         for raw_path, path_item in paths.items():
             if not isinstance(path_item, dict):
                 continue
-            api_path = str(raw_path or "/")
-            if not api_path.startswith("/"):
-                api_path = "/" + api_path
-            
-            while api_path.startswith("//"):
-                api_path = api_path[1:]
+            api_path = ApiAutomationService._normalize_doc_path(str(raw_path or "/"))
 
             for method in ("get", "post", "put", "delete", "patch", "options"):
                 operation = path_item.get(method)
@@ -1603,30 +2310,37 @@ class ApiAutomationService:
                 api_name = str(operation.get("summary") or operation.get("operationId") or f"{method.upper()} {api_path}")
                 api_desc = str(operation.get("description") or "")
 
-                same_path_rows = (
-                    await db.execute(
-                        select(ApiModel).where(
-                            ApiModel.enabled_flag == 1,
-                            ApiModel.created_by == user_id,
-                            ApiModel.api_service_id == api_service_id,
-                            ApiModel.url == api_path,
-                        )
-                    )
-                ).scalars().all()
-
-                target_api = None
                 target_method = int(req.get("method") or 2)
-                for row in same_path_rows:
-                    row_method = int((row.req or {}).get("method") or 2)
-                    if row_method == target_method:
-                        target_api = row
-                        break
+                target_api = ApiAutomationService._find_api_by_path_and_method(
+                    existing_apis, api_path, target_method
+                )
 
                 if target_api:
+                    keep_url = ApiAutomationService._prefer_existing_url(
+                        str(target_api.url or (target_api.req or {}).get("url") or ""),
+                        api_path,
+                    )
+                    req["url"] = keep_url
+                    old_req = target_api.req if isinstance(target_api.req, dict) else {}
+                    if old_req.get("assert"):
+                        req["assert"] = old_req.get("assert")
+                    if old_req.get("before"):
+                        req["before"] = old_req.get("before")
+                    if old_req.get("after"):
+                        req["after"] = old_req.get("after")
+                    if old_req.get("config"):
+                        req["config"] = old_req.get("config")
                     await db.execute(
                         update(ApiModel)
                         .where(ApiModel.id == target_api.id, ApiModel.enabled_flag == 1)
-                        .values(req=req, document=operation, name=api_name, description=api_desc, updated_by=user_id)
+                        .values(
+                            url=keep_url,
+                            req=req,
+                            document=operation,
+                            name=api_name,
+                            description=api_desc,
+                            updated_by=user_id,
+                        )
                     )
                     api_id = int(target_api.id)
                     updated_count += 1
@@ -1644,6 +2358,7 @@ class ApiAutomationService:
                     db.add(api_row)
                     await db.flush()
                     api_id = int(api_row.id)
+                    existing_apis.append(api_row)
                     imported_count += 1
 
                 leaf = (
@@ -1748,7 +2463,7 @@ class ApiAutomationService:
 
     @staticmethod
     async def del_menu(db: AsyncSession, body: Dict[str, Any], user_id: int) -> None:
-        # 逻辑删除
+        
         menu_id = int(body["id"])
         m = await db.execute(select(ApiMenuModel).where(ApiMenuModel.id == menu_id, ApiMenuModel.enabled_flag == 1))
         menu = m.scalar_one_or_none()
@@ -1802,7 +2517,7 @@ class ApiAutomationService:
             return None
         data = row.__dict__.copy()
         data.pop("_sa_instance_state", None)
-        data.pop("id", None)  
+
         return data
 
     @staticmethod
@@ -1842,15 +2557,26 @@ class ApiAutomationService:
         api_id = int(body["id"])
         row = (await db.execute(select(ApiModel).where(ApiModel.id == api_id, ApiModel.enabled_flag == 1))).scalar_one()
         old_req = row.req or {}
-        new_req = body.get("req") or {}
+        values: Dict[str, Any] = {"updated_by": user_id}
+        if "url" in body and body.get("url") is not None:
+            values["url"] = body.get("url")
+        if "req" in body:
+            values["req"] = body.get("req") or {}
+        if "document" in body:
+            values["document"] = body.get("document") if body.get("document") is not None else {}
+        if body.get("name") is not None:
+            values["name"] = body.get("name")
+        if body.get("description") is not None:
+            values["description"] = body.get("description")
         await db.execute(
             update(ApiModel)
             .where(ApiModel.id == api_id, ApiModel.enabled_flag == 1)
-            .values(url=body.get("url"), req=new_req, updated_by=user_id)
+            .values(**values)
         )
-        edits = ApiAutomationService._compare_data(old_req, new_req)
-        if edits:
-            db.add(ApiEditModel(api_id=api_id, edit=edits, created_by=user_id, updated_by=user_id))
+        if "req" in body:
+            edits = ApiAutomationService._compare_data(old_req, values.get("req") or {})
+            if edits:
+                db.add(ApiEditModel(api_id=api_id, edit=edits, created_by=user_id, updated_by=user_id))
         await db.commit()
 
     @staticmethod
@@ -1953,6 +2679,19 @@ class ApiAutomationService:
             d.pop("_sa_instance_state", None)
             data.append(d)
         return {"content": data, "total": total, "page": page, "pageSize": page_size}
+
+    @staticmethod
+    async def delete_request_history(db: AsyncSession, result_id: int, user_id: int) -> None:
+        """删除单条调试记录。"""
+        result = await db.execute(
+            delete(ApiResultModel).where(
+                ApiResultModel.id == int(result_id),
+                ApiResultModel.created_by == user_id,
+            )
+        )
+        if not result.rowcount:
+            raise ValueError("调试记录不存在或无权限")
+        await db.commit()
 
     @staticmethod
     async def get_edit_history(db: AsyncSession, api_id: int, user_id: int) -> List[Dict[str, Any]]:
@@ -2115,6 +2854,400 @@ class ApiAutomationService:
         except Exception as e:
             return {"status": 0, "message": f"后置操作-等待时长：{wait_time} 秒 失败，原因是：{str(e)}"}
 
+    @staticmethod
+    async def _load_script_env_maps(
+        db: AsyncSession, env_id: int, user_id: int
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """返回 (session_vars, env_vars) 供脚本 ntest 使用。"""
+        session_vars: Dict[str, Any] = {}
+        env_vars: Dict[str, Any] = {}
+        if env_id:
+            env_row = (
+                await db.execute(
+                    select(ApiEnvironmentModel).where(
+                        ApiEnvironmentModel.id == env_id,
+                        ApiEnvironmentModel.enabled_flag == 1,
+                    )
+                )
+            ).scalar_one_or_none()
+            if env_row:
+                for i in (env_row.config or []):
+                    if isinstance(i, dict) and i.get("name") is not None:
+                        env_vars[str(i.get("name"))] = i.get("value")
+                for j in (env_row.variable or []):
+                    if isinstance(j, dict) and j.get("name") is not None:
+                        session_vars[str(j.get("name"))] = j.get("value")
+        g_rows = (
+            await db.execute(
+                select(ApiVariableModel).where(
+                    ApiVariableModel.enabled_flag == 1,
+                    ApiVariableModel.created_by == user_id,
+                )
+            )
+        ).scalars().all()
+        for row in g_rows:
+            if row.name and row.name not in session_vars:
+                session_vars[str(row.name)] = row.value
+        return session_vars, env_vars
+
+    @staticmethod
+    async def _apply_exported_vars(
+        db: AsyncSession,
+        exported: Dict[str, Any],
+        env_id: int,
+        user_id: int,
+        request_ctx: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """将脚本导出的变量写入环境；__request__ 回写到 request_ctx。"""
+        if not exported:
+            return
+        for key, value in exported.items():
+            if key == "__request__":
+                if isinstance(value, dict) and isinstance(request_ctx, dict):
+                    request_ctx.clear()
+                    request_ctx.update(value)
+                continue
+            await ApiAutomationService._pre_set_var(
+                db,
+                {
+                    "name": key,
+                    "value": value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, default=str),
+                    "env_type": 1 if env_id else 2,
+                },
+                env_id,
+                user_id,
+            )
+
+    @staticmethod
+    async def _op_run_script(
+        db: AsyncSession,
+        op: Dict[str, Any],
+        env_id: int,
+        user_id: int,
+        *,
+        phase: str,
+        request_ctx: Optional[Dict[str, Any]] = None,
+        response_ctx: Optional[Dict[str, Any]] = None,
+        code_override: Optional[str] = None,
+        language_override: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        from .script_runtime import normalize_language, run_script_async
+
+        code = code_override if code_override is not None else str(op.get("code") or "")
+        language = normalize_language(language_override or op.get("language") or "python")
+        if not str(code).strip():
+            return {"status": 0, "message": f"{phase}操作-自定义脚本：代码为空", "type": op.get("type")}
+
+        session_vars, env_vars = await ApiAutomationService._load_script_env_maps(db, env_id, user_id)
+        req_snap = dict(request_ctx) if isinstance(request_ctx, dict) else None
+        run_res = await run_script_async(
+            code,
+            language=language,
+            session_vars=session_vars,
+            env_vars=env_vars,
+            request_ctx=req_snap,
+            response_ctx=response_ctx,
+        )
+        if not run_res.success:
+            return {
+                "status": 0,
+                "message": f"{phase}操作-自定义脚本失败：{run_res.error or 'unknown'}",
+                "type": op.get("type"),
+                "output": run_res.output or "",
+                "language": language,
+            }
+        await ApiAutomationService._apply_exported_vars(
+            db, run_res.vars or {}, env_id, user_id, request_ctx=request_ctx
+        )
+        return {
+            "status": 1,
+            "message": f"{phase}操作-自定义脚本成功（{language}）",
+            "type": op.get("type"),
+            "output": (run_res.output or "")[:500],
+            "vars": {k: v for k, v in (run_res.vars or {}).items() if k != "__request__"},
+            "language": language,
+        }
+
+    @staticmethod
+    async def _op_run_script_lib(
+        db: AsyncSession,
+        op: Dict[str, Any],
+        env_id: int,
+        user_id: int,
+        *,
+        phase: str,
+        request_ctx: Optional[Dict[str, Any]] = None,
+        response_ctx: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        from .model import NtestScriptModel
+        from .script_runtime import normalize_language
+
+        func_id = op.get("func_id")
+        if not func_id:
+            return {"status": 0, "message": f"{phase}操作-脚本库：未选择脚本", "type": op.get("type")}
+        row = (
+            await db.execute(
+                select(NtestScriptModel).where(
+                    NtestScriptModel.id == int(func_id),
+                    NtestScriptModel.enabled_flag == 1,
+                )
+            )
+        ).scalar_one_or_none()
+        if not row or not (row.code or "").strip():
+            return {"status": 0, "message": f"{phase}操作-脚本库：脚本不存在或为空", "type": op.get("type")}
+
+        # 可选参数注入到 session
+        params_raw = op.get("func_params") or ""
+        extra_prefix = ""
+        language = normalize_language(getattr(row, "language", None) or "python")
+        if str(params_raw).strip():
+            try:
+                params_obj = json.loads(params_raw) if isinstance(params_raw, str) else params_raw
+            except Exception:
+                params_obj = None
+            if isinstance(params_obj, dict):
+                if language == "javascript":
+                    extra_prefix = f"const __params = {json.dumps(params_obj, ensure_ascii=False)};\n"
+                else:
+                    extra_prefix = f"__params = {json.dumps(params_obj, ensure_ascii=False)}\n"
+
+        result = await ApiAutomationService._op_run_script(
+            db,
+            op,
+            env_id,
+            user_id,
+            phase=phase,
+            request_ctx=request_ctx,
+            response_ctx=response_ctx,
+            code_override=extra_prefix + (row.code or ""),
+            language_override=language,
+        )
+        if result.get("status") == 1 and op.get("result_var"):
+            await ApiAutomationService._pre_set_var(
+                db,
+                {
+                    "name": str(op.get("result_var")),
+                    "value": str(result.get("output") or ""),
+                    "env_type": 1,
+                },
+                env_id,
+                user_id,
+            )
+        name = op.get("func_name") or row.name or str(func_id)
+        if result.get("status") == 1:
+            result["message"] = f"{phase}操作-脚本库「{name}」成功"
+        return result
+
+    @staticmethod
+    async def _op_run_db(
+        db: AsyncSession,
+        op: Dict[str, Any],
+        env_id: int,
+        user_id: int,
+        *,
+        phase: str,
+    ) -> Dict[str, Any]:
+        db_id = op.get("db_id")
+        sql = str(op.get("sql") or "").strip()
+        if not db_id:
+            return {"status": 0, "message": f"{phase}操作-数据库：未选择数据库", "type": op.get("type")}
+        if not sql:
+            return {"status": 0, "message": f"{phase}操作-数据库：SQL 为空", "type": op.get("type")}
+
+        row = (
+            await db.execute(
+                select(ApiDatabaseModel).where(
+                    ApiDatabaseModel.id == int(db_id),
+                    ApiDatabaseModel.enabled_flag == 1,
+                    ApiDatabaseModel.created_by == user_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if not row:
+            return {"status": 0, "message": f"{phase}操作-数据库：配置不存在", "type": op.get("type")}
+
+        sql = await ApiAutomationService.handle_var(db, env_id, sql)
+        try:
+            cfg = row.config or {}
+            host = cfg.get("host") or row.host
+            user = cfg.get("user") or row.username
+            password = cfg.get("password") or row.password
+            database = cfg.get("database") or row.database_name
+            port = int(cfg.get("port") or row.port or 3306)
+            conn = pymysql.connect(host=host, user=user, passwd=password, db=database, port=port)
+            cur = conn.cursor()
+            cur.execute(sql)
+            rows_data: Any
+            if cur.description:
+                cols = [c[0] for c in cur.description]
+                fetched = cur.fetchall()
+                rows_data = [dict(zip(cols, r)) for r in fetched]
+            else:
+                rows_data = {"affected": cur.rowcount}
+                conn.commit()
+            cur.close()
+            conn.close()
+            result_var = str(op.get("result_var") or "").strip()
+            if result_var:
+                val = json.dumps(rows_data, ensure_ascii=False, default=str)
+                await ApiAutomationService._pre_set_var(
+                    db, {"name": result_var, "value": val, "env_type": 1}, env_id, user_id
+                )
+            return {
+                "status": 1,
+                "message": f"{phase}操作-数据库执行成功",
+                "type": op.get("type"),
+                "data": rows_data if not isinstance(rows_data, list) or len(rows_data) <= 20 else rows_data[:20],
+            }
+        except Exception as e:
+            return {"status": 0, "message": f"{phase}操作-数据库失败：{str(e)}", "type": op.get("type")}
+
+    @staticmethod
+    async def _op_import_api(
+        db: AsyncSession,
+        op: Dict[str, Any],
+        env_id: int,
+        user_id: int,
+        *,
+        phase: str,
+    ) -> Dict[str, Any]:
+        """引入接口。
+        """
+        raw = op.get("api_id")
+        menu_id = 0
+        if isinstance(raw, list) and raw:
+            try:
+                menu_id = int(raw[-1])
+            except Exception:
+                menu_id = 0
+        elif raw is not None and str(raw).strip() != "":
+            try:
+                menu_id = int(raw)
+            except Exception:
+                menu_id = 0
+
+        if not menu_id:
+            return {
+                "status": 0,
+                "message": f"{phase}操作-引入接口：未选择接口",
+                "content": [],
+                "type": op.get("type"),
+            }
+
+        menu_row = (
+            await db.execute(
+                select(ApiMenuModel).where(
+                    ApiMenuModel.id == menu_id,
+                    ApiMenuModel.enabled_flag == 1,
+                )
+            )
+        ).scalar_one_or_none()
+        if not menu_row:
+            return {
+                "status": 0,
+                "message": f"{phase}操作-引入接口：所选菜单不存在（id={menu_id}）",
+                "content": [],
+                "type": op.get("type"),
+            }
+        # type: 1=目录 2=接口 3=用例；引入接口应允许 2/3
+        if int(menu_row.type or 0) not in (2, 3):
+            return {
+                "status": 0,
+                "message": f"{phase}操作-引入接口：请选择接口或用例，不能选择目录",
+                "content": [],
+                "type": op.get("type"),
+            }
+        if not menu_row.api_id:
+            return {
+                "status": 0,
+                "message": f"{phase}操作-引入接口：所选菜单未关联接口定义",
+                "content": [],
+                "type": op.get("type"),
+            }
+
+        api_row = (
+            await db.execute(
+                select(ApiModel).where(
+                    ApiModel.id == int(menu_row.api_id),
+                    ApiModel.enabled_flag == 1,
+                )
+            )
+        ).scalar_one_or_none()
+        if not api_row:
+            return {
+                "status": 0,
+                "message": f"{phase}操作-引入接口：接口不存在（api_id={menu_row.api_id}）",
+                "content": [],
+                "type": op.get("type"),
+            }
+        res = await ApiAutomationService._pre_request_api(
+            db=db,
+            api=api_row,
+            env_id=int(op.get("env_id") or env_id),
+            user_id=user_id,
+        )
+        res["type"] = op.get("type")
+        if res.get("status") is None and res.get("code") is not None:
+            # _pre_request_api 返回的是请求结果结构，补齐操作结果字段
+            code = int(res.get("code") or 0)
+            res["status"] = 1 if 200 <= code < 400 else 0
+            res["message"] = f"{phase}操作-引入接口「{api_row.name or menu_row.name}」完成（HTTP {code}）"
+        elif not res.get("message"):
+            res["message"] = f"{phase}操作-引入接口「{api_row.name or menu_row.name}」完成"
+            res.setdefault("status", 1)
+        return res
+
+    @staticmethod
+    def _map_apifox_processors(processors: Any, *, phase: str = "before") -> List[Dict[str, Any]]:
+        """将 Apifox转为平台操作。"""
+        from .script_runtime import normalize_language
+
+        ops: List[Dict[str, Any]] = []
+        for p in processors or []:
+            if not isinstance(p, dict):
+                continue
+            t = str(p.get("type") or "").strip()
+            if t in ("inheritProcessors", ""):
+                continue
+            data = p.get("data") if isinstance(p.get("data"), dict) else {}
+            if t in ("customScript", "script"):
+                code = str(data.get("script") or data.get("code") or "")
+                if not code.strip():
+                    continue
+                lang = normalize_language(data.get("language") or "javascript")
+                if phase == "before":
+                    ops.append({"type": 4, "code": code, "language": lang})
+                else:
+                    ops.append({"type": 5, "code": code, "language": lang})
+            elif t == "wait":
+                wait_raw = data.get("waitTime") or data.get("duration") or data.get("time") or 1
+                try:
+                    wait_num = float(wait_raw)
+                except Exception:
+                    wait_num = 1
+                # Apifox 常见毫秒；>=100 视为毫秒
+                wait_s = int(wait_num / 1000) if wait_num >= 100 else int(wait_num)
+                wait_s = max(wait_s, 0)
+                if phase == "before":
+                    ops.append({"type": 3, "wait_time": wait_s or 1})
+                else:
+                    ops.append({"type": 2, "wait_time": wait_s or 1})
+        return ops
+
+    @staticmethod
+    def _resolve_apifox_processors(own: Any, inherited: Optional[List[Any]] = None) -> List[Any]:
+        inherited = list(inherited or [])
+        if not isinstance(own, list) or not own:
+            return inherited
+        resolved: List[Any] = []
+        for p in own:
+            if not isinstance(p, dict):
+                continue
+            if str(p.get("type") or "") == "inheritProcessors":
+                resolved.extend(inherited)
+            else:
+                resolved.append(p)
+        return resolved
   
     @staticmethod
     async def _pre_set_var(db: AsyncSession, data: Dict[str, Any], env_id: int, user_id: int) -> Dict[str, Any]:
@@ -2199,75 +3332,27 @@ class ApiAutomationService:
         ops: List[Dict[str, Any]],
         env_id: int,
         user_id: int,
+        request_ctx: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """
         pre_request：
         - type=1: 预请求接口
         - type=2: 设置变量
         - type=3: 等待
+        - type=4: 自定义脚本（python/javascript，支持 ntest/pm）
+        - type=5: 数据库操作
+        - type=6: 脚本库
         """
         results: List[Dict[str, Any]] = []
         for op in ops or []:
             try:
                 t = int(op.get("type") or 0)
                 if t == 1:
-                   
-                    api_id_list = op.get("api_id") or []
-                    menu_id = int(api_id_list[-1]) if api_id_list else 0
-                    if not menu_id:
-                        results.append(
-                            {
-                                "status": 0,
-                                "message": "前置操作-预请求接口：未选择接口用例，请求失败",
-                                "content": [],
-                                "type": t,
-                            }
+                    results.append(
+                        await ApiAutomationService._op_import_api(
+                            db, op, env_id, user_id, phase="前置"
                         )
-                        continue
-                    menu_row = (
-                        await db.execute(
-                            select(ApiMenuModel).where(
-                                ApiMenuModel.id == menu_id,
-                                ApiMenuModel.type == 3,
-                                ApiMenuModel.enabled_flag == 1,
-                            )
-                        )
-                    ).scalar_one_or_none()
-                    if not menu_row or not menu_row.api_id:
-                        results.append(
-                            {
-                                "status": 0,
-                                "message": "前置操作-预请求接口：未选择接口用例，请求失败",
-                                "content": [],
-                                "type": t,
-                            }
-                        )
-                        continue
-                    api_row = (
-                        await db.execute(
-                            select(ApiModel).where(
-                                ApiModel.id == int(menu_row.api_id),
-                                ApiModel.enabled_flag == 1,
-                            )
-                        )
-                    ).scalar_one_or_none()
-                    if not api_row:
-                        results.append(
-                            {
-                                "status": 0,
-                                "message": "前置操作-预请求接口：接口不存在，请求失败",
-                                "content": [],
-                                "type": t,
-                            }
-                        )
-                        continue
-                    res = await ApiAutomationService._pre_request_api(
-                        db=db,
-                        api=api_row,
-                        env_id=int(op.get("env_id") or env_id),
-                        user_id=user_id,
                     )
-                    results.append(res)
                 elif t == 2:
                     r = await ApiAutomationService._pre_set_var(db, op, env_id, user_id)
                     r["type"] = t
@@ -2276,6 +3361,24 @@ class ApiAutomationService:
                     r = await ApiAutomationService._pre_wait_time(int(op.get("wait_time") or 0))
                     r["type"] = t
                     results.append(r)
+                elif t == 4:
+                    results.append(
+                        await ApiAutomationService._op_run_script(
+                            db, op, env_id, user_id, phase="前置", request_ctx=request_ctx
+                        )
+                    )
+                elif t == 5:
+                    results.append(
+                        await ApiAutomationService._op_run_db(
+                            db, op, env_id, user_id, phase="前置"
+                        )
+                    )
+                elif t == 6:
+                    results.append(
+                        await ApiAutomationService._op_run_script_lib(
+                            db, op, env_id, user_id, phase="前置", request_ctx=request_ctx
+                        )
+                    )
                 else:
                     results.append({"status": 0, "message": f"未知前置操作类型：{t}", "type": t})
             except Exception as e:
@@ -2291,7 +3394,11 @@ class ApiAutomationService:
         - before 固定为空
         """
         url = await ApiAutomationService.handle_var(db, env_id, api.url or "")
-        api_req = api.req or {}
+        api_req = dict(api.req or {}) if isinstance(api.req, dict) else {}
+        common = await ApiAutomationService._load_common_params_by_api(
+            db, api_id=getattr(api, "id", None), api_service_id=getattr(api, "api_service_id", None)
+        )
+        api_req = ApiAutomationService.apply_common_params_to_req(api_req, common)
 
         body_payload = await ApiAutomationService.handle_var(db, env_id, api_req.get("body") or {})
         method = int(api_req.get("method") or 2)
@@ -2302,6 +3409,10 @@ class ApiAutomationService:
         form_urlencoded = await ApiAutomationService.handle_var(db, env_id, ApiAutomationService.params_header(api_req.get("form_urlencoded")))
         file_paths = api_req.get("file_path") or []
         config = api_req.get("config") or {"retry": 0, "req_timeout": 5, "res_timeout": 5}
+
+        headers, params, req_auth = await ApiAutomationService.apply_request_auth(
+            db, env_id, api_req, headers=headers, params=params
+        )
 
         res = await ApiAutomationService._send_request(
             method=method,
@@ -2314,6 +3425,7 @@ class ApiAutomationService:
             form_urlencoded=form_urlencoded,
             file_paths=file_paths,
             config=config,
+            auth=req_auth,
         )
 
         after_list: List[Dict[str, Any]] = []
@@ -2337,6 +3449,7 @@ class ApiAutomationService:
                 header=headers,
                 body=body_payload,
                 user_id=user_id,
+                env_id=env_id,
             )
 
         res["before"] = []
@@ -2450,20 +3563,97 @@ class ApiAutomationService:
         body: Any,
         env_id: int,
         user_id: int,
+        request_ctx: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """
         after_request：
         - type=1: 提取变量
         - type=2: 等待
+        - type=3: 断言
+        - type=4: 数据库操作
+        - type=5: 自定义脚本
+        - type=6: 脚本库
+        - type=7: 引入接口
         """
         results: List[Dict[str, Any]] = []
+        response_ctx = {
+            "code": res.get("code"),
+            "body": res.get("body"),
+            "header": res.get("header") or {},
+            "res_time": res.get("res_time"),
+        }
         for op in ops or []:
             try:
                 t = int(op.get("type") or 0)
                 if t == 1:
-                    results.append(await ApiAutomationService._after_set_var(db, op, res, header, body, env_id, user_id))
+                    results.append(
+                        await ApiAutomationService._after_set_var(
+                            db, op, res, header, body, env_id, user_id
+                        )
+                    )
                 elif t == 2:
-                    results.append(await ApiAutomationService._after_wait_time(int(op.get("wait_time") or 0)))
+                    results.append(
+                        await ApiAutomationService._after_wait_time(int(op.get("wait_time") or 0))
+                    )
+                elif t == 3:
+                    # 断言：复用 assert 处理
+                    assert_op = {
+                        "type": 1,
+                        "assert_name": op.get("assert_name") or "后置断言",
+                        "rules": op.get("rules") or [],
+                        "name": op.get("name"),
+                        "res_type": op.get("res_type"),
+                        "value": op.get("value"),
+                    }
+                    ar = await ApiAutomationService._handle_assert(
+                        db=db,
+                        ops=[assert_op],
+                        res=res,
+                        header=header,
+                        body=body,
+                        user_id=user_id,
+                        env_id=env_id,
+                        request_ctx=request_ctx,
+                    )
+                    item = ar[0] if ar else {"status": 0, "message": "断言执行失败"}
+                    item["type"] = t
+                    results.append(item)
+                elif t == 4:
+                    results.append(
+                        await ApiAutomationService._op_run_db(
+                            db, op, env_id, user_id, phase="后置"
+                        )
+                    )
+                elif t == 5:
+                    results.append(
+                        await ApiAutomationService._op_run_script(
+                            db,
+                            op,
+                            env_id,
+                            user_id,
+                            phase="后置",
+                            request_ctx=request_ctx,
+                            response_ctx=response_ctx,
+                        )
+                    )
+                elif t == 6:
+                    results.append(
+                        await ApiAutomationService._op_run_script_lib(
+                            db,
+                            op,
+                            env_id,
+                            user_id,
+                            phase="后置",
+                            request_ctx=request_ctx,
+                            response_ctx=response_ctx,
+                        )
+                    )
+                elif t == 7:
+                    results.append(
+                        await ApiAutomationService._op_import_api(
+                            db, op, env_id, user_id, phase="后置"
+                        )
+                    )
                 else:
                     results.append({"status": 0, "message": f"未知后置操作类型：{t}"})
             except Exception as e:
@@ -2862,14 +4052,24 @@ class ApiAutomationService:
         header: Dict[str, Any],
         body: Any,
         user_id: int,
+        env_id: int = 0,
+        request_ctx: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """
         handle_assert：
         - type=1: 响应结果断言（支持新版 rules 数组格式 和 旧版格式）
         - type=4: 直连数据库断言
-        - type=5: 自定义断言（Python 脚本）
+        - type=5: 自定义断言（Python / JavaScript 脚本）
         """
+        from .script_runtime import normalize_language, run_script_async
+
         results: List[Dict[str, Any]] = []
+        response_ctx = {
+            "code": res.get("code") or res.get("status_code") or 0,
+            "body": res.get("body") if res.get("body") is not None else body,
+            "header": res.get("header") or header or {},
+            "res_time": res.get("res_time") or 0,
+        }
         for op in ops or []:
             try:
                 t = int(op.get("type") or 0)
@@ -2893,26 +4093,60 @@ class ApiAutomationService:
                             break
                     results.append(r)
                 elif t == 5:
-                    # 自定义断言脚本
-                    script = op.get("custom_script") or ""
-                    if not script.strip():
-                        results.append({"status": 1, "message": "自定义断言：脚本为空，跳过", "type": t})
+                    script = op.get("custom_script") or op.get("code") or ""
+                    language = normalize_language(op.get("language") or "python")
+                    name = str(op.get("custom_name") or "").strip()
+                    label = f"自定义断言{('：' + name) if name else ''}"
+                    if not str(script).strip():
+                        results.append({"status": 1, "message": f"{label}：脚本为空，跳过", "type": t, "language": language})
                         continue
                     try:
-                        import json as _json
-                        exec_globals = {
-                            "response": body,
-                            "status_code": res.get("code") or res.get("status_code") or 0,
-                            "headers": header,
-                            "res_time": res.get("res_time") or 0,
-                            "assert": __builtins__["assert"] if isinstance(__builtins__, dict) else getattr(__builtins__, "assert", None),
-                        }
-                        exec(script, exec_globals)
-                        results.append({"status": 1, "message": "自定义断言：执行通过", "type": t})
-                    except AssertionError as ae:
-                        results.append({"status": 0, "message": f"自定义断言失败：{ae}", "type": t})
+                        session_vars, env_vars = await ApiAutomationService._load_script_env_maps(
+                            db, int(env_id or 0), user_id
+                        )
+                        run_res = await run_script_async(
+                            str(script),
+                            language=language,
+                            session_vars=session_vars,
+                            env_vars=env_vars,
+                            request_ctx=request_ctx if isinstance(request_ctx, dict) else None,
+                            response_ctx=response_ctx,
+                            extra_globals={
+                                # 兼容旧版自定义断言注入
+                                "status_code": response_ctx.get("code") or 0,
+                                "headers": response_ctx.get("header") or {},
+                                "res_time": response_ctx.get("res_time") or 0,
+                                "body": response_ctx.get("body"),
+                            },
+                        )
+                        if run_res.success:
+                            await ApiAutomationService._apply_exported_vars(
+                                db, run_res.vars or {}, int(env_id or 0), user_id, request_ctx=request_ctx
+                            )
+                            results.append({
+                                "status": 1,
+                                "message": f"{label}：执行通过（{language}）",
+                                "type": t,
+                                "language": language,
+                                "output": (run_res.output or "")[:500],
+                            })
+                        else:
+                            err = str(run_res.error or "unknown")
+                            is_fail = "assert" in err.lower() or "failed" in err.lower() or "AssertionError" in err
+                            results.append({
+                                "status": 0,
+                                "message": (f"{label}失败：{err}" if is_fail else f"{label}脚本执行错误：{err}"),
+                                "type": t,
+                                "language": language,
+                                "output": (run_res.output or "")[:500],
+                            })
                     except Exception as se:
-                        results.append({"status": 0, "message": f"自定义断言脚本执行错误：{se}", "type": t})
+                        results.append({
+                            "status": 0,
+                            "message": f"{label}脚本执行错误：{se}",
+                            "type": t,
+                            "language": language,
+                        })
                 else:
                     results.append({"status": 0, "message": f"未知断言类型：{t}", "type": t})
             except Exception as e:
@@ -2921,33 +4155,39 @@ class ApiAutomationService:
 
     @staticmethod
     async def _send_request(method: int, url: str, headers: Dict[str, Any], params: Dict[str, Any], body_type: int, body: Any,
-                            form_data: Dict[str, Any], form_urlencoded: Dict[str, Any], file_paths: List[str], config: Dict[str, Any]) -> Dict[str, Any]:
+                            form_data: Dict[str, Any], form_urlencoded: Dict[str, Any], file_paths: List[str], config: Dict[str, Any],
+                            auth: Any = None) -> Dict[str, Any]:
         timeout = (config.get("req_timeout", 5), config.get("res_timeout", 5))
         ssl_verify = config.get("ssl_verify", True)
         allow_redirects = config.get("allow_redirects", True)
+        common = {"timeout": timeout, "verify": ssl_verify, "allow_redirects": allow_redirects, "auth": auth}
         try:
             if method == 1:
-                r = requests.get(url, headers=headers, params=params, timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
+                r = requests.get(url, headers=headers, params=params, **common)
             elif method == 2:
                 if body_type in (1, 2):
-                    r = requests.post(url, headers=headers, json=(body if body_type == 2 else {}), timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
+                    r = requests.post(url, headers=headers, params=params, json=(body if body_type == 2 else {}), **common)
                 elif body_type == 3:
-                    r = requests.post(url, headers=headers, data=form_data, timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
+                    r = requests.post(url, headers=headers, params=params, data=form_data, **common)
                 elif body_type == 4:
-                    r = requests.post(url, headers=headers, data=form_urlencoded, timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
+                    r = requests.post(url, headers=headers, params=params, data=form_urlencoded, **common)
                 elif body_type == 5:
                     files = []
                     for p in file_paths or []:
                         files.append(("file", (p.split("/")[-1], open(p, "rb"), "application/octet-stream")))
-                    r = requests.request("POST", url=url, files=files, data={}, timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
+                    r = requests.request("POST", url=url, headers=headers, params=params, files=files, data={}, **common)
                 else:
-                    r = requests.post(url, headers=headers, json=body, timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
+                    r = requests.post(url, headers=headers, params=params, json=body, **common)
             elif method == 3:
-                r = requests.put(url, headers=headers, params=params, json=body, timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
+                r = requests.put(url, headers=headers, params=params, json=body, **common)
             elif method == 4:
-                r = requests.delete(url, headers=headers, params=params, timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
+                r = requests.delete(url, headers=headers, params=params, **common)
+            elif method == 5:
+                r = requests.patch(url, headers=headers, params=params, json=body, **common)
+            elif method == 6:
+                r = requests.options(url, headers=headers, params=params, **common)
             else:
-                r = requests.request("GET", url=url, headers=headers, timeout=timeout, verify=ssl_verify, allow_redirects=allow_redirects)
+                r = requests.request("GET", url=url, headers=headers, params=params, **common)
 
             try:
                 body_json = r.json()
@@ -3010,8 +4250,51 @@ class ApiAutomationService:
         """
         env_id = int(body.get("env_id") or 0)
         req = body.get("req") or {}
-       
-        raw_url = body.get("url") or req.get("url") or ""
+        if not isinstance(req, dict):
+            req = {}
+
+        # 服务级全局参数（Header/Cookie/Query/Body），请求侧同名覆盖
+        api_id = int(body.get("id") or req.get("id") or 0)
+        common = await ApiAutomationService._load_common_params_by_api(db, api_id=api_id or None)
+        req = ApiAutomationService.apply_common_params_to_req(req, common)
+
+        # 可被前置脚本改写的请求上下文
+        request_ctx: Dict[str, Any] = {
+            "url": body.get("url") or req.get("url") or "",
+            "method": req.get("method"),
+            "header": req.get("header"),
+            "params": req.get("params"),
+            "body": req.get("body"),
+            "body_type": req.get("body_type"),
+            "form_data": req.get("form_data"),
+            "form_urlencoded": req.get("form_urlencoded"),
+            "file_path": req.get("file_path"),
+            "config": req.get("config"),
+            "cookies": req.get("cookies"),
+        }
+
+        before_ops = req.get("before") or []
+        after_ops = req.get("after") or []
+        assert_ops = req.get("assert") or []
+
+        before_list: List[Dict[str, Any]] = []
+        if before_ops:
+            before_list = await ApiAutomationService._pre_request(
+                db=db,
+                ops=before_ops,
+                env_id=env_id,
+                user_id=user_id,
+                request_ctx=request_ctx,
+            )
+
+        # 前置可能改写 request_ctx / 环境变量，回写后再做变量替换
+        if request_ctx.get("url") is not None:
+            req["url"] = request_ctx.get("url")
+        for k in ("header", "params", "body", "body_type", "form_data", "form_urlencoded", "file_path", "config", "method", "cookies"):
+            if k in request_ctx and request_ctx.get(k) is not None:
+                req[k] = request_ctx.get(k)
+
+        raw_url = request_ctx.get("url") or body.get("url") or req.get("url") or ""
         url = await ApiAutomationService.handle_var(db, env_id, raw_url)
         url = str(url or "").strip()
         if "{{" in url and "}}" in url:
@@ -3025,13 +4308,6 @@ class ApiAutomationService:
                 "请确认环境配置中的接口前缀（如 https://uapis.cn）已正确替换到 URL。"
             )
 
-        # 参数依赖
-        params_id = req.get("params_id")
-        if params_id is not None:
-            p = (await db.execute(select(ApiParamsModel).where(ApiParamsModel.id == int(params_id), ApiParamsModel.enabled_flag == 1))).scalar_one_or_none()
-            if p and isinstance(req.get("body"), dict) and isinstance(p.value, dict):
-                req["body"].update(p.value)
-
         body_payload = await ApiAutomationService.handle_var(db, env_id, req.get("body") or {})
         method = int(req.get("method") or 2)
         body_type = int(req.get("body_type") or 2)
@@ -3043,19 +4319,9 @@ class ApiAutomationService:
         config = req.get("config") if isinstance(req.get("config"), dict) else None
         config = config or {"retry": 0, "req_timeout": 5, "res_timeout": 5}
 
-     
-        before_ops = req.get("before") or []
-        after_ops = req.get("after") or []
-        assert_ops = req.get("assert") or []
-
-        before_list: List[Dict[str, Any]] = []
-        if before_ops:
-            before_list = await ApiAutomationService._pre_request(
-                db=db,
-                ops=before_ops,
-                env_id=env_id,
-                user_id=user_id,
-            )
+        headers, params, req_auth = await ApiAutomationService.apply_request_auth(
+            db, env_id, req, headers=headers, params=params
+        )
 
         res = await ApiAutomationService._send_request(
             method=method,
@@ -3068,6 +4334,7 @@ class ApiAutomationService:
             form_urlencoded=form_urlencoded,
             file_paths=file_paths,
             config=config,
+            auth=req_auth,
         )
 
         after_list: List[Dict[str, Any]] = []
@@ -3080,6 +4347,7 @@ class ApiAutomationService:
                 body=body_payload,
                 env_id=env_id,
                 user_id=user_id,
+                request_ctx=request_ctx,
             )
 
         assert_list: List[Dict[str, Any]] = []
@@ -3091,6 +4359,8 @@ class ApiAutomationService:
                 header=headers,
                 body=body_payload,
                 user_id=user_id,
+                env_id=env_id,
+                request_ctx=request_ctx,
             )
 
         res["before"] = before_list
@@ -3132,7 +4402,6 @@ class ApiAutomationService:
                     "before": req.get("before") or [],
                     "after": req.get("after") or [],
                     "assert": req.get("assert") or [],
-                    "params_id": params_id,
                 },
                 res=res,
                 api_id=int(body.get("id") or 0),
@@ -3202,8 +4471,6 @@ class ApiAutomationService:
                 case["fail"] = 0
                 case_uuid = await ApiAutomationService._new_uuid()
                 case["uuid"] = case_uuid
-
-                params_id = case.get("config", {}).get("params_id")
 
                 for step in case.get("script", []):
                     if ApiAutomationService._is_api_script_result_cancel_requested(result_id):
@@ -3337,224 +4604,6 @@ class ApiAutomationService:
             await ApiAutomationService._send_notice(db, 33, "api_report", notice_data, user_id=user_id)
         finally:
             ApiAutomationService._clear_api_script_cancel(result_id)
-
-    @staticmethod
-    async def _execute_script_step(
-        db: AsyncSession,
-        step: Dict[str, Any],
-        result_id: str,
-        menu_uuid: str,
-        env_id: int,
-        params_id: Optional[int],
-        user_id: int,
-    ) -> Tuple[bool, Dict[str, Any], Dict[str, Any]]:
-        """单步执行逻辑，对handle_api_request（before -> request -> after -> assert）。"""
-        req: Dict[str, Any] = {}
-        try:
-            api_id = int(step["api_id"])
-            api_row = (
-                await db.execute(
-                    select(ApiModel).where(
-                        ApiModel.id == api_id,
-                        ApiModel.enabled_flag == 1,
-                    )
-                )
-            ).scalar_one()
-            api_cfg = api_row.req or {}
-
-            
-            try:
-                url = await ApiAutomationService.handle_var(db, env_id, api_row.url)
-                await ApiAutomationService._write_log_line(menu_uuid, result_id, f"请求地址-url：{url}")
-            except Exception as e:
-                await ApiAutomationService._write_log_line(menu_uuid, result_id, f"请求url地址解析失败，原因是：{e}")
-                url = str(e)
-
-            async def _safe_handle_params(raw: Any, t: str) -> Dict[str, Any]:
-                try:
-                    d = ApiAutomationService.params_header(raw)
-                    d = await ApiAutomationService.handle_var(db, env_id, d)
-                    await ApiAutomationService._write_log_line(menu_uuid, result_id, f"请求参数-{t}：{d}")
-                    return d
-                except Exception as e:
-                    await ApiAutomationService._write_log_line(menu_uuid, result_id, f"请求参数解析失败，原因：{str(e)}")
-                    return {"Exception": str(e)}
-
-            async def _safe_handle_body(raw: Any) -> Any:
-                try:
-                    d = await ApiAutomationService.handle_var(db, env_id, raw)
-                    await ApiAutomationService._write_log_line(menu_uuid, result_id, f"请求体-body：{d}")
-                    return d
-                except Exception as e:
-                    await ApiAutomationService._write_log_line(menu_uuid, result_id, f"请求体解析失败，原因：{str(e)}")
-                    return {"Exception": str(e)}
-
-            headers = await _safe_handle_params(api_cfg.get("header"), "header") if api_cfg.get("header") else {}
-            params = await _safe_handle_params(api_cfg.get("params"), "params") if api_cfg.get("params") else {}
-
-            if api_cfg.get("params_id") is not None and params_id is not None:
-                p = (
-                    await db.execute(
-                        select(ApiParamsModel).where(
-                            ApiParamsModel.id == int(params_id),
-                            ApiParamsModel.enabled_flag == 1,
-                        )
-                    )
-                ).scalar_one_or_none()
-                if p and isinstance(api_cfg.get("body"), dict) and isinstance(p.value, dict):
-                    api_cfg["body"].update(p.value)
-
-            body = await _safe_handle_body(api_cfg.get("body") or {})
-            form_data = await _safe_handle_params(api_cfg.get("form_data"), "form_data") if api_cfg.get("form_data") else {}
-            form_urlencoded = await _safe_handle_params(api_cfg.get("form_urlencoded"), "form_urlencoded") if api_cfg.get("form_urlencoded") else {}
-            file_paths = api_cfg.get("file_path") or []
-            config = api_cfg.get("config") or {"retry": 0, "req_timeout": 5, "res_timeout": 5}
-
-            
-            before_ops = api_cfg.get("before") or []
-            after_ops = api_cfg.get("after") or []
-            assert_ops = api_cfg.get("assert") or []
-
-            before_list: List[Dict[str, Any]] = []
-            if before_ops:
-                before_list = await ApiAutomationService._pre_request(
-                    db=db,
-                    ops=before_ops,
-                    env_id=env_id,
-                    user_id=user_id,
-                )
-            before_status = all(int(i.get("status") or 0) == 1 for i in before_list) if before_ops else True
-            for item in before_list:
-                if item.get("message"):
-                    await ApiAutomationService._write_log_line(menu_uuid, result_id, str(item.get("message")))
-
-            res = await ApiAutomationService._send_request(
-                method=int(api_cfg.get("method") or 2),
-                url=str(url),
-                headers=headers,
-                params=params,
-                body_type=int(api_cfg.get("body_type") or 2),
-                body=body,
-                form_data=form_data,
-                form_urlencoded=form_urlencoded,
-                file_paths=file_paths,
-                config=config,
-            )
-            await ApiAutomationService._write_log_line(
-                menu_uuid, result_id, f"请求结果：{res.get('body')}"
-            )
-
-            after_list: List[Dict[str, Any]] = []
-            if after_ops:
-                after_list = await ApiAutomationService._after_request(
-                    db=db,
-                    ops=after_ops,
-                    res=res,
-                    header=headers,
-                    body=body,
-                    env_id=env_id,
-                    user_id=user_id,
-                )
-          
-                for idx, op in enumerate(after_ops):
-                    if idx < len(after_list) and isinstance(after_list[idx], dict) and "type" not in after_list[idx]:
-                        after_list[idx]["type"] = op.get("type")
-            after_status = all(int(i.get("status") or 0) == 1 for i in after_list) if after_ops else True
-            for item in after_list:
-                if item.get("message"):
-                    await ApiAutomationService._write_log_line(menu_uuid, result_id, str(item.get("message")))
-
-            assert_list: List[Dict[str, Any]] = []
-            if assert_ops:
-                assert_list = await ApiAutomationService._handle_assert(
-                    db=db,
-                    ops=assert_ops,
-                    res=res,
-                    header=headers,
-                    body=body,
-                    user_id=user_id,
-                )
-            assert_status = all(int(i.get("status") or 0) == 1 for i in assert_list) if assert_ops else True
-        
-            for item in assert_list:
-                if int(item.get("type") or 0) == 1:
-                    if item.get("message"):
-                        await ApiAutomationService._write_log_line(menu_uuid, result_id, str(item.get("message")))
-                elif int(item.get("type") or 0) == 4:
-                    for sub in item.get("content") or []:
-                        if not int(sub.get("status") or 0):
-                            if sub.get("message"):
-                                await ApiAutomationService._write_log_line(menu_uuid, result_id, str(sub.get("message")))
-
-            res["before"] = before_list
-            res["after"] = after_list
-            res["assert"] = assert_list
-
-            success = bool(before_status and after_status and assert_status and int(res.get("code") or 0) == 200)
-
-            def _to_kv_list(d: Dict[str, Any]) -> List[Dict[str, Any]]:
-                if not d:
-                    return []
-                return [{"key": k, "value": v, "status": True} for k, v in d.items()]
-
-            req = {
-                "params_id": params_id,
-                "method": api_cfg.get("method"),
-                "body_type": api_cfg.get("body_type"),
-                "url": url,
-                "header": _to_kv_list(headers),
-                "params": _to_kv_list(params),
-                "body": body,
-                "form_data": _to_kv_list(form_data),
-                "form_urlencoded": _to_kv_list(form_urlencoded),
-                "file_path": file_paths,
-                "assert": api_cfg.get("assert") or [],
-                "before": api_cfg.get("before") or [],
-                "config": config,
-                "after": api_cfg.get("after") or [],
-            }
-
-            row = ApiScriptResultModel(
-                name=step.get("name") or "",
-                uuid=str(step.get("uuid") or ""),
-                menu_id=menu_uuid,
-                result_id=int(result_id),
-                status=1 if success else 0,
-                req=req,
-                res=res,
-                created_by=user_id,
-                updated_by=user_id,
-            )
-            db.add(row)
-            await db.flush()
-            return success, req, res
-        except Exception as e:
-            await ApiAutomationService._write_log_line(
-                menu_uuid, result_id, f"构建请求失败，原因：{str(e)}"
-            )
-            error_res = {
-                "status": 0,
-                "message": f"请求接口失败， 原因是：{str(e)}",
-                "code": 500,
-                "body": {"msg": "接口请求失败", "exception": str(e)},
-                "header": {},
-                "size": 0,
-                "res_time": 0,
-            }
-            row = ApiScriptResultModel(
-                name=step.get("name") or "",
-                uuid=str(step.get("uuid") or ""),
-                menu_id=menu_uuid,
-                result_id=int(result_id),
-                status=0,
-                req=req,
-                res=error_res,
-                created_by=user_id,
-                updated_by=user_id,
-            )
-            db.add(row)
-            await db.flush()
-            return False, req, error_res
 
     # 结果查询 & 日志
     @staticmethod
@@ -3852,6 +4901,16 @@ class ApiAutomationService:
         imported_count = 0
         updated_count = 0
         folder_names = set()
+        service_apis = list(
+            (
+                await db.execute(
+                    select(ApiModel).where(
+                        ApiModel.enabled_flag == 1,
+                        ApiModel.api_service_id == service_id,
+                    )
+                )
+            ).scalars().all()
+        )
 
         for i in apis or []:
             if int(i.get("isFolder") or 0) != 1:
@@ -3871,16 +4930,13 @@ class ApiAutomationService:
                         body = await ApiAutomationService._gitlab_handle_body(k.get("requestParams") or [])
                         url = str(k.get("url") or "/")
 
-                       
-                        api_row = (
-                            await db.execute(
-                                select(ApiModel).where(
-                                    ApiModel.enabled_flag == 1,
-                                    ApiModel.api_service_id == service_id,
-                                    (ApiModel.url == url) | (ApiModel.url == (service_name + url)),
-                                )
+                        api_row = ApiAutomationService._find_api_by_path_and_method(
+                            service_apis, url, int(method)
+                        )
+                        if not api_row:
+                            api_row = ApiAutomationService._find_api_by_path_and_method(
+                                service_apis, service_name + url, int(method)
                             )
-                        ).scalar_one_or_none()
 
                         if api_row:
                             old_req = api_row.req or {}
@@ -3920,7 +4976,14 @@ class ApiAutomationService:
                                             )
                                         )
                                         break
-                            new_url = url if service_name in str(api_row.url) else (service_name + url)
+                            new_url = ApiAutomationService._prefer_existing_url(
+                                str(api_row.url or ""),
+                                service_name + url,
+                            )
+                            if service_name not in new_url and not re.match(r"^https?://", new_url, re.I):
+                                # 无前置时仍按历史逻辑补上服务名占位
+                                new_url = service_name + url
+                            req["url"] = new_url
                             await db.execute(
                                 update(ApiModel)
                                 .where(ApiModel.id == api_row.id, ApiModel.enabled_flag == 1)
@@ -3947,6 +5010,7 @@ class ApiAutomationService:
                                 "file_path": [],
                                 "assert": [],
                                 "config": {"retry": 0, "req_timeout": 5, "res_timeout": 5},
+                                "url": service_name + url,
                             }
                             api_value = ApiModel(
                                 api_service_id=service_id,
@@ -3959,6 +5023,7 @@ class ApiAutomationService:
                             db.add(api_value)
                             await db.flush()
                             api_id = api_value.id
+                            service_apis.append(api_value)
                             imported_count += 1
 
                         # 菜单叶子节点（type=2）
@@ -4005,20 +5070,6 @@ class ApiAutomationService:
         if not u:
             raise ValueError("author 对应用户不存在")
         user_id = int(u.id)
-
-        # upsert commonErrorCodes
-        for i in body.get("commonErrorCodes") or []:
-            code = str(i.get("code") or "")
-            msg = str(i.get("msg") or "")
-            if not code:
-                continue
-            row = (
-                await db.execute(select(ApiCodeModel).where(ApiCodeModel.code == code, ApiCodeModel.enabled_flag == 1))
-            ).scalar_one_or_none()
-            if row:
-                await db.execute(update(ApiCodeModel).where(ApiCodeModel.id == row.id).values(name=msg, updated_by=user_id))
-            else:
-                db.add(ApiCodeModel(code=code, name=msg, created_by=user_id, updated_by=user_id))
 
         server_name = str(body.get("serverName") or "")
         if not server_name:
@@ -4485,7 +5536,6 @@ class ApiAutomationService:
         from .model import ApiCaseModel, ApiSuiteModel
         case_ids = [int(i) for i in (body.get("case_ids") or [])]
         env_id = body.get("env_id")
-        params_id = body.get("params_id")
         task_name = body.get("name") or f"用例执行_{uuid.uuid4().hex[:8]}"
 
         # 查询用例，获取 script 和所属服务 ID
@@ -4509,7 +5559,7 @@ class ApiAutomationService:
             run_list.append({
                 "name": case.name,  # 显示原始名称
                 "script": case.script or [],
-                "config": {"env_id": env_id, "params_id": params_id, "case_id": case.id, "step_rely": getattr(case, 'step_rely', 1)},
+                "config": {"env_id": env_id, "case_id": case.id, "step_rely": getattr(case, 'step_rely', 1)},
             })
             case_id_map[case_name] = case.id
 
@@ -4517,7 +5567,7 @@ class ApiAutomationService:
         run_body = {
             "result_id": result_id,
             "name": task_name,
-            "config": {"env_id": env_id, "params_id": params_id},
+            "config": {"env_id": env_id},
             "run_list": run_list,
             "api_service_id": api_service_id,
         }

@@ -104,8 +104,18 @@
                     />
                   </el-form-item>
                   <el-form-item>
-                    <el-button type="primary" icon="Search" @click="element_list">搜索</el-button>
-                    <el-button type="success" icon="Plus" @click="Add_element(item, item.id)">新增元素</el-button>
+                    <el-button type="primary" @click="search_elements(item)">
+                      <el-icon><ele-Search /></el-icon>
+                      搜索
+                    </el-button>
+                    <el-button @click="reset_elements(item)">
+                      <el-icon><ele-Refresh /></el-icon>
+                      重置
+                    </el-button>
+                    <el-button type="success" @click="Add_element(item, item.id)">
+                      <el-icon><ele-Plus /></el-icon>
+                      新增元素
+                    </el-button>
                   </el-form-item>
                 </el-form>
               </el-card>
@@ -151,24 +161,24 @@
                   <el-table-column prop="update_time" label="更新时间" width="170" align="center" />
                   <el-table-column label="操作" width="170" align="center" fixed="right">
                     <template #default="{ row }">
-                      <span style="white-space: nowrap">
-                        <el-button type="primary" size="small" icon="Edit" @click="Edit_element(item, row)">编辑</el-button>
-                        <el-button type="danger" size="small" icon="Delete" @click="Del_element(item, row)">删除</el-button>
-                      </span>
+                      <div class="table-actions">
+                        <el-button type="warning" size="small" @click="Edit_element(item, row)">编辑</el-button>
+                        <el-button type="danger" size="small" @click="Del_element(item, row)">删除</el-button>
+                      </div>
                     </template>
                   </el-table-column>
                 </el-table>
                 <div style="margin-top: 12px">
                   <el-pagination
-                    v-show="refresh_tab.content?.total > 0"
+                    v-show="(item.content?.total || 0) > 0"
                     background
-                    v-model:current-page="refresh_tab.searchParams.currentPage"
-                    v-model:page-size="refresh_tab.searchParams.pageSize"
-                    :total="refresh_tab.content.total"
+                    v-model:current-page="item.searchParams.currentPage"
+                    v-model:page-size="item.searchParams.pageSize"
+                    :total="item.content?.total || 0"
                     :page-sizes="[10, 20, 50, 100]"
                     layout="total, sizes, prev, pager, next, jumper"
-                    @size-change="element_list"
-                    @current-change="element_list"
+                    @size-change="() => search_elements(item)"
+                    @current-change="() => search_elements(item)"
                   />
                 </div>
               </el-card>
@@ -506,28 +516,35 @@ const tab_active = ref('')
 const refresh_tab = ref<any>({})
 
 const get_element = async (data: any) => {
-  if (data.type === 1) {
-    searchParams.value.search.menu_id = data.id
-    const res: any = await get_element_list({
-      page: searchParams.value.currentPage,
-      pageSize: searchParams.value.pageSize,
+  // 仅菜单节点（type=1）打开元素列表
+  if (data.type !== 1) return
+  const params = {
+    currentPage: 1,
+    pageSize: 10,
+    search: {
+      name__icontains: '',
       menu_id: data.id,
-      name__icontains: searchParams.value.search.name__icontains,
-    })
-    const pageData = {
-      content: res.data.content || [],
-      total: res.data.totalElements ?? res.data.total ?? 0,
-    }
-    await addTab(data, searchParams.value, pageData)
+    },
   }
+  const res: any = await get_element_list({
+    page: params.currentPage,
+    pageSize: params.pageSize,
+    menu_id: data.id,
+    name__icontains: params.search.name__icontains,
+  })
+  const pageData = {
+    content: res.data.content || [],
+    total: res.data.totalElements ?? res.data.total ?? 0,
+  }
+  await addTab(data, params, pageData)
 }
 
 const addTab = async (node: any, searchParamsValue: any, element: any) => {
   const tabKey = String(node.id)
   const index = tab_list.value.findIndex((item: any) => item.name === tabKey)
   const tab = {
-    title: node.name,   // 显示用
-    name: tabKey,       // 唯一 key，用 id
+    title: node.name,
+    name: tabKey,
     content: element,
     id: node.id,
     type: node.type,
@@ -546,13 +563,11 @@ const addTab = async (node: any, searchParamsValue: any, element: any) => {
 
 const tab_click = async (target: any) => {
   const tabName = target.props.name
-  tab_list.value.forEach((tab: any) => {
-    if (tab.name === tabName) {
-      refresh_tab.value = tab
-      refresh_tab.value.searchParams.search.menu_id = tab.id
-    }
-  })
-  await element_list()
+  const tab = tab_list.value.find((t: any) => t.name === tabName)
+  if (tab) {
+    refresh_tab.value = tab
+    await search_elements(tab)
+  }
 }
 
 const removeTab = (targetName: string) => {
@@ -570,20 +585,34 @@ const removeTab = (targetName: string) => {
   }
   tab_active.value = activeName
   tab_list.value = tabs.filter((tab: any) => tab.name !== targetName)
+  refresh_tab.value = tab_list.value.find((t: any) => t.name === activeName) || {}
 }
 
-const element_list = async () => {
-  if (!refresh_tab.value.id) return
+const search_elements = async (tab?: any) => {
+  const current = tab || refresh_tab.value
+  if (!current?.id) return
+  refresh_tab.value = current
   const res: any = await get_element_list({
-    page: refresh_tab.value.searchParams.currentPage,
-    pageSize: refresh_tab.value.searchParams.pageSize,
-    menu_id: refresh_tab.value.id,
-    name__icontains: refresh_tab.value.searchParams.search.name__icontains,
+    page: current.searchParams.currentPage,
+    pageSize: current.searchParams.pageSize,
+    menu_id: current.id,
+    name__icontains: current.searchParams.search.name__icontains || '',
   })
-  refresh_tab.value.content = {
+  current.content = {
     content: res.data.content || [],
     total: res.data.totalElements ?? res.data.total ?? 0,
   }
+}
+
+const reset_elements = async (tab: any) => {
+  if (!tab?.searchParams) return
+  tab.searchParams.search.name__icontains = ''
+  tab.searchParams.currentPage = 1
+  await search_elements(tab)
+}
+
+const element_list = async () => {
+  await search_elements(refresh_tab.value)
 }
 
 const add_element_dialogRef = ref<InstanceType<typeof NtestercDialog> | null>(null)
@@ -702,7 +731,17 @@ onMounted(() => {
 }
 
 .el-table .el-button + .el-button {
-  margin-left: 6px;
+  margin-left: 0;
+}
+
+.table-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.table-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 
 .custom-tree-node {

@@ -16,8 +16,14 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" icon="Search" @click="loadList">搜索</el-button>
-          <el-button icon="Refresh" @click="resetSearch">重置</el-button>
+          <el-button type="primary" @click="loadList">
+            <el-icon><ele-Search /></el-icon>
+            搜索
+          </el-button>
+          <el-button @click="resetSearch">
+            <el-icon><ele-Refresh /></el-icon>
+            重置
+          </el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -51,10 +57,12 @@
         <el-table-column label="结束时间" prop="end_time" width="170" align="center">
           <template #default="{ row }">{{ row.end_time || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="160" align="center" fixed="right">
+        <el-table-column label="操作" width="180" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="viewDetail(row)">查看详情</el-button>
-            <el-button type="danger" size="small" plain @click="deleteResult(row)">删除</el-button>
+            <div class="table-actions">
+              <el-button type="success" size="small" @click="viewDetail(row)">详情</el-button>
+              <el-button type="danger" size="small" @click="deleteResult(row)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -232,6 +240,13 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .page-container { padding: 16px; }
+.table-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.table-actions :deep(.el-button + .el-button) { margin-left: 0; }
 .search-card { margin-bottom: 0; }
 .result-summary {
   display: flex; gap: 12px; margin-bottom: 14px;

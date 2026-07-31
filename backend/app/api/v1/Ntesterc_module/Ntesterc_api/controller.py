@@ -58,6 +58,43 @@ async def edit_api_service(
         return error_response(f"接口请求异常，原因是：{str(e)}")
 
 
+@router.post("/get_common_params")
+async def get_common_params(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """获取服务级全局参数（Header/Cookie/Query/Body）"""
+    try:
+        body = await body_to_json(request)
+        data = await ApiAutomationService.get_common_params(
+            db, int(body["api_service_id"]), current_user_id
+        )
+        return success_response(data, message="请求成功")
+    except Exception as e:
+        return error_response(f"接口请求异常，原因是：{str(e)}")
+
+
+@router.post("/save_common_params")
+async def save_common_params(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """保存服务级全局参数（Header/Cookie/Query/Body）"""
+    try:
+        body = await body_to_json(request)
+        await ApiAutomationService.save_common_params(
+            db,
+            int(body["api_service_id"]),
+            body.get("common_params") or {},
+            current_user_id,
+        )
+        return success_response({}, message="保存成功")
+    except Exception as e:
+        return error_response(f"接口请求异常，原因是：{str(e)}")
+
+
 @router.post("/del_api_service")
 async def del_api_service(
     request: Request,
@@ -286,6 +323,24 @@ async def req_history(
             page_size=page_size,
         )
         return success_response(data, message="请求成功")
+    except Exception as e:
+        return error_response(f"接口请求异常，原因是：{str(e)}")
+
+
+@router.post("/del_req_history")
+async def del_req_history(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """硬删除调试记录"""
+    try:
+        body = await body_to_json(request) or {}
+        result_id = body.get("id") or body.get("result_id")
+        if not result_id:
+            return error_response("缺少记录 ID")
+        await ApiAutomationService.delete_request_history(db, int(result_id), current_user_id)
+        return success_response({}, message="删除成功")
     except Exception as e:
         return error_response(f"接口请求异常，原因是：{str(e)}")
 
@@ -526,81 +581,6 @@ async def del_api_db(
         return error_response(f"接口请求异常，原因是：{str(e)}")
 
 
-@router.post("/api_params_list")
-async def api_params_list(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user_id: int = Depends(get_current_user_id),
-):
-    """参数依赖列表"""
-    try:
-        data = await ApiAutomationService.get_params_list(db, current_user_id)
-        return success_response(data, message="请求成功")
-    except Exception as e:
-        return error_response(f"接口请求异常，原因是：{str(e)}")
-
-
-@router.post("/add_api_params")
-async def add_api_params(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user_id: int = Depends(get_current_user_id),
-):
-    """新增参数依赖"""
-    try:
-        body = await body_to_json(request)
-        await ApiAutomationService.add_params(db, body, current_user_id)
-        return success_response({}, message="添加成功")
-    except Exception as e:
-        return error_response(f"接口请求异常，原因是：{str(e)}")
-
-
-@router.post("/edit_api_params")
-async def edit_api_params(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user_id: int = Depends(get_current_user_id),
-):
-    """编辑参数依赖"""
-    try:
-        body = await body_to_json(request)
-        await ApiAutomationService.edit_params(db, int(body["id"]), body, current_user_id)
-        return success_response({}, message="编辑成功")
-    except Exception as e:
-        return error_response(f"接口请求异常，原因是：{str(e)}")
-
-
-@router.post("/del_api_params")
-async def del_api_params(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user_id: int = Depends(get_current_user_id),
-):
-    """删除参数依赖"""
-    try:
-        body = await body_to_json(request)
-        await ApiAutomationService.delete_params(db, int(body["id"]), current_user_id)
-        return success_response({}, message="删除成功")
-    except Exception as e:
-        return error_response(f"接口请求异常，原因是：{str(e)}")
-
-
-
-@router.post("/api_params")
-async def api_params(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user_id: int = Depends(get_current_user_id),
-):
-    """参数依赖分页列表"""
-    try:
-        body = await body_to_json(request)
-        data = await ApiAutomationService.get_params_list_paged(db, body or {}, current_user_id)
-        return success_response(data, message="请求成功")
-    except Exception as e:
-        return error_response(f"接口请求异常，原因是：{str(e)}")
-
-
 @router.post("/test_db_conn")
 async def test_db_conn(
     request: Request,
@@ -616,184 +596,6 @@ async def test_db_conn(
         db_id = int(body.get("id"))
         data = await ApiAutomationService.test_db_connection(db, db_id, current_user_id)
         return success_response(data, message=data.get("message", "测试完成"))
-    except Exception as e:
-        return error_response(f"接口请求异常，原因是：{str(e)}")
-
-
-@router.post("/params_select")
-async def params_select(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user_id: int = Depends(get_current_user_id),
-):
-    """参数依赖下拉"""
-    try:
-        data = await ApiAutomationService.params_select(db, current_user_id)
-        return success_response(data, message="请求成功")
-    except Exception as e:
-        return error_response(f"接口请求异常，原因是：{str(e)}")
-
-
-@router.post("/api_function_list")
-async def api_function_list(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user_id: int = Depends(get_current_user_id),
-):
-    """公共函数列表"""
-    try:
-        data = await ApiAutomationService.get_functions(db, current_user_id)
-        return success_response(data, message="请求成功")
-    except Exception as e:
-        return error_response(f"接口请求异常，原因是：{str(e)}")
-
-
-@router.post("/add_api_function")
-async def add_api_function(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user_id: int = Depends(get_current_user_id),
-):
-    """新增公共函数"""
-    try:
-        body = await body_to_json(request)
-        await ApiAutomationService.add_function(db, body, current_user_id)
-        return success_response({}, message="添加成功")
-    except Exception as e:
-        return error_response(f"接口请求异常，原因是：{str(e)}")
-
-
-@router.post("/edit_api_function")
-async def edit_api_function(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user_id: int = Depends(get_current_user_id),
-):
-    """编辑公共函数"""
-    try:
-        body = await body_to_json(request)
-        await ApiAutomationService.edit_function(db, int(body["id"]), body, current_user_id)
-        return success_response({}, message="编辑成功")
-    except Exception as e:
-        return error_response(f"接口请求异常，原因是：{str(e)}")
-
-
-@router.post("/del_api_function")
-async def del_api_function(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user_id: int = Depends(get_current_user_id),
-):
-    """删除公共函数"""
-    try:
-        body = await body_to_json(request)
-        await ApiAutomationService.delete_function(db, int(body["id"]), current_user_id)
-        return success_response({}, message="删除成功")
-    except Exception as e:
-        return error_response(f"接口请求异常，原因是：{str(e)}")
-
-
-
-@router.post("/api_function")
-async def api_function(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user_id: int = Depends(get_current_user_id),
-):
-    """公共函数分页列表"""
-    try:
-        body = await body_to_json(request)
-        data = await ApiAutomationService.get_functions_paged(db, body or {}, current_user_id)
-        return success_response(data, message="请求成功")
-    except Exception as e:
-        return error_response(f"接口请求异常，原因是：{str(e)}")
-
-
-@router.post("/api_code_list")
-async def api_code_list(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-):
-    """错误码列表"""
-    try:
-        data = await ApiAutomationService.get_codes(db)
-        return success_response(data, message="请求成功")
-    except Exception as e:
-        return error_response(f"接口请求异常，原因是：{str(e)}")
-
-
-
-@router.post("/api_code")
-async def api_code(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user_id: int = Depends(get_current_user_id),
-):
-    """错误码分页列表"""
-    try:
-        body = await body_to_json(request)
-        data = await ApiAutomationService.get_codes_paged(db, body or {}, current_user_id)
-        return success_response(data, message="请求成功")
-    except Exception as e:
-        return error_response(f"接口请求异常，原因是：{str(e)}")
-
-
-@router.post("/add_code")
-async def add_code(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user_id: int = Depends(get_current_user_id),
-):
-    """新增错误码"""
-    try:
-        body = await body_to_json(request)
-        await ApiAutomationService.add_code(db, body or {}, current_user_id)
-        return success_response({}, message="添加成功")
-    except Exception as e:
-        return error_response(f"接口请求异常，原因是：{str(e)}")
-
-
-@router.post("/edit_code")
-async def edit_code(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user_id: int = Depends(get_current_user_id),
-):
-    """编辑错误码"""
-    try:
-        body = await body_to_json(request)
-        await ApiAutomationService.edit_code(db, int(body["id"]), body or {}, current_user_id)
-        return success_response({}, message="编辑成功")
-    except Exception as e:
-        return error_response(f"接口请求异常，原因是：{str(e)}")
-
-
-@router.post("/del_code")
-async def del_code(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user_id: int = Depends(get_current_user_id),
-):
-    """删除错误码"""
-    try:
-        body = await body_to_json(request)
-        await ApiAutomationService.delete_code(db, int(body["id"]), current_user_id)
-        return success_response({}, message="删除成功")
-    except Exception as e:
-        return error_response(f"接口请求异常，原因是：{str(e)}")
-
-
-@router.post("/api_update_list")
-async def api_update_list(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user_id: int = Depends(get_current_user_id),
-):
-    """文档同步变更记录列表"""
-    try:
-        body = await body_to_json(request)
-        data = await ApiAutomationService.get_updates(db, body.get("api_service_id"), current_user_id)
-        return success_response(data, message="请求成功")
     except Exception as e:
         return error_response(f"接口请求异常，原因是：{str(e)}")
 

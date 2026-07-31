@@ -92,6 +92,7 @@ class ProjectMCPConfigModel(Base):
     auth_type = Column(String(30), nullable=True, default="none", comment="none/bearer/api_key/custom")
     auth_config = Column(JSON, nullable=True, comment="鉴权参数")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
+    is_connected = Column(Boolean, default=False, comment="最近一次测试是否已连接")
     description = Column(Text, nullable=True, comment="备注")
 
 class ProjectApiKeyModel(Base):

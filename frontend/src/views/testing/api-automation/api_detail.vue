@@ -50,7 +50,10 @@
 											<el-input v-model="p.value" placeholder="参数值" style="flex:1" size="small" />
 											<el-button type="danger" link size="small" @click="removeParam(i)">删除</el-button>
 										</div>
-										<el-button type="primary" link size="small" @click="addParam">+ 添加参数</el-button>
+										<div class="kv-actions">
+											<el-button type="primary" link size="small" @click="addParam">+ 添加参数</el-button>
+											<el-button type="primary" link size="small" @click="openBulkEdit('params')">批量编辑</el-button>
+										</div>
 									</div>
 								</el-tab-pane>
 								<!-- Header -->
@@ -65,7 +68,10 @@
 											<el-input v-model="h.value" placeholder="Header值" style="flex:1" size="small" />
 											<el-button type="danger" link size="small" @click="removeHeader(i)">删除</el-button>
 										</div>
-										<el-button type="primary" link size="small" @click="addHeader">+ 添加Header</el-button>
+										<div class="kv-actions">
+											<el-button type="primary" link size="small" @click="addHeader">+ 添加Header</el-button>
+											<el-button type="primary" link size="small" @click="openBulkEdit('header')">批量编辑</el-button>
+										</div>
 									</div>
 								</el-tab-pane>
 								<!-- Body -->
@@ -73,11 +79,6 @@
 									<div class="body-pane">
 										<div class="body-type-bar">
 											<span v-for="bt in bodyTypes" :key="bt.value" class="body-type-item" :class="{ active: req.body_type === bt.value }" @click="req.body_type = bt.value">{{ bt.label }}</span>
-											<!-- <div class="body-type-bar-right">
-												<el-select v-model="req.params_id" clearable placeholder="非必选：参数依赖" size="small" style="width: 160px">
-													<el-option v-for="(p, i) in params_list" :key="i" :label="p.name" :value="p.id" />
-												</el-select>
-											</div> -->
 										</div>
 										<div class="body-content">
 											<div v-if="req.body_type === 1" class="body-empty">该请求没有 Body</div>
@@ -97,7 +98,10 @@
 													<el-input v-model="f.value" placeholder="参数值" class="kv-col-val" size="small" />
 													<el-button type="danger" link size="small" class="kv-col-act" @click="removeFormData(i)">删除</el-button>
 												</div>
-												<el-button type="primary" link size="small" style="margin-top:6px" @click="addFormData">+ 添加参数</el-button>
+												<div class="kv-actions">
+													<el-button type="primary" link size="small" @click="addFormData">+ 添加参数</el-button>
+													<el-button type="primary" link size="small" @click="openBulkEdit('form_data')">批量编辑</el-button>
+												</div>
 											</div>
 											<div v-else-if="req.body_type === 4" class="body-kv">
 												<div class="kv-header"><span class="kv-col-check"></span><span class="kv-col-key">参数名</span><span class="kv-col-val">参数值</span><span class="kv-col-act"></span></div>
@@ -107,7 +111,10 @@
 													<el-input v-model="f.value" placeholder="参数值" class="kv-col-val" size="small" />
 													<el-button type="danger" link size="small" class="kv-col-act" @click="removeFormUrlencoded(i)">删除</el-button>
 												</div>
-												<el-button type="primary" link size="small" style="margin-top:6px" @click="addFormUrlencoded">+ 添加参数</el-button>
+												<div class="kv-actions">
+													<el-button type="primary" link size="small" @click="addFormUrlencoded">+ 添加参数</el-button>
+													<el-button type="primary" link size="small" @click="openBulkEdit('form_urlencoded')">批量编辑</el-button>
+												</div>
 											</div>
 											<div v-else-if="req.body_type === 5" class="body-binary">
 												<el-upload :show-file-list="false" :limit="1" :http-request="uploadBinaryFile">
@@ -155,41 +162,86 @@
 											<el-input v-model="c.domain" placeholder="Domain（可选）" style="width:20%" size="small" />
 											<el-button type="danger" link size="small" @click="removeCookie(i)">删除</el-button>
 										</div>
-										<el-button type="primary" link size="small" style="margin-top:6px" @click="addCookie">+ 添加 Cookie</el-button>
+										<div class="kv-actions">
+											<el-button type="primary" link size="small" @click="addCookie">+ 添加 Cookie</el-button>
+											<el-button type="primary" link size="small" @click="openBulkEdit('cookies')">批量编辑</el-button>
+										</div>
 									</div>
 								</el-tab-pane>
 								<!-- Auth -->
 								<el-tab-pane name="auth">
 									<template #label><span>Auth</span></template>
-									<div style="padding:8px 0">
-										<el-form label-width="120px">
+									<div style="padding:8px 0; max-height:100%; overflow:auto">
+										<el-form label-width="130px">
 											<el-form-item label="认证类型：">
-												<el-select v-model="req.auth_type" style="width:220px" placeholder="请选择认证类型">
+												<el-select v-model="req.auth_type" style="width:280px" placeholder="请选择认证类型">
 													<el-option label="无认证" value="none" />
 													<el-option label="Bearer Token" value="bearer" />
+													<el-option label="JWT Bearer" value="jwt" />
 													<el-option label="Basic Auth" value="basic" />
+													<el-option label="Digest Auth" value="digest" />
 													<el-option label="API Key" value="apikey" />
+													<el-option label="OAuth 2.0" value="oauth2" />
 												</el-select>
 											</el-form-item>
+
 											<template v-if="req.auth_type === 'bearer'">
 												<el-form-item label="Token：">
-													<el-input v-model="req.auth_token" placeholder="请输入 Bearer Token" style="width:400px" />
+													<el-input v-model="req.auth_token" placeholder="支持 {{变量}}，如 {{token}}" style="width:420px" />
+												</el-form-item>
+												<el-form-item label="前缀：">
+													<el-input v-model="req.auth_prefix" placeholder="默认 Bearer，可留空" style="width:200px" />
 												</el-form-item>
 											</template>
-											<template v-if="req.auth_type === 'basic'">
+
+											<template v-if="req.auth_type === 'jwt'">
+												<el-form-item label="Token 来源：">
+													<el-radio-group v-model="req.auth_jwt_mode">
+														<el-radio value="token">使用已有 Token</el-radio>
+														<el-radio value="generate">本地签发 JWT</el-radio>
+													</el-radio-group>
+												</el-form-item>
+												<template v-if="req.auth_jwt_mode !== 'generate'">
+													<el-form-item label="JWT Token：">
+														<el-input v-model="req.auth_token" type="textarea" :rows="3" placeholder="粘贴 JWT，支持 {{变量}}" style="width:480px" />
+													</el-form-item>
+												</template>
+												<template v-else>
+													<el-form-item label="算法：">
+														<el-select v-model="req.auth_jwt_alg" style="width:200px">
+															<el-option v-for="a in jwtAlgOptions" :key="a" :label="a" :value="a" />
+														</el-select>
+													</el-form-item>
+													<el-form-item label="Secret / 私钥：">
+														<el-input v-model="req.auth_jwt_secret" type="textarea" :rows="3" placeholder="HS* 填密钥；RS*/ES* 填 PEM 私钥" style="width:480px" />
+													</el-form-item>
+													<el-form-item label="Payload：">
+														<el-input v-model="req.auth_jwt_payload" type="textarea" :rows="5" placeholder='{"sub":"user","exp":1710000000}' style="width:480px" />
+													</el-form-item>
+													<el-form-item label="Header（可选）：">
+														<el-input v-model="req.auth_jwt_headers" type="textarea" :rows="2" placeholder='{"typ":"JWT"}' style="width:480px" />
+													</el-form-item>
+												</template>
+												<el-form-item label="前缀：">
+													<el-input v-model="req.auth_prefix" placeholder="默认 Bearer" style="width:200px" />
+												</el-form-item>
+											</template>
+
+											<template v-if="req.auth_type === 'basic' || req.auth_type === 'digest'">
 												<el-form-item label="用户名：">
-													<el-input v-model="req.auth_username" placeholder="请输入用户名" style="width:300px" />
+													<el-input v-model="req.auth_username" placeholder="请输入用户名，支持 {{变量}}" style="width:320px" />
 												</el-form-item>
 												<el-form-item label="密码：">
-													<el-input v-model="req.auth_password" placeholder="请输入密码" type="password" show-password style="width:300px" />
+													<el-input v-model="req.auth_password" placeholder="请输入密码，支持 {{变量}}" type="password" show-password style="width:320px" />
 												</el-form-item>
 											</template>
+
 											<template v-if="req.auth_type === 'apikey'">
 												<el-form-item label="Key：">
-													<el-input v-model="req.auth_key" placeholder="请输入 Key 名称" style="width:300px" />
+													<el-input v-model="req.auth_key" placeholder="如 X-API-KEY / api_key" style="width:320px" />
 												</el-form-item>
 												<el-form-item label="Value：">
-													<el-input v-model="req.auth_value" placeholder="请输入 Key 值" style="width:300px" />
+													<el-input v-model="req.auth_value" placeholder="支持 {{变量}}" style="width:320px" />
 												</el-form-item>
 												<el-form-item label="添加到：">
 													<el-radio-group v-model="req.auth_in">
@@ -198,6 +250,56 @@
 													</el-radio-group>
 												</el-form-item>
 											</template>
+
+											<template v-if="req.auth_type === 'oauth2'">
+												<el-form-item label="Grant Type：">
+													<el-select v-model="req.auth_oauth_grant" style="width:280px">
+														<el-option label="Access Token（已有令牌）" value="access_token" />
+														<el-option label="Client Credentials" value="client_credentials" />
+														<el-option label="Password Credentials" value="password" />
+													</el-select>
+												</el-form-item>
+												<template v-if="req.auth_oauth_grant === 'access_token'">
+													<el-form-item label="Access Token：">
+														<el-input v-model="req.auth_oauth_access_token" type="textarea" :rows="2" placeholder="支持 {{access_token}}" style="width:480px" />
+													</el-form-item>
+												</template>
+												<template v-else>
+													<el-form-item label="Token URL：">
+														<el-input v-model="req.auth_oauth_token_url" placeholder="https://auth.example.com/oauth/token" style="width:480px" />
+													</el-form-item>
+													<el-form-item label="Client ID：">
+														<el-input v-model="req.auth_oauth_client_id" style="width:320px" />
+													</el-form-item>
+													<el-form-item label="Client Secret：">
+														<el-input v-model="req.auth_oauth_client_secret" type="password" show-password style="width:320px" />
+													</el-form-item>
+													<el-form-item label="Scope：">
+														<el-input v-model="req.auth_oauth_scope" placeholder="可选，多个用空格分隔" style="width:320px" />
+													</el-form-item>
+													<el-form-item label="Client 认证：">
+														<el-radio-group v-model="req.auth_oauth_client_auth">
+															<el-radio value="basic">Basic Auth Header</el-radio>
+															<el-radio value="body">Request Body</el-radio>
+														</el-radio-group>
+													</el-form-item>
+													<template v-if="req.auth_oauth_grant === 'password'">
+														<el-form-item label="用户名：">
+															<el-input v-model="req.auth_username" style="width:320px" />
+														</el-form-item>
+														<el-form-item label="密码：">
+															<el-input v-model="req.auth_password" type="password" show-password style="width:320px" />
+														</el-form-item>
+													</template>
+												</template>
+												<el-form-item label="前缀：">
+													<el-input v-model="req.auth_prefix" placeholder="默认 Bearer" style="width:200px" />
+												</el-form-item>
+											</template>
+
+											<div v-if="req.auth_type && req.auth_type !== 'none'" class="auth-hint">
+												发送请求时会自动写入 Authorization / 指定 Header 或 Query；支持环境变量替换。
+											</div>
 										</el-form>
 									</div>
 								</el-tab-pane>
@@ -308,7 +410,35 @@ mode="assert"
 						</div>
 					</div>
 
-				<!-- 保存为用例对话框 -->
+				
+				<el-dialog v-model="bulkEditVisible" title="批量编辑" width="560px" destroy-on-close append-to-body>
+					<div class="bulk-edit-toolbar">
+						<el-radio-group v-model="bulkEditMode" size="small">
+							<el-radio-button value="comma">逗号模式</el-radio-button>
+							<el-radio-button value="colon">冒号模式</el-radio-button>
+						</el-radio-group>
+						<span class="bulk-edit-format">格式：{{ bulkEditMode === 'colon' ? '参数名:示例值' : '参数名,示例值' }}</span>
+					</div>
+					<el-input
+						v-model="bulkEditText"
+						type="textarea"
+						:rows="12"
+						:placeholder="bulkEditPlaceholder"
+						spellcheck="false"
+						class="bulk-edit-textarea"
+					/>
+					<div class="bulk-edit-tip">
+						{{ bulkEditMode === 'colon'
+							? '字段之间以英文冒号(:)分隔，多条记录以换行分隔'
+							: '字段之间以英文逗号(,)分隔，多条记录以换行分隔' }}
+					</div>
+					<template #footer>
+						<el-button @click="bulkEditVisible = false">取消</el-button>
+						<el-button type="primary" @click="confirmBulkEdit">确定</el-button>
+					</template>
+				</el-dialog>
+
+				
 				<el-dialog v-model="saveCaseDialogVisible" title="保存为测试用例" width="560px" destroy-on-close>
 					<el-form :model="saveCaseForm" label-width="80px">
 						<el-form-item label="用例名称" required>
@@ -542,7 +672,7 @@ mode="assert"
 
 			<!-- 接口文档面板 -->
 			<div v-show="mainTab==='doc'" class="side-panel doc-panel">
-				<ApiDocPanel :api-data="apiData" />
+				<ApiDocPanel :api-data="apiData" :api-id="Number(apiId || 0)" />
 			</div>
 
 			<!-- 调试记录面板 -->
@@ -633,6 +763,10 @@ mode="assert"
 									<el-select v-model="c.operator" style="width:110px">
 										<el-option label="等于" value="eq" />
 										<el-option label="不等于" value="neq" />
+										<el-option label="大于" value="gt" />
+										<el-option label="大于等于" value="gte" />
+										<el-option label="小于" value="lt" />
+										<el-option label="小于等于" value="lte" />
 										<el-option label="包含" value="contains" />
 										<el-option label="不包含" value="not_contains" />
 										<el-option label="正则" value="regex" />
@@ -690,7 +824,7 @@ import VueJsonPretty from 'vue-json-pretty';
 import JsonEditor from '/@/components/code-editor/JsonEditor.vue';
 import 'vue-json-pretty/lib/styles.css';
 import { ArrowDown, Operation, Clock, CircleCheck, Coin, Delete, Connection, EditPen, InfoFilled, View, Folder } from '@element-plus/icons-vue';
-import { api_send, save_api, save_api_case, edit_history, api_params, apiAutomationApi } from '/@/api/v1/testing/apiAutomation';
+import { api_send, save_api, save_api_case, edit_history, apiAutomationApi } from '/@/api/v1/testing/apiAutomation';
 import { useFileApi } from '/@/api/v1/common/file';
 import OperationPanel from './components/OperationPanel.vue';
 import ApiHistoryPanel from './components/ApiHistoryPanel.vue';
@@ -707,7 +841,6 @@ const props = defineProps({
 	tree_list: { type: Array, default: () => [] },
 	redis_example_list: { type: Array, default: () => ['common'] },
 	local_db_list: { type: Array, default: () => [] },
-	params_list: { type: Array, default: () => [{ name: '', id: null }] },
 	serviceId: { type: [Number, String], default: null },
 	embedded: { type: Boolean, default: false }, // 嵌入模式：隐藏顶部大 Tab
 	initialTab: { type: String, default: 'debug' }, // 嵌入模式下初始显示的 Tab
@@ -775,11 +908,7 @@ const buildRawCode = (raw: any, lang: string): string => {
 	return JSON.stringify(raw, null, 2);
 };
 
-const toolboxDialogVisible = ref(false);
-const paramsDepDialogVisible = ref(false);
 const directDbDialogVisible = ref(false);
-const publicFuncDialogVisible = ref(false);
-const errorCodeDialogVisible = ref(false);
 const envManageDialogVisible = ref(false);
 
 // 顶部大 Tab
@@ -844,7 +973,10 @@ const mockDisplayUrl = computed(() => {
 const formatMockCondition = (row: any) => {
 	const parts: string[] = [];
 	if (row.ipEnabled && row.ips?.trim()) parts.push(`IP∈[${row.ips.trim()}]`);
-	const opMap: Record<string, string> = { eq: '等于', neq: '不等于', contains: '包含', not_contains: '不包含', regex: '正则', exists: '存在', not_exists: '不存在' };
+	const opMap: Record<string, string> = {
+		eq: '等于', neq: '不等于', gt: '大于', gte: '大于等于', lt: '小于', lte: '小于等于',
+		contains: '包含', not_contains: '不包含', regex: '正则', exists: '存在', not_exists: '不存在',
+	};
 	for (const c of row.paramConditions || []) {
 		if (!c?.name) continue;
 		const op = opMap[c.operator] || c.operator;
@@ -888,7 +1020,6 @@ const confirmAddMockExpect = () => {
 	mockExpectDialogVisible.value = false;
 };
 
-const functionList = ref<any[]>([]);
 const scriptList = ref<any[]>([]);  // 脚本中心的脚本列表
 const localDbList = ref<any[]>([]);  // 内部加载的数据库列表，优先级高于 props
 
@@ -905,14 +1036,6 @@ const addClientCert = () => {
 	clientCerts.value.push({ ...newCert.value });
 	newCert.value = { host: '', port: '443', crt: '', key: '', pfx: '', passphrase: '' };
 	certPage.value = 'list';
-};
-
-const loadFunctionList = async () => {
-	try {
-		const res: any = await apiAutomationApi.api_function_list({});
-		const raw = res?.data;
-		functionList.value = Array.isArray(raw?.content) ? raw.content : (Array.isArray(raw) ? raw : []);
-	} catch { functionList.value = []; }
 };
 
 // 加载脚本中心的脚本列表（用于前置/后置操作的脚本库选择）
@@ -942,14 +1065,34 @@ const effectiveDbList = computed(() => {
 
 const req = ref({
 	method: 1, url: '', params: [], header: [], body: '', body_type: 2,
-	form_data: [], form_urlencoded: [], file_path: [], params_id: null,
+	form_data: [], form_urlencoded: [], file_path: [],
 	before: [], after: [], assert: [],
 	config: { retry: 0, req_timeout: 30, res_timeout: 30, ssl_verify: true, allow_redirects: true, url_encode: false },
 	xml_body: '', text_body: '', graphql_query: '', graphql_variables: '',
 	cookies: [] as any[],
-	auth_type: 'none', auth_token: '', auth_username: '', auth_password: '',
-	auth_key: '', auth_value: '', auth_in: 'header',
+	auth_type: 'none',
+	auth_token: '',
+	auth_username: '',
+	auth_password: '',
+	auth_key: '',
+	auth_value: '',
+	auth_in: 'header',
+	auth_prefix: 'Bearer',
+	auth_jwt_mode: 'token',
+	auth_jwt_alg: 'HS256',
+	auth_jwt_secret: '',
+	auth_jwt_payload: '{\n  "sub": "user"\n}',
+	auth_jwt_headers: '',
+	auth_oauth_grant: 'access_token',
+	auth_oauth_access_token: '',
+	auth_oauth_token_url: '',
+	auth_oauth_client_id: '',
+	auth_oauth_client_secret: '',
+	auth_oauth_scope: '',
+	auth_oauth_client_auth: 'basic',
 });
+
+const jwtAlgOptions = ['HS256', 'HS384', 'HS512', 'RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512'];
 
 const bodyTypes = [
 	{ label: 'none', value: 1 }, { label: 'form-data', value: 3 },
@@ -981,7 +1124,6 @@ let offScriptListSync: (() => void) | null = null;
 let offDbListSync: (() => void) | null = null;
 onMounted(() => {
 	window.addEventListener('resize', onResize);
-	loadFunctionList();
 	loadScriptList();
 	loadLocalDbList();
 	offScriptListSync = onNtestScriptsChanged((sid) => {
@@ -1007,7 +1149,12 @@ const currentMethodColor = computed(() => {
 
 const apiId = computed(() => {
 	const d = props.apiData;
-	return d?.api_id ?? d?.api_info?.id ?? d?.id ?? null;
+	const candidates = [d?.api_id, d?.api_info?.id, d?.api_info?.api_id];
+	for (const c of candidates) {
+		const n = Number(c);
+		if (Number.isFinite(n) && n > 0) return n;
+	}
+	return null;
 });
 
 const lastApiId = ref<number | string | null>(null);
@@ -1030,7 +1177,6 @@ watch(
 			form_data: Array.isArray(reqSrc.form_data) ? reqSrc.form_data : [],
 			form_urlencoded: Array.isArray(reqSrc.form_urlencoded) ? reqSrc.form_urlencoded : [],
 			file_path: Array.isArray(reqSrc.file_path) ? reqSrc.file_path : [],
-			params_id: reqSrc.params_id ?? apiInfo.params_id ?? null,
 			before: Array.isArray(reqSrc.before) ? reqSrc.before : [],
 			after: Array.isArray(reqSrc.after) ? reqSrc.after : [],
 			assert: Array.isArray(reqSrc.assert) ? reqSrc.assert : [],
@@ -1038,9 +1184,26 @@ watch(
 			xml_body: reqSrc.xml_body ?? '', text_body: reqSrc.text_body ?? '',
 			graphql_query: reqSrc.graphql_query ?? '', graphql_variables: reqSrc.graphql_variables ?? '',
 			cookies: Array.isArray(reqSrc.cookies) ? reqSrc.cookies : [],
-			auth_type: reqSrc.auth_type ?? 'none', auth_token: reqSrc.auth_token ?? '',
-			auth_username: reqSrc.auth_username ?? '', auth_password: reqSrc.auth_password ?? '',
-			auth_key: reqSrc.auth_key ?? '', auth_value: reqSrc.auth_value ?? '', auth_in: reqSrc.auth_in ?? 'header',
+			auth_type: reqSrc.auth_type ?? 'none',
+			auth_token: reqSrc.auth_token ?? '',
+			auth_username: reqSrc.auth_username ?? '',
+			auth_password: reqSrc.auth_password ?? '',
+			auth_key: reqSrc.auth_key ?? '',
+			auth_value: reqSrc.auth_value ?? '',
+			auth_in: reqSrc.auth_in ?? 'header',
+			auth_prefix: reqSrc.auth_prefix ?? 'Bearer',
+			auth_jwt_mode: reqSrc.auth_jwt_mode ?? 'token',
+			auth_jwt_alg: reqSrc.auth_jwt_alg ?? 'HS256',
+			auth_jwt_secret: reqSrc.auth_jwt_secret ?? '',
+			auth_jwt_payload: reqSrc.auth_jwt_payload ?? '{\n  "sub": "user"\n}',
+			auth_jwt_headers: reqSrc.auth_jwt_headers ?? '',
+			auth_oauth_grant: reqSrc.auth_oauth_grant ?? 'access_token',
+			auth_oauth_access_token: reqSrc.auth_oauth_access_token ?? '',
+			auth_oauth_token_url: reqSrc.auth_oauth_token_url ?? '',
+			auth_oauth_client_id: reqSrc.auth_oauth_client_id ?? '',
+			auth_oauth_client_secret: reqSrc.auth_oauth_client_secret ?? '',
+			auth_oauth_scope: reqSrc.auth_oauth_scope ?? '',
+			auth_oauth_client_auth: reqSrc.auth_oauth_client_auth ?? 'basic',
 		};
 		res.value = { body: resSrc.body ?? {}, header: resSrc.header ?? {}, before: Array.isArray(resSrc.before) ? resSrc.before : [], after: Array.isArray(resSrc.after) ? resSrc.after : [], assert: Array.isArray(resSrc.assert) ? resSrc.assert : [], code: resSrc.code ?? 0, size: resSrc.size ?? 0, res_time: resSrc.res_time ?? 0, cookies: Array.isArray(resSrc.cookies) ? resSrc.cookies : [], console: Array.isArray(resSrc.console) ? resSrc.console : [], raw_request: resSrc.raw_request ?? null };
 	},
@@ -1057,6 +1220,87 @@ const addFormUrlencoded = () => { req.value.form_urlencoded.push({ key: '', valu
 const removeFormUrlencoded = (i: number) => { req.value.form_urlencoded.splice(i, 1); };
 const addCookie = () => { if (!req.value.cookies) req.value.cookies = []; req.value.cookies.push({ status: true, name: '', value: '', domain: '' }); };
 const removeCookie = (i: number) => { req.value.cookies?.splice(i, 1); };
+
+type BulkEditTarget = 'params' | 'header' | 'form_data' | 'form_urlencoded' | 'cookies';
+const bulkEditVisible = ref(false);
+const bulkEditMode = ref<'colon' | 'comma'>('colon');
+const bulkEditText = ref('');
+const bulkEditTarget = ref<BulkEditTarget>('header');
+const bulkEditPlaceholder = computed(() =>
+	bulkEditMode.value === 'colon'
+		? 'name:value\nAuthorization: Bearer xxx'
+		: 'name,value\nAuthorization,Bearer xxx'
+);
+
+const getBulkRows = (target: BulkEditTarget): Array<{ key: string; value: string; status?: boolean; domain?: string }> => {
+	if (target === 'cookies') {
+		return (req.value.cookies || []).map((c: any) => ({
+			key: String(c.name || ''),
+			value: String(c.value || ''),
+			status: c.status !== false,
+			domain: String(c.domain || ''),
+		}));
+	}
+	const list = (req.value as any)[target];
+	return Array.isArray(list) ? list.map((r: any) => ({
+		key: String(r.key || ''),
+		value: String(r.value ?? ''),
+		status: r.status !== false,
+	})) : [];
+};
+
+const serializeBulkRows = (rows: Array<{ key: string; value: string }>, mode: 'colon' | 'comma') => {
+	const sep = mode === 'colon' ? ':' : ',';
+	return rows
+		.filter((r) => String(r.key || '').trim())
+		.map((r) => `${String(r.key).trim()}${sep}${String(r.value ?? '')}`)
+		.join('\n');
+};
+
+const parseBulkText = (text: string, mode: 'colon' | 'comma') => {
+	const sep = mode === 'colon' ? ':' : ',';
+	const rows: Array<{ key: string; value: string; status: boolean }> = [];
+	for (const raw of String(text || '').split(/\r?\n/)) {
+		const line = raw.trim();
+		if (!line) continue;
+		const idx = line.indexOf(sep);
+		if (idx < 0) {
+			const key = line.trim();
+			if (key) rows.push({ key, value: '', status: true });
+			continue;
+		}
+		const key = line.slice(0, idx).trim();
+		const value = line.slice(idx + 1).trim();
+		if (!key) continue;
+		rows.push({ key, value, status: true });
+	}
+	return rows;
+};
+
+const openBulkEdit = (target: BulkEditTarget) => {
+	bulkEditTarget.value = target;
+	bulkEditMode.value = 'colon';
+	bulkEditText.value = serializeBulkRows(getBulkRows(target), 'colon');
+	bulkEditVisible.value = true;
+};
+
+const confirmBulkEdit = () => {
+	const rows = parseBulkText(bulkEditText.value, bulkEditMode.value);
+	const target = bulkEditTarget.value;
+	if (target === 'cookies') {
+		const oldMap = new Map((req.value.cookies || []).map((c: any) => [String(c.name || ''), c]));
+		req.value.cookies = rows.map((r) => ({
+			status: true,
+			name: r.key,
+			value: r.value,
+			domain: String(oldMap.get(r.key)?.domain || ''),
+		}));
+	} else {
+		(req.value as any)[target] = rows.map((r) => ({ key: r.key, value: r.value, status: true }));
+	}
+	bulkEditVisible.value = false;
+	ElMessage.success(`已导入 ${rows.length} 条`);
+};
 
 const addBefore = (type: number) => {
 	const item: any = { type };
@@ -1089,7 +1333,7 @@ const addAssert = (type: number) => {
 	else if (type===2) { item.ops_db=null; item.ops_db_table=''; item.ops_db_where=''; item.ops_db_assert=[]; }
 	else if (type===3) { item.ops_redis=null; item.ops_redis_key=''; item.ops_redis_assert=[]; }
 	else if (type===4) { item.local_db=null; item.local_db_table=''; item.local_db_where=''; item.local_db_assert=[]; }
-	else if (type===5) { item.custom_name=''; item.custom_script=''; item.custom_expect=''; }
+	else if (type===5) { item.custom_name=''; item.custom_script=''; item.custom_expect=''; item.language='python'; }
 	req.value.assert.push(item);
 };
 const removeAssert = (i: number) => { req.value.assert.splice(i, 1); };
@@ -1286,6 +1530,12 @@ const confirmSaveAsCase = async () => {
 .kv-header { display: flex; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--el-border-color-lighter); margin-bottom: 4px; font-size: 12px; color: var(--el-text-color-placeholder); }
 .kv-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .kv-col-check { width: 24px; flex-shrink: 0; } .kv-col-key { flex: 1; } .kv-col-val { flex: 1; } .kv-col-act { width: 40px; flex-shrink: 0; }
+.kv-actions { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.auth-hint { margin: 4px 0 0 130px; max-width: 520px; font-size: 12px; color: var(--el-text-color-placeholder); line-height: 1.5; }
+.bulk-edit-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.bulk-edit-format { font-size: 13px; color: var(--el-text-color-secondary); }
+.bulk-edit-textarea :deep(textarea) { font-family: Consolas, Monaco, 'Courier New', monospace; font-size: 13px; line-height: 1.5; }
+.bulk-edit-tip { margin-top: 8px; font-size: 12px; color: var(--el-text-color-placeholder); }
 .header-icon { margin-right: 6px; }
 .tab-info { display: flex; align-items: center; gap: 4px; font-size: 13px; }
 .code, .size { font-size: 13px; color: #409eff; margin-left: 4px; font-weight: 500; }

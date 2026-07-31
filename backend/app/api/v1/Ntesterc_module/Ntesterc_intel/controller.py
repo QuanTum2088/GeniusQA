@@ -1959,15 +1959,17 @@ async def get_sub_projects(
                 for row in ui_projects
             ]
         
-        # 查询API项目
+        # 查询API服务（接口自动化 api_automation_services）
         if not project_type or project_type == 'api':
+            # 与主项目无强外键关联时，返回当前可用的接口服务列表供选择
             api_query = text("""
-                SELECT id, name, description, base_url
-                FROM api_projects
-                WHERE project_id = :project_id AND enabled_flag = 1
-                ORDER BY creation_date DESC
+                SELECT id, name, COALESCE(description, '') AS description,
+                       COALESCE(source_addr, '') AS base_url
+                FROM api_automation_services
+                WHERE enabled_flag = 1
+                ORDER BY id DESC
             """)
-            api_result = await db.execute(api_query, {'project_id': project_id})
+            api_result = await db.execute(api_query)
             api_projects = api_result.fetchall()
             result_data['api_projects'] = [
                 {

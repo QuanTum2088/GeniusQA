@@ -318,60 +318,6 @@ class ApiExecutionResponse(BaseModel):
     error_message: Optional[str] = None
 
 
-# ---------- 参数依赖 ----------
-class ApiParamsListRequest(BaseModel):
-    """参数依赖列表"""
-    pass
-
-
-class AddApiParamsRequest(BaseModel):
-    """新增参数依赖"""
-    name: str = Field(..., description="参数名称")
-    value: Dict[str, Any] = Field(default_factory=dict, description="参数值(JSON对象)")
-
-
-class EditApiParamsRequest(BaseModel):
-    """编辑参数依赖"""
-    id: int = Field(..., description="参数ID")
-    name: Optional[str] = Field(None, description="参数名称")
-    value: Optional[Dict[str, Any]] = Field(None, description="参数值(JSON对象)")
-
-
-class DelApiParamsRequest(BaseModel):
-    """删除参数依赖"""
-    id: int = Field(..., description="参数ID")
-
-
-# ---------- 公共函数 ----------
-class ApiFunctionListRequest(BaseModel):
-    """公共函数列表"""
-    pass
-
-
-class AddApiFunctionRequest(BaseModel):
-    """新增公共函数"""
-    name: str = Field(..., description="函数名称")
-    description: Optional[str] = Field(None, description="函数描述")
-
-
-class EditApiFunctionRequest(BaseModel):
-    """编辑公共函数"""
-    id: int = Field(..., description="函数ID")
-    name: Optional[str] = Field(None, description="函数名称")
-    description: Optional[str] = Field(None, description="函数描述")
-
-
-class DelApiFunctionRequest(BaseModel):
-    """删除公共函数"""
-    id: int = Field(..., description="函数ID")
-
-
-# ---------- 文档同步变更 ----------
-class ApiUpdateListRequest(BaseModel):
-    """同步变更列表"""
-    api_service_id: Optional[int] = Field(None, description="服务ID，不传返回全部")
-
-
 # ---------- 用例集（Suite）----------
 
 class ApiSuiteListRequest(BaseModel):
@@ -434,6 +380,5 @@ class RunApiCaseRequest(BaseModel):
     """执行用例"""
     case_ids: List[int] = Field(..., description="用例ID列表")
     env_id: int = Field(..., description="环境ID")
-    params_id: Optional[int] = Field(None, description="参数集ID，可选")
     name: Optional[str] = Field(None, description="任务名称，不传则自动生成")
     result_id: Optional[int] = Field(None, description="前端指定的执行ID，用于轮询")

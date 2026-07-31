@@ -1400,143 +1400,174 @@ class TestCaseParserService:
         template_id: Optional[int],
         created_by: int
     ) -> int:
-        """保存到API测试用例"""
+        """保存到接口自动化服务（api_automation_*），api_project_id 实际为 api_service_id。"""
         from datetime import datetime
-        
+        from app.api.v1.Ntesterc_module.Ntesterc_api.model import (
+            ApiModel,
+            ApiMenuModel,
+            ApiServiceModel,
+        )
+        from app.api.v1.Ntesterc_module.Ntesterc_api.service import ApiAutomationService
+        from sqlalchemy import select
+
         # 1. 获取生成任务
         task = await TestCaseGenerationTaskService.get_task_by_id(db, task_id)
         if not task or not task.final_test_cases:
             raise Exception("任务不存在或没有生成用例")
-        
+
         # 2. 获取模板
         if template_id:
             template = await TestCaseTemplateService.get_by_id(db, template_id)
         else:
             template = await TestCaseTemplateService.get_default_template(db, 'api')
-        
+
         if not template:
             raise Exception("API模板不存在")
-        
+
         # 3. 解析用例
         rows = TestCaseParserService.parse_markdown_table(task.final_test_cases)
-        
         if not rows:
             raise Exception("没有解析到有效的测试用例")
-        
-        # 4. 获取或创建默认集合
-        from sqlalchemy import text
-        
-        # 查找或创建"AI生成用例"集合
-        collection_query = text("""
-            SELECT id FROM api_collections
-            WHERE api_project_id = :api_project_id 
-              AND name = 'AI生成用例'
-              AND enabled_flag = 1
-            LIMIT 1
-        """)
-        result = await db.execute(collection_query, {'api_project_id': api_project_id})
-        collection = result.fetchone()
-        
-        if collection:
-            collection_id = collection[0]
-        else:
-            # 创建新集合
-            create_collection_sql = text("""
-                INSERT INTO api_collections (
-                    api_project_id, name, description, 
-                    created_by, creation_date, enabled_flag
-                ) VALUES (
-                    :api_project_id, 'AI生成用例', 'AI智能生成的测试用例',
-                    :created_by, NOW(), 1
+
+        # 4. 校验接口服务
+        api_service_id = int(api_project_id)
+        service = (
+            await db.execute(
+                select(ApiServiceModel).where(
+                    ApiServiceModel.id == api_service_id,
+                    ApiServiceModel.enabled_flag == 1,
                 )
-            """)
-            result = await db.execute(create_collection_sql, {
-                'api_project_id': api_project_id,
-                'created_by': created_by
-            })
-            collection_id = result.lastrowid
-        
-        # 5. 批量保存API请求
+            )
+        ).scalar_one_or_none()
+        if not service:
+            raise Exception("接口服务不存在，请先在接口自动化中创建服务")
+
+        # 5. 获取或创建「AI生成用例」目录
+        folder = (
+            await db.execute(
+                select(ApiMenuModel).where(
+                    ApiMenuModel.api_service_id == api_service_id,
+                    ApiMenuModel.name == "AI生成用例",
+                    ApiMenuModel.type == 1,
+                    ApiMenuModel.enabled_flag == 1,
+                )
+            )
+        ).scalar_one_or_none()
+        if folder:
+            folder_id = int(folder.id)
+        else:
+            folder = ApiMenuModel(
+                name="AI生成用例",
+                type=1,
+                pid=0,
+                api_service_id=api_service_id,
+                status=1,
+                api_id=None,
+                created_by=created_by,
+                updated_by=created_by,
+            )
+            db.add(folder)
+            await db.flush()
+            folder_id = int(folder.id)
+
+        # 6. 批量保存为接口
         saved_count = 0
         for row in rows:
             mapped_data = TestCaseParserService.map_fields(row, template.field_mapping)
-            
-            # 创建API请求
-            insert_sql = text("""
-                INSERT INTO api_requests (
-                    collection_id, name, description, 
-                    method, url, request_type,
-                    headers, params, body,
-                    assertions, created_by, 
-                    creation_date, enabled_flag
-                ) VALUES (
-                    :collection_id, :name, :description,
-                    :method, :url, 'single',
-                    :headers, :params, :body,
-                    :assertions, :created_by,
-                    NOW(), 1
+            method = str(mapped_data.get("method", "GET") or "GET").upper()
+            url = str(mapped_data.get("url") or "/")
+            name = str(mapped_data.get("name") or "未命名API用例")
+            description = str(mapped_data.get("description") or row.get("用例ID", "") or "")
+
+            def _parse_json_field(raw, default):
+                if not raw:
+                    return default
+                if isinstance(raw, (dict, list)):
+                    return raw
+                try:
+                    return json.loads(raw)
+                except Exception:
+                    return default
+
+            headers_obj = _parse_json_field(mapped_data.get("headers"), {})
+            params_obj = _parse_json_field(mapped_data.get("params"), {})
+            body_obj = _parse_json_field(mapped_data.get("body"), {})
+
+            header_rows = []
+            if isinstance(headers_obj, dict):
+                for k, v in headers_obj.items():
+                    header_rows.append({"key": str(k), "value": str(v), "status": True})
+            elif isinstance(headers_obj, list):
+                header_rows = headers_obj
+
+            param_rows = []
+            if isinstance(params_obj, dict):
+                for k, v in params_obj.items():
+                    param_rows.append({"key": str(k), "value": str(v), "status": True})
+            elif isinstance(params_obj, list):
+                param_rows = params_obj
+
+            assert_ops = []
+            assertions = mapped_data.get("assertions")
+            if assertions:
+                try:
+                    assertions_data = json.loads(assertions) if isinstance(assertions, str) else assertions
+                    if isinstance(assertions_data, list):
+                        assert_ops = [{"type": 1, "assert_name": "AI断言", "rules": assertions_data}]
+                except Exception:
+                    assert_ops = [{
+                        "type": 1,
+                        "assert_name": "状态码",
+                        "rules": [{"target": "status_code", "path": "", "comparator": "eq", "expect": "200"}],
+                    }]
+
+            req = {
+                "params_id": None,
+                "body": body_obj if isinstance(body_obj, (dict, list, str)) else {},
+                "after": [],
+                "assert": assert_ops,
+                "before": [],
+                "config": {"retry": 0, "req_timeout": 5, "res_timeout": 5},
+                "header": header_rows or [{"key": None, "value": None, "status": True}],
+                "method": ApiAutomationService._doc_method_to_int(method),
+                "params": param_rows or [{"key": None, "value": None, "status": True}],
+                "body_type": 2 if body_obj else 1,
+                "file_path": [],
+                "form_data": [],
+                "form_urlencoded": [],
+                "url": url,
+            }
+
+            api_row = ApiModel(
+                api_service_id=api_service_id,
+                url=url,
+                req=req,
+                document={"source": "ai_generation", "raw": mapped_data},
+                name=name,
+                description=description,
+                created_by=created_by,
+                updated_by=created_by,
+            )
+            db.add(api_row)
+            await db.flush()
+
+            db.add(
+                ApiMenuModel(
+                    name=name,
+                    type=2,
+                    pid=folder_id,
+                    api_service_id=api_service_id,
+                    api_id=int(api_row.id),
+                    status=1,
+                    created_by=created_by,
+                    updated_by=created_by,
                 )
-            """)
-            
-            # 解析请求方法和URL
-            method = mapped_data.get('method', 'GET').upper()
-            url = mapped_data.get('url', '')
-            
-            # 解析headers（如果有）
-            headers_json = json.dumps({})
-            if mapped_data.get('headers'):
-                try:
-                    headers_json = json.dumps(json.loads(mapped_data['headers']))
-                except:
-                    headers_json = json.dumps({})
-            
-            # 解析params（如果有）
-            params_json = json.dumps({})
-            if mapped_data.get('params'):
-                try:
-                    params_json = json.dumps(json.loads(mapped_data['params']))
-                except:
-                    params_json = json.dumps({})
-            
-            # 解析body（如果有）
-            body_json = json.dumps({})
-            if mapped_data.get('body'):
-                try:
-                    body_json = json.dumps(json.loads(mapped_data['body']))
-                except:
-                    body_json = json.dumps({})
-            
-            # 解析assertions（如果有）
-            assertions_json = json.dumps([])
-            if mapped_data.get('assertions'):
-                try:
-                    assertions_json = json.dumps(json.loads(mapped_data['assertions']))
-                except:
-                    # 简单的断言格式：状态码200
-                    assertions_json = json.dumps([{
-                        'type': 'status_code',
-                        'operator': 'equals',
-                        'expected': '200'
-                    }])
-            
-            await db.execute(insert_sql, {
-                'collection_id': collection_id,
-                'name': mapped_data.get('name', '未命名API用例'),
-                'description': mapped_data.get('description', row.get('用例ID', '')),
-                'method': method,
-                'url': url,
-                'headers': headers_json,
-                'params': params_json,
-                'body': body_json,
-                'assertions': assertions_json,
-                'created_by': created_by
-            })
-            
+            )
             saved_count += 1
-        
+
         await db.commit()
-        
-        # 6. 更新任务状态
+
+        # 7. 更新任务状态
         from .schema import TestCaseGenerationTaskUpdateSchema
         await TestCaseGenerationTaskService.update_task(
             db,
@@ -1547,7 +1578,7 @@ class TestCaseParserService:
             )
         )
         await db.commit()
-        
+
         return saved_count
 
 

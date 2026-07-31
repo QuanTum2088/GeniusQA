@@ -232,9 +232,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useApiAutomationApi } from '/@/api/v1/testing/apiAutomation'
+import { Local } from '/@/utils/storage'
 import { notifyNtestScriptsChanged } from './composables/scriptListSync'
 
 const props = defineProps<{ serviceId: number }>()
@@ -264,8 +265,20 @@ const detailScript = ref<any>(null)
 const running = ref(false)
 const runningId = ref<number | null>(null)
 const runOutput = ref<string | null>(null)
-/** sandbox=沙盒（默认，仅 Python）；native=本机运行时 */
-const execMode = ref<'sandbox' | 'native'>('sandbox')
+
+const EXEC_MODE_STORAGE_KEY = 'api_automation:last_exec_mode'
+const readLastExecMode = (): 'sandbox' | 'native' => {
+  try {
+    const v = String(Local.get(EXEC_MODE_STORAGE_KEY) || '').toLowerCase()
+    return v === 'native' ? 'native' : 'sandbox'
+  } catch {
+    return 'sandbox'
+  }
+}
+const execMode = ref<'sandbox' | 'native'>(readLastExecMode())
+watch(execMode, (mode) => {
+  Local.set(EXEC_MODE_STORAGE_KEY, mode)
+})
 
 const normalizeLang = (lang: any): 'python' | 'javascript' => {
   const v = String(lang || 'python').toLowerCase()

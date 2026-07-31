@@ -15,7 +15,7 @@ import pymysql
 from jsonpath_ng import parse as jsonpath_parse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from .model import ApiDatabaseModel, ApiModel, ApiFunctionModel
+from .model import ApiDatabaseModel, ApiModel
 from .script_runtime import normalize_language, resolve_exec_mode, run_native, run_sandbox
 
 
@@ -539,12 +539,7 @@ class StepExecutor:
             result.error = "script 步骤缺少 script_content"
             return result
 
-        # Python 才注入公共函数库；JS 仅拼接 public + inline
-        if language == "python":
-            func_code = await self._load_function_code()
-            parts = [p for p in [func_code, public_code, code] if p and p.strip()]
-        else:
-            parts = [p for p in [public_code, code] if p and p.strip()]
+        parts = [p for p in [public_code, code] if p and p.strip()]
         full_code = "\n\n".join(parts)
 
         # JS 只能走原生
@@ -604,23 +599,6 @@ class StepExecutor:
             "language": language,
         }
         return result
-
-    async def _load_function_code(self) -> str:
-        """加载所有启用的公共函数代码，拼接后注入脚本上下文。"""
-        try:
-            rows = (
-                await self.db.execute(
-                    select(ApiFunctionModel).where(
-                        ApiFunctionModel.enabled_flag == 1,
-                        ApiFunctionModel.created_by == self.user_id,
-                    )
-                )
-            ).scalars().all()
-            codes = [r.code for r in rows if r.code and r.code.strip()]
-            return "\n\n".join(codes)
-        except Exception:
-            return ""
-
 
     # -----------------------------------------------------------------------
     # _exec_if — 条件控制器
