@@ -165,8 +165,15 @@ uploads/skills/
 # Debug / reproduce / test scripts (local only, never commit)
 backend/reproduce_*.py
 backend/test_*.py
+backend/check_*.py
 backend/scripts/portable_env.py
 backend/scripts/run_portable.py
+
+# Local install scripts (environment-specific)
+backend/install-*.bat
+
+# Misc local temp files
+backend/nl
 
 # Dependency lock files (generated, environment-specific)
 requirements-full*.txt
