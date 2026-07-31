@@ -142,3 +142,12 @@ static/upload/
 backend/app/static/api_results/
 backend/static/upload/
 backend/static/uploads/
+
+# ==================== Local runtime data (never commit) ====================
+.n-tester/
+uploads/
+uploads/knowledge/
+uploads/skills/
+
+# ==================== Agent TODO files (session-local) ====================
+*_TODO.md

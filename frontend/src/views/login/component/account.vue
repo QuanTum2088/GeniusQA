@@ -29,26 +29,27 @@
       </el-input>
     </el-form-item>
     <el-form-item v-if="captchaEnable" class="login-animation3" prop="code">
-      <el-col :span="15">
-        <el-input text maxlength="8" placeholder="请输入验证码" v-model="state.ruleForm.code" clearable
-                  autocomplete="off" @keyup.enter="onSignIn">
-          <template #prefix>
-            <el-icon class="el-input__icon">
-              <ele-Position/>
-            </el-icon>
-          </template>
-        </el-input>
-      </el-col>
-      <el-col :span="1"></el-col>
-      <el-col :span="8">
-        <Captcha
-          ref="captchaRef"
-          :img-base="captchaImg"
-          :width="100"
-          :height="40"
-          @refresh="loadCaptcha"
-        />
-      </el-col>
+      <div class="captcha-row">
+        <div class="captcha-input-wrap">
+          <el-input text maxlength="8" placeholder="请输入验证码" v-model="state.ruleForm.code" clearable
+                    autocomplete="off" @keyup.enter="onSignIn">
+            <template #prefix>
+              <el-icon class="el-input__icon">
+                <ele-Position/>
+              </el-icon>
+            </template>
+          </el-input>
+        </div>
+        <div class="captcha-img-wrap">
+          <Captcha
+            ref="captchaRef"
+            :img-base="captchaImg"
+            :width="100"
+            :height="40"
+            @refresh="loadCaptcha"
+          />
+        </div>
+      </div>
     </el-form-item>
     <el-form-item class="login-animation4">
       <el-button type="primary" class="login-content-submit" v-waves @click="onSignIn"
@@ -290,6 +291,11 @@ onMounted(() => {
   .login-content-submit {
     height: 44px !important;
     font-size: 15px;
+  }
+  .captcha-img-wrap :deep(.captcha-img),
+  .captcha-img-wrap :deep(.captcha-placeholder) {
+    width: 80px !important;
+    height: 36px !important;
   }
 }
 </style>

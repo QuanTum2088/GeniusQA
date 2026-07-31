@@ -1,6 +1,0 @@
-2026-04-01 13:53:57 开始执行接口-99 
-2026-04-01 13:53:57 请求地址-url：/ 
-2026-04-01 13:53:57 请求参数-header：{'Content-Type': 'application/json'} 
-2026-04-01 13:53:57 请求体-body：{} 
-2026-04-01 13:53:57 请求结果：{'msg': '接口请求失败', 'exception': "Invalid URL '/': No scheme supplied. Perhaps you meant https:///?"} 
-2026-04-01 13:53:57 接口-99执行完成 

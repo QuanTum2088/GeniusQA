@@ -1966,6 +1966,76 @@ onUnmounted(() => {
   color: var(--el-text-color-secondary);
 }
 
+@media (max-width: 768px) {
+  .hero-section {
+    padding: 16px;
+  }
+  .hero-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .hero-right {
+    margin-left: 0;
+    align-self: flex-end;
+  }
+  .hero-greeting {
+    font-size: 18px;
+  }
+  .stat-card {
+    padding: 12px;
+  }
+  .stat-val {
+    font-size: 22px;
+  }
+  .stat-card-icon-wrap {
+    width: 40px;
+    height: 40px;
+  }
+  .quick-grid {
+    padding: 8px 4px;
+  }
+  .quick-item {
+    padding: 8px 4px;
+  }
+  .quick-icon-wrap {
+    width: 40px;
+    height: 40px;
+  }
+  .llm-usage-body {
+    padding: 12px;
+  }
+  .llm-usage-donut-wrap,
+  .llm-usage-donut {
+    width: 200px;
+    height: 180px;
+  }
+  .llm-usage-total {
+    font-size: 28px;
+  }
+  .llm-usage-metrics {
+    gap: 16px;
+  }
+  .llm-metric-val {
+    font-size: 18px;
+  }
+  .review-stats-body {
+    flex-direction: column;
+    padding: 12px;
+  }
+  .review-num-grid {
+    width: 100%;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .df-total-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .df-total-block {
+    min-width: unset;
+  }
+}
+
 
 .llm-usage-panel {
   overflow: visible;
@@ -2290,6 +2360,76 @@ onUnmounted(() => {
 :deep(.el-empty__description p) {
   font-size: 12px;
   color: var(--el-text-color-secondary);
+}
+
+@media (max-width: 768px) {
+  .hero-section {
+    padding: 16px;
+  }
+  .hero-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .hero-right {
+    margin-left: 0;
+    align-self: flex-end;
+  }
+  .hero-greeting {
+    font-size: 18px;
+  }
+  .stat-card {
+    padding: 12px;
+  }
+  .stat-val {
+    font-size: 22px;
+  }
+  .stat-card-icon-wrap {
+    width: 40px;
+    height: 40px;
+  }
+  .quick-grid {
+    padding: 8px 4px;
+  }
+  .quick-item {
+    padding: 8px 4px;
+  }
+  .quick-icon-wrap {
+    width: 40px;
+    height: 40px;
+  }
+  .llm-usage-body {
+    padding: 12px;
+  }
+  .llm-usage-donut-wrap,
+  .llm-usage-donut {
+    width: 200px;
+    height: 180px;
+  }
+  .llm-usage-total {
+    font-size: 28px;
+  }
+  .llm-usage-metrics {
+    gap: 16px;
+  }
+  .llm-metric-val {
+    font-size: 18px;
+  }
+  .review-stats-body {
+    flex-direction: column;
+    padding: 12px;
+  }
+  .review-num-grid {
+    width: 100%;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .df-total-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .df-total-block {
+    min-width: unset;
+  }
 }
 
 

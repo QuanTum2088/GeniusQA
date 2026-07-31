@@ -1,11 +1,24 @@
 <script setup lang="ts">
 import {getHexColor} from "/@/utils/theme";
 import {getThemeConfig, onAddDarkChange, onAddFilterChange, onColorPickerChange} from "../index";
-import {computed} from "vue";
+import {computed, ref} from "vue";
 import {MoonStar, Sun, SunMoon} from "/@/icons"
 
 
 defineOptions({name: 'appearance'})
+
+// 默认配色是否展开（默认关闭）
+const showDefaultColors = ref(false)
+
+// 切换默认配色展示
+const toggleDefaultColors = () => {
+  showDefaultColors.value = !showDefaultColors.value
+}
+
+// 处理自定义颜色选择
+const handleCustomColorChange = (color: string) => {
+  onColorPickerChange(color)
+}
 
 
 const BUILT_IN_THEME_PRESETS = [
@@ -133,20 +146,43 @@ const isIsDark = computed(() => {
       </div>
     </div>
 
-    <el-divider content-position="left"><h3>内置主题</h3></el-divider>
+    <el-divider content-position="left">
+      <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+        <h3>内置主题</h3>
+        <el-button type="primary" size="small" plain @click="showDefaultColors = !showDefaultColors">
+          {{ showDefaultColors ? '收起默认配色' : '展示默认配色' }}
+        </el-button>
+      </div>
+    </el-divider>
 
-    <div class="layout-setting-appearance">
-      <div class="layout-setting-appearance-item"
-           v-for="theme in BUILT_IN_THEME_PRESETS"
-           :key="theme.type"
-           @click="onColorPickerChange(theme.color)">
-        <div class="layout-setting-appearance-item-value outline-box p4"
-             :class="theme.color && getHexColor(theme.color) == getThemeConfig.primary ? 'outline-box-active' :'' ">
-          <div :style="{backgroundColor: theme.color}" style="width: 20px; height: 20px; margin: 8px 40px">
+    <!-- 默认配色圆点（默认隐藏，点击自定义配色展开） -->
+    <transition name="el-fade-in">
+      <div v-show="showDefaultColors" class="layout-setting-appearance">
+        <div class="layout-setting-appearance-item"
+             v-for="theme in BUILT_IN_THEME_PRESETS.filter(t => t.type !== 'custom')"
+             :key="theme.type"
+             @click="onColorPickerChange(theme.color)">
+          <div class="layout-setting-appearance-item-value outline-box p4"
+               :class="theme.color && getHexColor(theme.color) == getThemeConfig.primary ? 'outline-box-active' :'' ">
+            <div :style="{backgroundColor: theme.color}" style="width: 20px; height: 20px; margin: 8px 40px">
 
+            </div>
           </div>
+          <div class="layout-setting-appearance-item-label mb8">{{ theme.name }}</div>
         </div>
-        <div class="layout-setting-appearance-item-label mb8">{{ theme.name }}</div>
+      </div>
+    </transition>
+
+    <!-- 自定义颜色选择器 -->
+    <div class="flex justify-space-between mt15">
+      <div class="layout-breadcrumb-setting-bar-flex-label">自定义颜色</div>
+      <div class="flex">
+        <el-color-picker 
+          v-model="getThemeConfig.primary" 
+          size="default"
+          @change="handleCustomColorChange"
+          show-alpha
+        />
       </div>
     </div>
 

@@ -298,7 +298,7 @@ const getThemeConfig = computed(() => themeConfig.value);
       position: fixed;
       top: 16px;
       left: 20px;
-      z-index: 1000;
+      z-index: 101;
     }
   }
 }

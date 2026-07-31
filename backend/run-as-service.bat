@@ -20,8 +20,8 @@ set SECRET_KEY=change-me-in-production
 
 :: ==== Watchdog Loop ====
 :start
-echo [%date% %time%] Starting backend on port 80...
-"D:\GeniusQA\backend\.venv\Scripts\python.exe" "D:\GeniusQA\backend\run_portable.py"
+echo [%date% %time%] Starting backend on port 8100...
+"D:\GeniusQA\backend\.venv\Scripts\python.exe" "D:\GeniusQA\backend\run_portable.py" > "D:\GeniusQA\logs\backend.log" 2>&1
 echo [%date% %time%] Backend exited, restart in 5s...
 timeout /t 5 /nobreak >nul
 goto start

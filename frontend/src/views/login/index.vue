@@ -384,6 +384,7 @@ onMounted(() => {
 
   .login-wrap {
     width: 100%;
+    margin-top: 60px;
   }
 
   .login-toolbar {
@@ -413,6 +414,120 @@ onMounted(() => {
 
   .form .title {
     font-size: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .right-wrap {
+    padding: 0 16px;
+  }
+
+  .login-toolbar {
+    top: 8px;
+    right: 8px;
+    padding: 3px 6px;
+    gap: 3px;
+    border-radius: 20px;
+  }
+
+  .theme-colors {
+    gap: 4px;
+  }
+
+  .theme-dot {
+    width: 16px;
+    height: 16px;
+  }
+
+  .theme-custom-picker {
+    :deep(.el-color-picker__trigger) {
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  .dark-toggle {
+    width: 22px;
+    height: 22px;
+    font-size: 13px;
+  }
+
+  .login-wrap {
+    margin-top: 50px;
+  }
+
+  .form {
+    padding: 16px 0 32px;
+
+    .title {
+      font-size: 24px;
+    }
+
+    .sub-title {
+      font-size: 13px;
+    }
+  }
+
+  .login-copyright {
+    font-size: 11px;
+    margin: 20px 0 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .right-wrap {
+    padding: 0 16px;
+  }
+
+  .login-toolbar {
+    top: 8px;
+    right: 8px;
+    padding: 3px 6px;
+    gap: 3px;
+    border-radius: 20px;
+  }
+
+  .theme-colors {
+    gap: 4px;
+  }
+
+  .theme-dot {
+    width: 16px;
+    height: 16px;
+  }
+
+  .theme-custom-picker {
+    :deep(.el-color-picker__trigger) {
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  .dark-toggle {
+    width: 22px;
+    height: 22px;
+    font-size: 13px;
+  }
+
+  .login-wrap {
+    margin-top: 8vh;
+  }
+
+  .form {
+    padding: 16px 0 32px;
+
+    .title {
+      font-size: 24px;
+    }
+
+    .sub-title {
+      font-size: 13px;
+    }
+  }
+
+  .login-copyright {
+    font-size: 11px;
+    margin: 20px 0 16px;
   }
 }
 

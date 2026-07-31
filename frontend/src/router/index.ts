@@ -73,18 +73,23 @@ export function formatTwoStageRoutes(arr: any) {
 				children: []
 			});
 		} else {
+			// 确保 meta 存在
+			if (!v.meta) v.meta = {};
 			// 判断是否是动态路由（xx/:id/:name），用于 tagsView 等中使用
 			if (v.path.indexOf('/:') > -1) {
 				v.meta['isDynamic'] = true;
 				v.meta['isDynamicPath'] = v.path;
 			}
-			newArr[0].children.push({...v});
-			// 存 name 值，keep-alive 中 include 使用，实现路由的缓存
-			// 路径：/@/layout/routerView/parent.vue
-			if (newArr[0].meta.isKeepAlive && v.meta.isKeepAlive) {
-				cacheList.push(v.name);
-				const stores = useKeepALiveNames();
-				stores.setCacheKeepAlive(cacheList);
+			// 安全检查：确保 newArr[0] 已创建（根路由 / 必须先被处理）
+			if (newArr.length > 0) {
+				newArr[0].children.push({...v});
+				// 存 name 值，keep-alive 中 include 使用，实现路由的缓存
+				// 路径：/@/layout/routerView/parent.vue
+				if (newArr[0].meta?.isKeepAlive && v.meta.isKeepAlive) {
+					cacheList.push(v.name);
+					const stores = useKeepALiveNames();
+					stores.setCacheKeepAlive(cacheList);
+				}
 			}
 		}
 	});
